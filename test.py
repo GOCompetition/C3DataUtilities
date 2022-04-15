@@ -7,12 +7,16 @@ data_file = '/pic/dtn/go/Nongchao/c3/updated/PSY_RTS_GMLC_data_flex_load_2022041
 #sol_file = '/pic/dtn/go/Carleton/PSY_RTS_GMLC_data_flex_load_20220414-solution.zip'
 sol_file = '/pic/dtn/go/Jesse/c3/updated/solution_BASECASE.json'
 
+def read_json(file_name):
+
+    with open(file_name, 'r') as f:
+        data = json.load(f)
+        return data
+
 def read_file(file_name):
 
     if file_name.endswith('.json'):
-        with open(file_name, 'r') as f:
-            data = json.load(f)
-            return data
+        data = read_json(file_name)
     if file_name.endswith('.zip'):
         with ZipFile(file_name, 'r') as z:
             z.printdir()
@@ -20,8 +24,8 @@ def read_file(file_name):
                 print(info.filename)
             return None
 
-data = read_file(data_file)
+data = read_json(data_file)
 print(json.dumps(data, indent=4, sort_keys=True))
 
-sol = read_file(sol_file)
+sol = read_json(sol_file)
 print(json.dumps(sol, indent=4, sort_keys=True))
