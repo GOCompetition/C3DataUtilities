@@ -1,6 +1,6 @@
 import jsonschema
 import json
-from read_data import read_json
+from reading import read_json
 
 #data_schema_file_name = 'data_schema_error.json' # validating with this should cause an error
 data_schema_file_name = 'data_schema.json'

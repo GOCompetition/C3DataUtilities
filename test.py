@@ -1,5 +1,5 @@
-from read_data import read_json_data, read_json_sol
-from validate_data import Validator
+from reading import Reader
+from validation import Validator
 import json
 
 #data_file = '/pic/dtn/go/Jesse/c3/updated/PSY_RTS_GMLC_data_fixed_load_commit_v3_output.json'
@@ -11,10 +11,12 @@ data_file = '/pic/dtn/go/Nongchao/c3/updated/PSY_RTS_GMLC_data_flex_load_2022050
 #sol_file = '/pic/dtn/go/Carleton/PSY_RTS_GMLC_data_flex_load_20220414-solution.zip'
 sol_file = '/pic/dtn/go/Jesse/c3/updated/solution_BASECASE.json'
 
-data = read_json_data(data_file)
+reader = Reader()
+
+data = reader.read_json_data(data_file)
 print(json.dumps(data, indent=4, sort_keys=True))
 
-sol = read_json_sol(sol_file)
+sol = reader.read_json_sol(sol_file)
 print(json.dumps(sol, indent=4, sort_keys=True))
 
 validator = Validator()
