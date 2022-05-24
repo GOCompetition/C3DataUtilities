@@ -1,5 +1,7 @@
 from reading import Reader
 from validation import Validator
+import datamodel
+from datamodel.input.data import InputDataFile
 import json
 
 #data_file = '/pic/dtn/go/Jesse/c3/updated/PSY_RTS_GMLC_data_fixed_load_commit_v3_output.json'
@@ -7,23 +9,33 @@ import json
 #data_file = '/pic/dtn/go/Nongchao/c3/updated/PSY_RTS_GMLC_data_flex_load_20220414.json'
 #data_file = '/pic/dtn/go/Nongchao/c3/updated/PSY_RTS_GMLC_data_fixed_load_20220422.json'
 #data_file = '/pic/dtn/go/Nongchao/c3/updated/PSY_RTS_GMLC_data_flex_load_20220422.json'
-data_file = '/pic/dtn/go/Nongchao/c3/updated/PSY_RTS_GMLC_data_flex_load_20220501.json'
+#data_file = '/pic/dtn/go/Nongchao/c3/updated/PSY_RTS_GMLC_data_flex_load_20220501.json'
+data_file = '/people/holz501/gocomp/c3/Bid-DS-data-model/input/json_data/PSY_RTS_GMLC_data_flex_load_20220502.json'
 #sol_file = '/pic/dtn/go/Carleton/PSY_RTS_GMLC_data_flex_load_20220414-solution.zip'
-sol_file = '/pic/dtn/go/Jesse/c3/updated/solution_BASECASE.json'
+#sol_file = '/pic/dtn/go/Jesse/c3/updated/solution_BASECASE.json'
 
 reader = Reader()
 
 data = reader.read_json_data(data_file)
 print(json.dumps(data, indent=4, sort_keys=True))
 
-sol = reader.read_json_sol(sol_file)
-print(json.dumps(sol, indent=4, sort_keys=True))
+print('reading into Bid-DS problem data model')
+problem_data = InputDataFile.load(data_file)
+print('done reading into Bid-DS problem data model')
+
+print('problem_data attributes:')
+print(problem_data.__dict__.keys())
+
+
+
+#sol = reader.read_json_sol(sol_file)
+#print(json.dumps(sol, indent=4, sort_keys=True))
 
 validator = Validator()
 
 validator.validate_json_data(data)
 
-validator.validate_json_sol(sol)
+#validator.validate_json_sol(sol)
 
 # print('data keys: {}'.format(data.keys()))
 # print('network keys: {}'.format(data['network'].keys()))
