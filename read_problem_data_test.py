@@ -1,5 +1,5 @@
 import sys
-from datamodel.input.dataderived import InputDataFileDerived as InputDataFile
+from datamodel.input.data import InputDataFile
 
 data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510.json'
 #data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510_general_timestamp_error.json'
