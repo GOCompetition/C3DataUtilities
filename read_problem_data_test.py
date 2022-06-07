@@ -1,8 +1,23 @@
 import sys
 from datamodel.input.data import InputDataFile
 
+# run this either as:
+#
+#   python read_problem_data_test.py
+#
+# or as:
+#
+#   python read_problem_data_test.py <problem_data_file_name>
+#
+
+# this file is OK
 data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510.json'
-#data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510_general_timestamp_error.json'
+
+# this file has multiple errors. The data reader should find and report all of them by raising an exception.
+#data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510_multiple_errors.json'
+
+# error message starts with, e.g.:
+# pydantic.error_wrappers.ValidationError: 9 validation errors for InputDataFile
 
 def read_validate_summarize_problem_data(problem_data_file):
     '''
