@@ -31,4 +31,4 @@ from datamodel.input.data import InputDataFile
 problem_data = InputDataFile.load(problem_data_file_name)
 ```
 
-```datamodel``` is the Python module contained in Bid-DS-data-model. If no errors are raised by ```load()```, then ```problem_data``` is a Pydantic model object containing the problem data.
+```datamodel``` is the Python module contained in Bid-DS-data-model. If no errors are raised by ```load```, then ```problem_data``` is a Pydantic model object containing the problem data.
