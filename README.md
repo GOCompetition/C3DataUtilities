@@ -4,6 +4,8 @@
 * Read problem solution
 * Evaluate problem solution
 
+🚧🚧 Under Construction 🚧🚧
+
 Currently relies on https://github.com/Smart-DS/Bid-DS-data-model/tree/validators. Follow installation directions in that repository. The validators branch contains the most complete set of input data checking, but this will later be merged into main. Once Bid-DS-data-model is installed, one can do:
 
 ```
