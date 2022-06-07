@@ -6,7 +6,14 @@
 
 🚧🚧 Under Construction 🚧🚧
 
-Currently relies on https://github.com/Smart-DS/Bid-DS-data-model/tree/validators. Follow installation directions in that repository. The validators branch contains the most complete set of input data checking, but this will later be merged into main. Once Bid-DS-data-model is installed, one can do:
+Currently relies on https://github.com/Smart-DS/Bid-DS-data-model. Follow installation directions in that repository, primarily:
+
+```
+cd Bid-DS-data-model
+pip install -e .
+```
+
+The validators branch (https://github.com/Smart-DS/Bid-DS-data-model/tree/validators) contains the most complete set of input data checking, but this will later be merged into main. Once Bid-DS-data-model is installed, one can do:
 
 ```
 python read_problem_data_test.py <problem_data_file_name>
