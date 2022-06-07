@@ -24,11 +24,11 @@ python read_problem_data_test.py <problem_data_file_name>
 
 This will read a problem data file, check it against properties specified in the data format document and problem formulation document, and print out some information about the problem dimensions. If the data fails any of the required properties, an exception will be raised to report this. It is not guaranteed that all failed properties will be reported. If there is at least one failure, then it is guaranteed that at least one failure will be reported.
 
-The operative part of read_problem_data_test.py for data checking is:
+The operative part of ```read_problem_data_test.py``` for data checking is:
 
 ```
 from datamodel.input.data import InputDataFile
 problem_data = InputDataFile.load(problem_data_file_name)
 ```
 
-If no errors are raised, then problem_data is a Pydantic model object containing the problem data.
+```datamodel``` is the Python module contained in Bid-DS-data-model. If no errors are raised by ```load()```, then ```problem_data``` is a Pydantic model object containing the problem data.
