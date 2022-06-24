@@ -13,7 +13,8 @@ from datamodel.input.data import InputDataFile
 # this file is OK
 data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510.json'
 
-# this file has multiple errors. The data reader should find and report all of them by raising an exception.
+# this file has multiple errors. The data reader should find and report all (maybe only some?)
+# of them by raising an exception.
 #data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510_multiple_errors.json'
 
 # error message starts with, e.g.:
