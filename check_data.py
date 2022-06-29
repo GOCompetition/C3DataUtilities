@@ -3,11 +3,11 @@ from datamodel.input.data import InputDataFile
 
 # run this either as:
 #
-#   python read_problem_data_test.py
+#   python check_data.py
 #
 # or as:
 #
-#   python read_problem_data_test.py <problem_data_file_name>
+#   python check_data.py <problem_data_file_name>
 #
 
 # this file is OK
