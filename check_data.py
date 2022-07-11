@@ -20,6 +20,11 @@ data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_2022051
 # error message starts with, e.g.:
 # pydantic.error_wrappers.ValidationError: 9 validation errors for InputDataFile
 
+def check_data_model(data_model):
+
+    data_model.uids_not_repeated()
+    data_model.ctg_dvc_uids_in_domain()
+
 def read_validate_summarize_problem_data(problem_data_file):
     '''
     This function demonstrates how you might use the Bid-DS problem data model
@@ -40,6 +45,9 @@ def read_validate_summarize_problem_data(problem_data_file):
     print('Problem data file name: {}'.format(problem_data_file))
     problem_data = InputDataFile.load(problem_data_file)
     print('Done reading problem data into Bid-DS problem data model. If no error is raised, then read-time validation was successful, and no errors were found in the data.')
+    print('Start post-read data checks.')
+    check_data_model(problem_data)
+    print('Done with post-read data checks. If no error is raised, then post-read validation was successful, and no errors were found in the data.')
     
     print('problem_data: {}'.format(list(problem_data.dict().keys())))
     
