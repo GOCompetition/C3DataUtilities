@@ -8,6 +8,8 @@
 
 🚧🚧 Under Construction 🚧🚧
 
+# Installation
+
 Currently relies on https://github.com/Smart-DS/Bid-DS-data-model. Follow installation directions in that repository, primarily:
 
 ```
@@ -15,7 +17,16 @@ cd Bid-DS-data-model
 pip install -e .
 ```
 
-The validators branch (https://github.com/Smart-DS/Bid-DS-data-model/tree/validators) contains the most complete set of input data checking, but this will later be merged into main. Once Bid-DS-data-model is installed, one can do:
+The validators branch (https://github.com/Smart-DS/Bid-DS-data-model/tree/validators) contains the most complete set of input data checking, but this will later be merged into main. To use the validators branch, do:
+
+```
+cd Bid-DS-data-model
+git checkout validators
+```
+
+# Checking problem data formatting and properties
+
+Once Bid-DS-data-model is installed, one can do:
 
 ```
 cd C3DataUtilities
@@ -42,4 +53,6 @@ and
 check_data_model(problem_data)
 ```
 
-```datamodel``` is the Python module contained in Bid-DS-data-model. If no errors are raised by ```load```, then ```problem_data``` is a Pydantic model object containing the problem data, and no errors were found at reat time. ```check_data_model``` performs additional data checks after reading the data file, and any errors it finds are also raised.
+```datamodel``` is the Python module contained in Bid-DS-data-model. If no errors are raised by ```InputDataFile.load```, then ```problem_data``` is a Pydantic model object containing the problem data, and no errors were found at read time. ```check_data_model``` performs additional data checks on the Pydantic model after reading the data file, and any errors it finds are also raised.
+
+By and large, if a data file contains multiple errors of a given type or errors of multiple types, the data checker reports as many errors as possible. However, some errors can mask others, so it is not guaranteed that all errors will be reported. Specifically, if any errors are found by ```InputDataFile.load``` then the subsequent call to ```check_data_model``` is skipped, so errors that would be found only by ```check_data_model``` will not be reported.
