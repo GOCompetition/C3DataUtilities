@@ -6,7 +6,7 @@
 * Check solution data formatting and properties
 * Evaluate solution to problem, i.e. constraint feasibility, objective value, properties of interest
 
-🚧🚧 Under Construction 🚧🚧
+# Installation
 
 Currently relies on https://github.com/Smart-DS/Bid-DS-data-model. Follow installation directions in that repository, primarily:
 
@@ -15,7 +15,16 @@ cd Bid-DS-data-model
 pip install -e .
 ```
 
-The validators branch (https://github.com/Smart-DS/Bid-DS-data-model/tree/validators) contains the most complete set of input data checking, but this will later be merged into main. Once Bid-DS-data-model is installed, one can do:
+The validators branch (https://github.com/Smart-DS/Bid-DS-data-model/tree/validators) contains the most complete set of input data checking, but this will later be merged into main. To use the validators branch, do:
+
+```
+cd Bid-DS-data-model
+git checkout validators
+```
+
+# Checking problem data formatting and properties
+
+Once Bid-DS-data-model is installed, one can do:
 
 ```
 cd C3DataUtilities
@@ -33,13 +42,15 @@ from datamodel.input.data import InputDataFile
 and
 
 ```
-problem_data = InputDataFile.load(problem_data_file_name)
+problem_data_model = InputDataFile.load(problem_data_file_name)
 ```
 
 and
 
 ```
-check_data_model(problem_data)
+check_data_model(problem_data_model)
 ```
 
-```datamodel``` is the Python module contained in Bid-DS-data-model. If no errors are raised by ```load```, then ```problem_data``` is a Pydantic model object containing the problem data, and no errors were found at reat time. ```check_data_model``` performs additional data checks after reading the data file, and any errors it finds are also raised.
+```datamodel``` is the Python module contained in Bid-DS-data-model. If no errors are raised by ```InputDataFile.load```, then ```problem_data_model``` is a Pydantic model object containing the problem data, and no errors were found at read time. ```check_data_model``` performs additional data checks on the Pydantic model after reading the data file, and any errors it finds are also raised.
+
+If a data file contains multiple errors of a given type or errors of multiple types, the data checker reports as many errors as possible, subject to simple coding. However, some errors can mask others, so it is not guaranteed that all errors will be reported. E.g., if any errors are found by ```InputDataFile.load``` then the subsequent call to ```check_data_model``` is skipped, so errors that would be found only by ```check_data_model``` will not be reported.
