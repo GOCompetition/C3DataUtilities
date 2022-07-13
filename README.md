@@ -6,8 +6,6 @@
 * Check solution data formatting and properties
 * Evaluate solution to problem, i.e. constraint feasibility, objective value, properties of interest
 
-🚧🚧 Under Construction 🚧🚧
-
 # Installation
 
 Currently relies on https://github.com/Smart-DS/Bid-DS-data-model. Follow installation directions in that repository, primarily:
