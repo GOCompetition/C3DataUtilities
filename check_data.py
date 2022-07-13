@@ -22,8 +22,23 @@ data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_2022051
 
 def check_data_model(data_model):
 
-    data_model.uids_not_repeated()
-    data_model.ctg_dvc_uids_in_domain()
+    errors = []
+    try:
+        data_model.uids_not_repeated()
+    except Exception as e:
+        errors.append(e)
+    try:
+        data_model.ctg_dvc_uids_in_domain()
+    except Exception as e:
+        errors.append(e)
+    try:
+        data_model.network.shunt_bus_uids_in_domain()
+    except Exception as e:
+        errors.append(e)
+    if len(errors) > 0:
+        msg = 'check_data_model found errors\n' + 'number of errors: {}\n'.format(len(errors)) + '\n'.join([str(e) for e in errors])
+    print(msg)
+    raise Exception(msg)
 
 def read_validate_summarize_problem_data(problem_data_file):
     '''
