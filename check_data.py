@@ -1,5 +1,6 @@
 import sys
 from datamodel.input.data import InputDataFile
+import validation
 
 # run this either as:
 #
@@ -33,15 +34,31 @@ def check_problem_data_model(data_model):
 
     errors = []
     try:
-        data_model.uids_not_repeated()
+        validation.uids_not_repeated(data_model)
     except Exception as e:
         errors.append(e)
     try:
-        data_model.ctg_dvc_uids_in_domain()
+        validation.ctg_dvc_uids_in_domain(data_model)
     except Exception as e:
         errors.append(e)
     try:
-        data_model.network.shunt_bus_uids_in_domain()
+        validation.bus_prz_uids_in_domain(data_model)
+    except Exception as e:
+        errors.append(e)
+    try:
+        validation.bus_qrz_uids_in_domain(data_model)
+    except Exception as e:
+        errors.append(e)
+    try:
+        validation.shunt_bus_uids_in_domain(data_model)
+    except Exception as e:
+        errors.append(e)
+    try:
+        validation.sd_bus_uids_in_domain(data_model)
+    except Exception as e:
+        errors.append(e)
+    try:
+        validation.sd_type_in_domain(data_model)
     except Exception as e:
         errors.append(e)
     if len(errors) > 0:
