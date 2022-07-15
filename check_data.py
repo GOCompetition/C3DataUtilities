@@ -28,43 +28,43 @@ def summarize_problem_data(data_model):
 def check_problem_data(problem_data_file):
 
     problem_data_model = InputDataFile.load(problem_data_file)
-    check_problem_data_model(problem_data_model)
+    validation.all_checks(problem_data_model)
 
-def check_problem_data_model(data_model):
+# def check_problem_data_model(data_model):
 
-    errors = []
-    try:
-        validation.uids_not_repeated(data_model)
-    except Exception as e:
-        errors.append(e)
-    try:
-        validation.ctg_dvc_uids_in_domain(data_model)
-    except Exception as e:
-        errors.append(e)
-    try:
-        validation.bus_prz_uids_in_domain(data_model)
-    except Exception as e:
-        errors.append(e)
-    try:
-        validation.bus_qrz_uids_in_domain(data_model)
-    except Exception as e:
-        errors.append(e)
-    try:
-        validation.shunt_bus_uids_in_domain(data_model)
-    except Exception as e:
-        errors.append(e)
-    try:
-        validation.sd_bus_uids_in_domain(data_model)
-    except Exception as e:
-        errors.append(e)
-    try:
-        validation.sd_type_in_domain(data_model)
-    except Exception as e:
-        errors.append(e)
-    if len(errors) > 0:
-        msg = 'check_problem_data_model found errors\n' + 'number of errors: {}\n'.format(len(errors)) + '\n'.join([str(e) for e in errors])
-        print(msg)
-        raise Exception(msg)
+#     errors = []
+#     try:
+#         validation.uids_not_repeated(data_model)
+#     except Exception as e:
+#         errors.append(e)
+#     try:
+#         validation.ctg_dvc_uids_in_domain(data_model)
+#     except Exception as e:
+#         errors.append(e)
+#     try:
+#         validation.bus_prz_uids_in_domain(data_model)
+#     except Exception as e:
+#         errors.append(e)
+#     try:
+#         validation.bus_qrz_uids_in_domain(data_model)
+#     except Exception as e:
+#         errors.append(e)
+#     try:
+#         validation.shunt_bus_uids_in_domain(data_model)
+#     except Exception as e:
+#         errors.append(e)
+#     try:
+#         validation.sd_bus_uids_in_domain(data_model)
+#     except Exception as e:
+#         errors.append(e)
+#     try:
+#         validation.sd_type_in_domain(data_model)
+#     except Exception as e:
+#         errors.append(e)
+#     if len(errors) > 0:
+#         msg = 'check_problem_data_model found errors\n' + 'number of errors: {}\n'.format(len(errors)) + '\n'.join([str(e) for e in errors])
+#         print(msg)
+#         raise Exception(msg)
 
 def read_validate_summarize_problem_data(problem_data_file):
     '''
@@ -87,7 +87,8 @@ def read_validate_summarize_problem_data(problem_data_file):
     problem_data = InputDataFile.load(problem_data_file)
     print('Done reading problem data into Bid-DS problem data model. If no error is raised, then read-time validation was successful, and no errors were found in the data.')
     print('Start post-read data checks.')
-    check_data_model(problem_data)
+    #check_data_model(problem_data)
+    validation.all_checks(problem_data)
     print('Done with post-read data checks. If no error is raised, then post-read validation was successful, and no errors were found in the data.')
     
     print('problem_data: {}'.format(list(problem_data.dict().keys())))

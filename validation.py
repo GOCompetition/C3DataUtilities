@@ -2,6 +2,30 @@
 
 '''
 
+def all_checks(data):
+
+    checks = [
+        uids_not_repeated,
+        ctg_dvc_uids_in_domain,
+        bus_prz_uids_in_domain,
+        bus_qrz_uids_in_domain,
+        shunt_bus_uids_in_domain,
+        sd_bus_uids_in_domain,
+        sd_type_in_domain,
+        ]
+    errors = []
+    for c in checks:
+        try:
+            c(data)
+        except Exception as e:
+            errors.append(e)
+    if len(errors) > 0:
+        msg = (
+            'validation.all_checks found errors\n' + 
+            'number of errors: {}\n'.format(len(errors)) +
+            '\n'.join([str(e) for e in errors]))
+        raise Exception(msg)        
+
 def uids_not_repeated(data):
     
     uids = data.get_uids()
