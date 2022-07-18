@@ -12,6 +12,12 @@ def all_checks(data):
         shunt_bus_uids_in_domain,
         sd_bus_uids_in_domain,
         sd_type_in_domain,
+        acl_fr_bus_uids_in_domain,
+        acl_to_bus_uids_in_domain,
+        xfr_fr_bus_uids_in_domain,
+        xfr_to_bus_uids_in_domain,
+        dcl_fr_bus_uids_in_domain,
+        dcl_to_bus_uids_in_domain,
         ]
     errors = []
     for c in checks:
@@ -144,4 +150,107 @@ def sd_type_in_domain(data):
         for i in sd_idx_type_not_in_domain]
     if len(sd_idx_type_not_in_domain) > 0:
         msg = "fails simple dispatchable device type in domain. domain: {}, failing devices (index, uid, type): {}".format(domain, sd_type_not_in_domain)
+        raise ValueError(msg)
+
+def acl_fr_bus_uids_in_domain(data):
+    
+    domain = data.network.get_bus_uids()
+    domain = set(domain)
+    num_dvc = len(data.network.ac_line)
+    dvc_idx_bus_not_in_domain = [
+        i for i in range(num_dvc)
+        if not (data.network.ac_line[i].fr_bus in domain)]
+    dvc_bus_not_in_domain = [
+        (i, data.network.ac_line[i].uid, data.network.ac_line[i].fr_bus)
+        for i in dvc_idx_bus_not_in_domain]
+    if len(dvc_idx_bus_not_in_domain) > 0:
+        msg = "fails ac line from bus in buses. failing devices (index, uid, from bus uid): {}".format(
+            dvc_bus_not_in_domain)
+        raise ValueError(msg)
+
+def acl_to_bus_uids_in_domain(data):
+    
+    domain = data.network.get_bus_uids()
+    domain = set(domain)
+    num_dvc = len(data.network.ac_line)
+    dvc_idx_bus_not_in_domain = [
+        i for i in range(num_dvc)
+        if not (data.network.ac_line[i].to_bus in domain)]
+    dvc_bus_not_in_domain = [
+        (i, data.network.ac_line[i].uid, data.network.ac_line[i].to_bus)
+        for i in dvc_idx_bus_not_in_domain]
+    if len(dvc_idx_bus_not_in_domain) > 0:
+        msg = "fails ac line to bus in buses. failing devices (index, uid, to bus uid): {}".format(
+            dvc_bus_not_in_domain)
+        raise ValueError(msg)
+
+
+
+
+def xfr_fr_bus_uids_in_domain(data):
+    
+    domain = data.network.get_bus_uids()
+    domain = set(domain)
+    num_dvc = len(data.network.two_winding_transformer)
+    dvc_idx_bus_not_in_domain = [
+        i for i in range(num_dvc)
+        if not (data.network.two_winding_transformer[i].fr_bus in domain)]
+    dvc_bus_not_in_domain = [
+        (i, data.network.two_winding_transformer[i].uid, data.network.two_winding_transformer[i].fr_bus)
+        for i in dvc_idx_bus_not_in_domain]
+    if len(dvc_idx_bus_not_in_domain) > 0:
+        msg = "fails transformer from bus in buses. failing devices (index, uid, from bus uid): {}".format(
+            dvc_bus_not_in_domain)
+        raise ValueError(msg)
+
+def xfr_to_bus_uids_in_domain(data):
+    
+    domain = data.network.get_bus_uids()
+    domain = set(domain)
+    num_dvc = len(data.network.two_winding_transformer)
+    dvc_idx_bus_not_in_domain = [
+        i for i in range(num_dvc)
+        if not (data.network.two_winding_transformer[i].to_bus in domain)]
+    dvc_bus_not_in_domain = [
+        (i, data.network.two_winding_transformer[i].uid, data.network.two_winding_transformer[i].to_bus)
+        for i in dvc_idx_bus_not_in_domain]
+    if len(dvc_idx_bus_not_in_domain) > 0:
+        msg = "fails transformer to bus in buses. failing devices (index, uid, to bus uid): {}".format(
+            dvc_bus_not_in_domain)
+        raise ValueError(msg)
+
+
+
+
+
+def dcl_fr_bus_uids_in_domain(data):
+    
+    domain = data.network.get_bus_uids()
+    domain = set(domain)
+    num_dvc = len(data.network.dc_line)
+    dvc_idx_bus_not_in_domain = [
+        i for i in range(num_dvc)
+        if not (data.network.dc_line[i].fr_bus in domain)]
+    dvc_bus_not_in_domain = [
+        (i, data.network.dc_line[i].uid, data.network.dc_line[i].fr_bus)
+        for i in dvc_idx_bus_not_in_domain]
+    if len(dvc_idx_bus_not_in_domain) > 0:
+        msg = "fails dc line from bus in buses. failing devices (index, uid, from bus uid): {}".format(
+            dvc_bus_not_in_domain)
+        raise ValueError(msg)
+
+def dcl_to_bus_uids_in_domain(data):
+    
+    domain = data.network.get_bus_uids()
+    domain = set(domain)
+    num_dvc = len(data.network.dc_line)
+    dvc_idx_bus_not_in_domain = [
+        i for i in range(num_dvc)
+        if not (data.network.dc_line[i].to_bus in domain)]
+    dvc_bus_not_in_domain = [
+        (i, data.network.dc_line[i].uid, data.network.dc_line[i].to_bus)
+        for i in dvc_idx_bus_not_in_domain]
+    if len(dvc_idx_bus_not_in_domain) > 0:
+        msg = "fails dc line to bus in buses. failing devices (index, uid, to bus uid): {}".format(
+            dvc_bus_not_in_domain)
         raise ValueError(msg)
