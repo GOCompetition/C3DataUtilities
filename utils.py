@@ -29,7 +29,8 @@ def get_git_info(path): # todo get branch also
         'commit': '',
         'date': '',
         'query_return_code': 0,
-        'query_err': ''
+        'query_err': '',
+        'exception': '',
         }
 
     results = subprocess.run(['git', 'log', '-1'], cwd=path, capture_output=True)
@@ -39,10 +40,14 @@ def get_git_info(path): # todo get branch also
     repo['query_err'] = results.stderr.decode(sys.stderr.encoding)
     
     if repo['query_return_code'] == 0:
-        out_split = repo['query_out'].split('\n')
-        repo['commit'] = out_split[0].split('commit')[1].strip()
-        repo['author'] = out_split[1].split('Author:')[1].strip()
-        repo['date'] = out_split[2].split('Date:')[1].strip()
+        try:
+            out_split = repo['query_out'].split('\n')
+            repo['commit'] = out_split[0].split('commit')[1].strip()
+            repo['author'] = out_split[1].split('Author:')[1].strip()
+            repo['date'] = out_split[2].split('Date:')[1].strip()
+            #print('out_split[5]: {}'.format(out_split[5][2]))
+        except Exception as e:
+            repo['exception'] = str(e)
 
     return repo
 
@@ -50,18 +55,18 @@ def print_git_info_all():
 
     git_info = get_git_info(get_data_utils_dir())
     #git_info = get_git_info('foo')
-    if git_info['query_return_code'] != 0:
+    if git_info['query_return_code'] != 0 or len(git_info['exception']) > 0:
         msg = 'get_git_info failed for C3DataUtilities. git_info: {}'.format(git_info)
-        #print(msg)
+        print(msg)
         raise Exception(msg)
     else:
         print('C3DataUtilities commit ID: {}'.format(git_info['commit']))
         print('C3DataUtilities commit date: {}'.format(git_info['date']))
 
     git_info = get_git_info(get_data_model_dir())
-    if git_info['query_return_code'] != 0:
+    if git_info['query_return_code'] != 0 or len(git_info['exception']) > 0:
         msg = 'get_git_info failed for Bid-DS-data-model. git_info: {}'.format(git_info)
-        #print(msg)
+        print(msg)
         raise Exception(msg)
     else:
         print('Bid-DS-data-model commit ID: {}'.format(git_info['commit']))
