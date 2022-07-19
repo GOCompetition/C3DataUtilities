@@ -13,7 +13,7 @@ def get_data_model_dir():
 
     return os.path.dirname(os.path.realpath(datamodel.__file__))
 
-def get_git_info(path):
+def get_git_info(path): # todo get branch also
     '''
     path is a string giving a path from which a git repository can be found
     returns a dict describing the current state of the repository,
