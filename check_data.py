@@ -154,10 +154,15 @@ def read_validate_summarize_problem_data(problem_data_file):
     
 if __name__ == '__main__':
 
-    utils.print_git_info_all()
+    try:
+        utils.print_git_info_all()
+    except Exception as e:
+        print('error in print_git_info_all, not raising the exception')
+        print(e)
     if len(sys.argv) > 1:
         problem_data_file_name = sys.argv[1]
     else:
         problem_data_file_name = data_file
+    print('problem data file: {}'.format(problem_data_file_name))
     problem_data_model = check_problem_data(problem_data_file_name)
     summarize_problem_data(problem_data_model)

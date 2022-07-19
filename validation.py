@@ -18,6 +18,7 @@ def all_checks(data):
         xfr_to_bus_uids_in_domain,
         dcl_fr_bus_uids_in_domain,
         dcl_to_bus_uids_in_domain,
+        
         ]
     errors = []
     for c in checks:

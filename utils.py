@@ -49,6 +49,7 @@ def get_git_info(path): # todo get branch also
 def print_git_info_all():
 
     git_info = get_git_info(get_data_utils_dir())
+    #git_info = get_git_info('foo')
     if git_info['query_return_code'] != 0:
         msg = 'get_git_info failed for C3DataUtilities. git_info: {}'.format(git_info)
         #print(msg)
