@@ -1,6 +1,6 @@
 import sys
 from datamodel.input.data import InputDataFile
-import validation
+import utils, validation
 
 # run this either as:
 #
@@ -12,11 +12,12 @@ import validation
 #
 
 # this file is OK
-data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510.json'
+data_file = '/people/holz501/gocomp/c3/data/Jesse/14bus/14bus_20220707.json'
 
-# this file has multiple errors. The data reader should find and report all (maybe only some?)
+# these files has multiple errors. The data reader should find and report all (maybe only some?)
 # of them by raising an exception.
-#data_file = '/people/holz501/gocomp/c3/data/PSY_RTS_GMLC_data_fixed_load_20220510_multiple_errors.json'
+#data_file = '/people/holz501/gocomp/c3/data/Jesse/14bus/14bus_20220707_read_errors.json'
+#data_file = '/people/holz501/gocomp/c3/data/Jesse/14bus/14bus_20220707_model_errors.json'
 
 # error message starts with, e.g.:
 # pydantic.error_wrappers.ValidationError: 9 validation errors for InputDataFile
@@ -152,6 +153,8 @@ def read_validate_summarize_problem_data(problem_data_file):
     print('Done with post-read data checks. If no error is raised, then post-read validation was successful, and no errors were found in the data.')
     
 if __name__ == '__main__':
+
+    utils.print_git_info_all()
     if len(sys.argv) > 1:
         problem_data_file_name = sys.argv[1]
     else:
