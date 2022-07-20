@@ -1,4 +1,4 @@
-import sys
+import sys, traceback
 from datamodel.input.data import InputDataFile
 import utils, validation
 
@@ -14,7 +14,7 @@ import utils, validation
 # this file is OK
 data_file = '/people/holz501/gocomp/c3/data/Jesse/14bus/14bus_20220707.json'
 
-# these files has multiple errors. The data reader should find and report all (maybe only some?)
+# these files have multiple errors. The data reader should find and report all (maybe only some?)
 # of them by raising an exception.
 #data_file = '/people/holz501/gocomp/c3/data/Jesse/14bus/14bus_20220707_read_errors.json'
 #data_file = '/people/holz501/gocomp/c3/data/Jesse/14bus/14bus_20220707_model_errors.json'
@@ -158,7 +158,8 @@ if __name__ == '__main__':
         utils.print_git_info_all()
     except Exception as e:
         print('error in print_git_info_all, not raising the exception')
-        print(e)
+        traceback.print_exc()
+        #print(e)
     if len(sys.argv) > 1:
         problem_data_file_name = sys.argv[1]
     else:

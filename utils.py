@@ -1,7 +1,7 @@
 '''
 '''
 
-import os, sys, subprocess
+import os, sys, subprocess, traceback
 
 import datamodel
 
@@ -47,7 +47,7 @@ def get_git_info(path): # todo get branch also
             repo['date'] = out_split[2].split('Date:')[1].strip()
             #print('out_split[5]: {}'.format(out_split[5][2]))
         except Exception as e:
-            repo['exception'] = str(e)
+            repo['exception'] = traceback.format_exc()
 
     return repo
 
