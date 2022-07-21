@@ -42,22 +42,32 @@ def get_git_info(path): # todo get branch also
     repo['query_out'] = results.stdout.decode(sys.stdout.encoding)
     repo['query_err'] = results.stderr.decode(sys.stderr.encoding)
     
+    keys = ['commit', 'date']
     if repo['query_return_code'] == 0:
         try:
-            lines = repo['query_out'].split('\n')
+            lines = repo['query_out'].splitlines()
             for line in lines:
-                if line.startswith('commit'):
-                    if repo['commit'] is not None:
-                        raise Exception('"commit" appears more than once')
-                    repo['commit'] = line.split('commit')[1].strip()
-                if line.startswith('Date'):
-                    if repo['date']:
-                        raise Exception('"Date" appears more than once')
-                    repo['date'] = line.split('Date:')[1].strip()
-            if repo['commit'] is None:
-                raise Exception('"commit" does not appear')
-            if repo['date'] is None:
-                raise Exception('"date" does not appear')
+                line_lower = line.lower()
+                for k in keys:
+                    if line_lower.startswith(k):
+                        if repo[k] is not None:
+                            raise Exception('"{}" appears more than once'.format(k))
+                        repo[k] = line[len(k):].lstrip(':').strip()
+            for k in keys:
+                if repo[k] is None:
+                    raise Exception('"{}" does not appear'.format(k))
+            #     if line.startswith('commit'):
+            #         if repo['commit'] is not None:
+            #             raise Exception('"commit" appears more than once')
+            #         repo['commit'] = line.split('commit')[1].strip()
+            #     if line.startswith('date'):
+            #         if repo['date']:
+            #             raise Exception('"date" appears more than once')
+            #         repo['date'] = line.split('date:')[1].strip()
+            # if repo['commit'] is None:
+            #     raise Exception('"commit" does not appear')
+            # if repo['date'] is None:
+            #     raise Exception('"date" does not appear')
         except Exception as e:
             repo['exception'] = traceback.format_exc()
 

@@ -24,16 +24,16 @@ data_file = '/people/holz501/gocomp/c3/data/Jesse/14bus/14bus_20220707.json'
 
 def summarize_problem_data(data):
 
-    print('data: {}'.format(list(data.dict().keys())))
+    # print('data: {}'.format(list(data.dict().keys())))
     
     network = data.network
-    print('network: {}'.format(list(network.dict().keys())))
+    # print('network: {}'.format(list(network.dict().keys())))
     
     general = network.general
     vio_cost = network.violation_cost
     
     print('general: {}'.format(general))
-    print('vio_cost: {}'.format(vio_cost))
+    print('violation costs: {}'.format(vio_cost))
     
     bus = network.bus
     acl = network.ac_line
@@ -41,6 +41,8 @@ def summarize_problem_data(data):
     xfr = network.two_winding_transformer
     sh = network.shunt
     sd = network.simple_dispatchable_device
+    pd = [i for i in network.simple_dispatchable_device if i.device_type == 'producer']
+    cd = [i for i in network.simple_dispatchable_device if i.device_type == 'consumer']
     prz = network.active_zonal_reserve
     qrz = network.reactive_zonal_reserve
     
@@ -50,107 +52,44 @@ def summarize_problem_data(data):
     num_xfr = len(xfr)
     num_sh = len(sh)
     num_sd = len(sd)
+    num_pd = len(pd)
+    num_cd = len(cd)
     num_prz = len(prz)
     num_qrz = len(qrz)
     
-    print('num bus: {}'.format(num_bus))
-    print('num acl: {}'.format(num_acl))
-    print('num dcl: {}'.format(num_dcl))
-    print('num xfr: {}'.format(num_xfr))
-    print('num sh: {}'.format(num_sh))
-    print('num sd: {}'.format(num_sd))
-    print('num prz: {}'.format(num_prz))
-    print('num qrz: {}'.format(num_qrz))
+    print('num buses: {}'.format(num_bus))
+    print('num ac lines: {}'.format(num_acl))
+    print('num dc lines: {}'.format(num_dcl))
+    print('num transformers: {}'.format(num_xfr))
+    print('num shunts: {}'.format(num_sh))
+    print('num simple dispatchable devices: {}'.format(num_sd))
+    print('num producing devices: {}'.format(num_pd))
+    print('num consuming devices: {}'.format(num_cd))
+    print('num real power reserve zones: {}'.format(num_prz))
+    print('num reactive power reserve zones: {}'.format(num_qrz))
     
     time_series_input = data.time_series_input
-    print('time_series_input: {}'.format(list(time_series_input.dict().keys())))
+    # print('time_series_input: {}'.format(list(time_series_input.dict().keys())))
     
     ts_general = time_series_input.general
-    print('ts general: {}'.format(list(ts_general.dict().keys())))
+    # print('ts general: {}'.format(list(ts_general.dict().keys())))
     
     num_t = ts_general.time_periods
-    print('num t: {}'.format(num_t))
+    print('num intervals: {}'.format(num_t))
     
     ts_intervals = ts_general.interval_duration
     ts_sd = time_series_input.simple_dispatchable_device
     ts_prz = time_series_input.active_zonal_reserve
     ts_qrz = time_series_input.reactive_zonal_reserve
-    num_ts_sd = len(ts_sd)
-    num_ts_prz = len(ts_prz)
-    num_ts_qrz = len(ts_qrz)
-    print('ts num sd: {}'.format(num_ts_sd))
-    print('ts num prz: {}'.format(num_ts_prz))
-    print('ts num qrz: {}'.format(num_ts_qrz))
 
-    print('ts total duration: {}'.format(sum(ts_intervals)))
-    #print('ts interval durations: {}'.format(ts_intervals))
+    print('total duration: {}'.format(sum(ts_intervals)))
+    print('interval durations: {}'.format(ts_intervals))
 
 def check_problem_data(problem_data_file):
 
     problem_data_model = InputDataFile.load(problem_data_file)
     validation.all_checks(problem_data_model)
     return problem_data_model
-
-# def check_problem_data_model(data_model):
-
-#     errors = []
-#     try:
-#         validation.uids_not_repeated(data_model)
-#     except Exception as e:
-#         errors.append(e)
-#     try:
-#         validation.ctg_dvc_uids_in_domain(data_model)
-#     except Exception as e:
-#         errors.append(e)
-#     try:
-#         validation.bus_prz_uids_in_domain(data_model)
-#     except Exception as e:
-#         errors.append(e)
-#     try:
-#         validation.bus_qrz_uids_in_domain(data_model)
-#     except Exception as e:
-#         errors.append(e)
-#     try:
-#         validation.shunt_bus_uids_in_domain(data_model)
-#     except Exception as e:
-#         errors.append(e)
-#     try:
-#         validation.sd_bus_uids_in_domain(data_model)
-#     except Exception as e:
-#         errors.append(e)
-#     try:
-#         validation.sd_type_in_domain(data_model)
-#     except Exception as e:
-#         errors.append(e)
-#     if len(errors) > 0:
-#         msg = 'check_problem_data_model found errors\n' + 'number of errors: {}\n'.format(len(errors)) + '\n'.join([str(e) for e in errors])
-#         print(msg)
-#         raise Exception(msg)
-
-def read_validate_summarize_problem_data(problem_data_file):
-    '''
-    This function demonstrates how you might use the Bid-DS problem data model
-    to read a problem data file into Bid-DS data structures,
-    perform read-time validation,
-    then get a handle on the data as represented in the data structures
-    as a preliminary step to further validation/checking, scrubbing,
-    conversion to numpy data structures, and finally use in solution evaluation.
-
-    The input argument is a file/path name of a problem data file.
-    The function reads that file.
-    Read-time validation is performed, with an error raised if any data errors are encountered there.
-    Then a Bid-DS data model object is populated from the data.
-    Then the Bid-DS data model object is explored and some basic summary information is printed.
-    '''
-
-    print('Start reading problem data into Bid-DS problem data model and performing read-time validation.')
-    print('Problem data file name: {}'.format(problem_data_file))
-    problem_data = InputDataFile.load(problem_data_file)
-    print('Done reading problem data into Bid-DS problem data model. If no error is raised, then read-time validation was successful, and no errors were found in the data.')
-    print('Start post-read data checks.')
-    #check_data_model(problem_data)
-    validation.all_checks(problem_data)
-    print('Done with post-read data checks. If no error is raised, then post-read validation was successful, and no errors were found in the data.')
     
 if __name__ == '__main__':
 
