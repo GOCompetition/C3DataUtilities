@@ -9,12 +9,12 @@
 # Installation
 
 * Install Bid-DS-data-model
-- clone repository
-- checkout validators branch
-- install with pip
+** clone repository
+** checkout validators branch
+** install with pip
 * Install C3DataUtilities
-- clone repository
-- install with pip
+** clone repository
+** install with pip
 
 Currently relies on https://github.com/Smart-DS/Bid-DS-data-model. You can obtain this by:
 
