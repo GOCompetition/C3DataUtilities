@@ -10,6 +10,9 @@ setup(
         "data_utilities"
     ],
     install_requires=[
+        "scipy",
+        "numpy",
+        "pandas",
         "pydantic",
         "datamodel"
     ]
