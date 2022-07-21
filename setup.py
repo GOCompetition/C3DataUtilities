@@ -7,7 +7,7 @@ setup(
     author="Jesse Holzer",
     author_email="jesse.holzer@pnnl.gov",
     packages=[
-        "data_utilities"
+        "datautilities"
     ],
     install_requires=[
         "scipy",
