@@ -46,6 +46,9 @@ def all_checks(data):
         ts_prz_ramping_reserve_down_len_eq_num_t,
         ts_qrz_react_up_len_eq_num_t,
         ts_qrz_react_down_len_eq_num_t,
+        ts_sd_on_status_lb_le_ub,
+        ts_sd_p_lb_le_ub,
+        ts_sd_q_lb_le_ub,
         ]
     errors = []
     for c in checks:
@@ -640,6 +643,46 @@ def ts_qrz_react_down_len_eq_num_t(data):
         msg = "fails time_series_input reactive_zonal_reserve len(REACT_DOWN) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(REACT_DOWN)): {}".format(
             num_t, idx_err)
         raise ValueError(msg)
+
+def ts_sd_on_status_lb_le_ub(data):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.time_series_input.simple_dispatchable_device)
+    uid = [c.uid for c in data.time_series_input.simple_dispatchable_device]
+    lb = [c.on_status_lb for c in data.time_series_input.simple_dispatchable_device]
+    ub = [c.on_status_ub for c in data.time_series_input.simple_dispatchable_device]
+    idx_err = [(i, uid[i], j, lb[i][j], ub[i][j]) for i in range(num_sd) for j in range(num_t) if lb[i][j] > ub[i][j]]
+    if len(idx_err) > 0:
+        msg = "fails time_series_input simple_dispatchable_device on_status_lb <= on_status_ub. failures (device index, device uid, interval index, on_status_lb, on_status_ub): {}".format(idx_err)
+        raise ValueError(msg)
+
+def ts_sd_p_lb_le_ub(data):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.time_series_input.simple_dispatchable_device)
+    uid = [c.uid for c in data.time_series_input.simple_dispatchable_device]
+    lb = [c.p_lb for c in data.time_series_input.simple_dispatchable_device]
+    ub = [c.p_ub for c in data.time_series_input.simple_dispatchable_device]
+    idx_err = [(i, uid[i], j, lb[i][j], ub[i][j]) for i in range(num_sd) for j in range(num_t) if lb[i][j] > ub[i][j]]
+    if len(idx_err) > 0:
+        msg = "fails time_series_input simple_dispatchable_device p_lb <= p_ub. failures (device index, device uid, interval index, p_lb, p_ub): {}".format(idx_err)
+        raise ValueError(msg)
+
+def ts_sd_q_lb_le_ub(data):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.time_series_input.simple_dispatchable_device)
+    uid = [c.uid for c in data.time_series_input.simple_dispatchable_device]
+    lb = [c.q_lb for c in data.time_series_input.simple_dispatchable_device]
+    ub = [c.q_ub for c in data.time_series_input.simple_dispatchable_device]
+    idx_err = [(i, uid[i], j, lb[i][j], ub[i][j]) for i in range(num_sd) for j in range(num_t) if lb[i][j] > ub[i][j]]
+    if len(idx_err) > 0:
+        msg = "fails time_series_input simple_dispatchable_device q_lb <= q_ub. failures (device index, device uid, interval index, q_lb, q_ub): {}".format(idx_err)
+        raise ValueError(msg)
+
+
+
+
 
 
 
