@@ -14,6 +14,6 @@ setup(
         "numpy",
         "pandas",
         "pydantic",
-        "datamodel"
+        #"datamodel"
     ]
 )
