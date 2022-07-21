@@ -25,12 +25,12 @@ def get_git_info(path): # todo get branch also
     '''
 
     repo = {
-        'branch': '',
-        'commit': '',
-        'date': '',
-        'query_return_code': 0,
-        'query_err': '',
-        'exception': '',
+        'branch': None,
+        'commit': None,
+        'date': None,
+        'query_return_code': None,
+        'query_err': None,
+        'exception': None,
         }
 
     repo['query_path'] = path
@@ -45,11 +45,19 @@ def get_git_info(path): # todo get branch also
     if repo['query_return_code'] == 0:
         try:
             lines = repo['query_out'].split('\n')
-            for line in out_split:
+            for line in lines:
                 if line.startswith('commit'):
+                    if repo['commit'] is not None:
+                        raise Exception('"commit" appears more than once')
                     repo['commit'] = line.split('commit')[1].strip()
                 if line.startswith('Date'):
+                    if repo['date']:
+                        raise Exception('"Date" appears more than once')
                     repo['date'] = line.split('Date:')[1].strip()
+            if repo['commit'] is None:
+                raise Exception('"commit" does not appear')
+            if repo['date'] is None:
+                raise Exception('"date" does not appear')
         except Exception as e:
             repo['exception'] = traceback.format_exc()
 
@@ -59,7 +67,7 @@ def print_git_info_all():
 
     git_info = get_git_info(get_data_utils_dir())
     #git_info = get_git_info('error_dir')
-    if git_info['query_return_code'] != 0 or len(git_info['exception']) > 0:
+    if git_info['query_return_code'] != 0 or git_info['exception'] is not None:
         msg = 'get_git_info failed for C3DataUtilities. git_info: {}'.format(git_info)
         print(msg)
         raise Exception(msg)
@@ -68,7 +76,7 @@ def print_git_info_all():
         print('C3DataUtilities commit date: {}'.format(git_info['date']))
 
     git_info = get_git_info(get_data_model_dir())
-    if git_info['query_return_code'] != 0 or len(git_info['exception']) > 0:
+    if git_info['query_return_code'] != 0 or git_info['exception'] is not None:
         msg = 'get_git_info failed for Bid-DS-data-model. git_info: {}'.format(git_info)
         print(msg)
         raise Exception(msg)
