@@ -11,7 +11,7 @@
 Currently relies on https://github.com/Smart-DS/Bid-DS-data-model. You can obtain this by:
 
 ```
-git clone https://github.com/Smart-DS/Bid-DS-data-model
+git clone https://github.com/Smart-DS/Bid-DS-data-model.git
 ```
 
 Currently uses the validators branch (https://github.com/Smart-DS/Bid-DS-data-model/tree/validators). This contains the most complete set of input data checking but will later be merged into main. To use the validators branch, do:
@@ -31,7 +31,7 @@ pip install -e .
 Next clone this repository:
 
 ```
-git clone https://github.com/GOCompetition/C3DataUtilities
+git clone https://github.com/GOCompetition/C3DataUtilities.git
 ```
 
 Then install with pip:
