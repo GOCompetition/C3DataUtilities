@@ -1,0 +1,183 @@
+{
+  "network": {
+    "general": {
+    },
+    "violation_cost": {
+    },
+    "bus": [
+      {
+      }
+    ],
+    "shunt": [
+      {
+      }
+    ],
+    "simple_dispatchable_device": [
+      {
+      }
+    ],
+    "ac_line": [
+      {
+      }
+    ],
+    "two_winding_transformer": [
+      {
+      }
+    ],
+    "dc_line": [
+      {
+      }
+    ],
+    "active_zonal_reserve": [
+      {
+      }
+    ],
+    "reactive_zonal_reserve": [
+      {
+      }
+    ]
+  },
+  "time_series_input": {
+    "general": {
+      "interval_duration": [
+        1.0,
+        1.0
+      ]
+    }
+    "simple_dispatchable_device": [
+      {
+        "uid": "Load Bus 14 #1",
+        "on_status_ub": [
+          1,
+          1
+        ],
+        "on_status_lb": [
+          0,
+          0
+        ],
+        "p_lb": [
+          0.3078000000000001,
+          0.306
+        ],
+        "p_ub": [
+          0.37620000000000003,
+          0.37400000000000005
+        ],
+        "q_lb": [
+          0.041292,
+          0.039069
+        ],
+        "q_ub": [
+          0.050468,
+          0.04775100000000001
+        ],
+        "cost": [
+          [
+            [
+              262700,
+              0.051
+            ],
+            [
+              11690.0,
+              0.10210000000000001
+            ],
+            [
+              3117.0,
+              0.20409999999999998
+            ]
+          ],
+          [
+            [
+              262700,
+              0.051
+            ],
+            [
+              11690.0,
+              0.10210000000000001
+            ],
+            [
+              3117.0,
+              0.20409999999999998
+            ]
+          ]
+        ],
+        "p_reg_res_up_cost": [
+          1244.0,
+          1244.0
+        ],
+        "p_reg_res_down_cost": [
+          1244.0,
+          1244.0
+        ],
+        "p_syn_res_cost": [
+          305.0,
+          305.0
+        ],
+        "p_nsyn_res_cost": [
+          24.0,
+          24.0
+        ],
+        "p_ramp_res_up_online_cost": [
+          0.1,
+          0.1
+        ],
+        "p_ramp_res_down_online_cost": [
+          0.1,
+          0.1
+        ],
+        "p_ramp_res_down_offline_cost": [
+          0.1,
+          0.1
+        ],
+        "p_ramp_res_up_offline_cost": [
+          0.1,
+          0.1
+        ],
+        "q_res_up_cost": [
+          24.0,
+          24.0
+        ],
+        "q_res_down_cost": [
+          24.0,
+          24.0
+        ]
+      }
+    ],
+    "active_zonal_reserve": [
+      {
+        "uid: ""
+        "RAMPING_RESERVE_UP": [
+          1.0,
+          1.0
+        ],
+        "RAMPING_RESERVE_DOWN": [
+          1.0,
+          1.0
+        ]
+      }
+    ],
+    "reactive_zonal_reserve": [
+      {
+        "uid": "",
+        "REACT_UP": [
+          1.0,
+          1.0
+        ],
+        "REACT_DOWN": [
+          1.0,
+          1.0
+        ]
+      }
+    ]
+  },
+  "reliability: {
+    "contingency: [
+      {
+        "uid": "",
+        "components": [
+          ""
+        ]
+      }
+    ]
+  }
+}
