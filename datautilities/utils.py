@@ -33,6 +33,9 @@ def get_git_info(path): # todo get branch also
         'exception': '',
         }
 
+    repo['query_path'] = path
+
+    # run "git log"
     results = subprocess.run(['git', 'log', '-1'], cwd=path, capture_output=True)
 
     repo['query_return_code'] = results.returncode
@@ -41,11 +44,12 @@ def get_git_info(path): # todo get branch also
     
     if repo['query_return_code'] == 0:
         try:
-            out_split = repo['query_out'].split('\n')
-            repo['commit'] = out_split[0].split('commit')[1].strip()
-            repo['author'] = out_split[1].split('Author:')[1].strip()
-            repo['date'] = out_split[2].split('Date:')[1].strip()
-            #print('out_split[5]: {}'.format(out_split[5][2]))
+            lines = repo['query_out'].split('\n')
+            for line in out_split:
+                if line.startswith('commit'):
+                    repo['commit'] = line.split('commit')[1].strip()
+                if line.startswith('Date'):
+                    repo['date'] = line.split('Date:')[1].strip()
         except Exception as e:
             repo['exception'] = traceback.format_exc()
 
@@ -54,7 +58,7 @@ def get_git_info(path): # todo get branch also
 def print_git_info_all():
 
     git_info = get_git_info(get_data_utils_dir())
-    #git_info = get_git_info('foo')
+    #git_info = get_git_info('error_dir')
     if git_info['query_return_code'] != 0 or len(git_info['exception']) > 0:
         msg = 'get_git_info failed for C3DataUtilities. git_info: {}'.format(git_info)
         print(msg)
