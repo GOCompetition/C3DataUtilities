@@ -1,6 +1,6 @@
 import sys, traceback
 from datamodel.input.data import InputDataFile
-from data_utilities import utils, validation
+from datautilities import utils, validation
 
 # run this either as:
 #
