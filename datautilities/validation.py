@@ -685,6 +685,8 @@ def ts_sd_q_lb_le_ub(data):
 
 def connected(data):
 
+    msg = ""
+
     # get buses, branches, and contingencies that are relavant to this check
     # i.e. all buses, AC in service branches, contingencies outaging AC in service branches
     buses, branches, ctgs = get_buses_branches_ctgs_on_in_service_ac_network(data)
@@ -704,6 +706,9 @@ def connected(data):
     bus_uid_map = {buses_uid[i]: i for i in range(num_buses)}
     branch_uid_map = {branches_uid[i]: i for i in range(num_branches)}
     ctg_uid_map = {ctgs_uid[i]: i for i in range(num_ctgs)}
+
+    # get branch outaged by each contingency
+    ctgs_branch = [branch_uid_map[i] for i in ctgs_branch_uid]
 
     # get uids on from and to buses of branch outaged in each contingency
     ctgs_branch_fbus_uid = [branches_fbus_uid[branch_uid_map[i]] for i in ctgs_branch_uid]
@@ -725,6 +730,10 @@ def connected(data):
     pairs = list(set(branches_pair))
     num_pairs = len(pairs)
     pairs_uid = [(buses_uid[i[0]], buses_uid[i[1]]) for i in pairs]
+
+    # get the bus pair of each contingency
+    ctgs_pair = [branches_pair[i] for i in ctgs_branch]
+    ctgs_pair_uid = [(buses_uid[i[0]], buses_uid[i[1]]) for i in ctgs_pair]
     
     # form graph
     # use only one edge for each bus pair,
@@ -738,41 +747,42 @@ def connected(data):
     # check connectedness under the base case
     connected_components = list(networkx.connected_components(graph))
     if len(connected_components) != 1:
-        msg = "fails connectedness of graph on all buses and base case in service AC branches. num connected components: {}, expected: 1, components: {}".format(
+        msg += "fails connectedness of graph on all buses and base case in service AC branches. num connected components: {}, expected: 1, components: {}".format(
             len(connected_components), connected_components)
-        raise ValueError(msg)
 
-    # # what branches span each pair?
+    # what branches span each pair?
     pair_branches = {i:[] for i in pairs}
-    # for i in range(num_branches):
-    #     j = branches_pair[i]
-    #     pair_branches[j].append(i)
-    # pair_num_branches = [len(i) for i in pair_branches
-    #     pair_branches
+    for i in range(num_branches):
+        j = branches_pair[i]
+        pair_branches[j].append(i)
+    pair_num_branches = {i:len(pair_branches[i]) for i in pairs}
+    print('pair_num_branches: {}'.format(pair_num_branches))
 
-    # bus_pairs = 
+    # what contingencies outage a branch spanning each pair?
+    pair_ctgs = {i:[] for i in pairs}
+    for i in range(num_ctgs):
+        j = ctgs_pair[i]
+        pair_ctgs[j].append(i)
 
-    # buses_id = [i.uid for i in data.network.bus]
-    # ac
-    # branches_id = [i.uid for i in data.network.ac_line
+    # check connectedness under each contingency
+    bridges_uid = list(networkx.bridges(graph))
+    bridges = [(bus_uid_map[i[0]], bus_uid_map[i[1]]) for i in bridges_uid]
+    print('bridges: {}'.format(bridges))
+    num_bridges = len(bridges)
+    bridges_one_branch = [i for i in bridges if pair_num_branches[i] == 1]
+    print('bridges spanned by one branch: {}'.format(bridges_one_branch))
+    num_bridges_one_branch = len(bridges_one_branch)
+    #bridges_one_branch_ctgs = [pair_ctgs[i] for i in bridges_one_branch]
+    #bridges_one_branch_at_least_one_ctg = [i for i in bridges_one_branch if len(bridges_one_branch_ctgs[i]) > 0]
+    disconnecting_ctgs = [j for i in bridges_one_branch for j in pair_ctgs[i]]
+    disconnecting_ctgs_uid = [ctgs_uid[i] for i in disconnecting_ctgs]
+    if len(disconnecting_ctgs_uid) > 0:
+        msg += "fails connectedness of graph on all buses and post-contingency in service AC branches. failing contingencies (i.e. contingencies outaging a branch that is a bridge in the graph) uid: {}".format(
+            disconnecting_ctgs_uid)
 
-    # return graph
-
-
-
-
-    # # check connectedness under each contingency
-    # bridges = list(networkx.bridges(graph))
-    # print('bridges: {}'.format(bridges))
-    # # num_bridges = len(bridges)
-    # # bridges = sorted(list(set(branch_edges).intersection(set(bridges))))
-    # # # assert len(bridges) == num_bridges i.e. all bridges are branch edges, i.e. not extra edges. extra edges should be elements of cycles
-    # # bridges = [branch_edge_branch_map[r] for r in bridges]
-    # disconnecting_ctgs_uid = [] # todo
-    # if len(disconnecting_ctgs_uid) > 0:
-    #     msg = "fails connectedness of graph on all buses and post-contingency in service AC branches. failing contingencies uid: {}".format(
-    #         disconnecting_ctgs_uid)
-    #     raise ValueError(msg)
+    # report the errors
+    if len(msg) > 0:
+        raise ValueError(msg)
 
 def get_buses_branches_ctgs_on_in_service_ac_network(data):
     '''
