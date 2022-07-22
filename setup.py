@@ -19,6 +19,7 @@ setup(
         "numpy",
         "pandas",
         "pydantic",
+        "networkx",
         # "datamodel",
         # "Bid-DS-data-model",
         ]
