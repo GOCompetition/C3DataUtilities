@@ -3,8 +3,141 @@
 '''
 
 import networkx
+from pydantic.error_wrappers import ValidationError
+from datamodel.input.data import InputDataFile
+from datautilities import utils
+from datautilities.errors import ModelError, GitError
+import traceback
 
-def all_checks(data):
+def write(file_name, mode, text):
+
+    with open(file_name, mode) as f:
+        f.write(text)
+
+def check(data_file, summary_file, data_errors_file, ignored_errors_file):
+
+    # open files
+    for fn in [summary_file, data_errors_file, ignored_errors_file]:
+        with open(fn, 'w') as f:
+            pass
+
+    # data file
+    with open(summary_file, 'a') as f:
+        f.write('problem data file: {}'.format(data_file))
+
+    # git info
+    try:
+        git_info = utils.get_git_info_all()
+        with open(summary_file, 'a') as f:
+            f.write('git info: {}'.format(git_info))
+    except GitError:
+        with open(summary_file, 'a') as f:
+            f.write('git info error ignored')
+        with open(ignored_errors_file, 'a') as f:
+            f.write(traceback.format_exc())
+    except Exception:
+        with open(summary_file, 'a') as f:
+            f.write('git info error ignored')
+        with open(ignored_errors_file, 'a') as f:
+            f.write(traceback.format_exc())
+
+    # read data
+    try:
+        data_model = InputDataFile.load(data_file)
+    except ValidationError as e:
+        with open(summary_file, 'a') as f:
+            f.write('data read error - pydantic validation')
+        with open(data_errors_file, 'a') as f:
+            f.write(traceback.format_exc())
+        raise e
+
+    # independent data model checks
+    try:
+        model_checks(data_model)
+    except ModelError as e:
+        with open(summary_file, 'a') as f:
+            f.write('model error - independent checks')
+        with open(data_errors_file, 'a') as f:
+            f.write(traceback.format_exc())
+        raise e
+
+    # connectedness check
+    try:
+        connected(data_model)
+    except ModelError as e:
+        with open(summary_file, 'a') as f:
+            f.write('model error - connectedness')
+        with open(data_errors_file, 'a') as f:
+            f.write(traceback.format_exc())
+        raise e
+
+    # summary
+    summary = get_summary(data_model)
+    with open(summary_file, 'a') as f:
+        f.write('data summary: {}'.format(summary))
+
+def get_summary(data):
+
+    network = data.network
+    
+    summary['general'] = network.general
+    summary['violation costs'] = network.violation_cost
+    
+    bus = network.bus
+    acl = network.ac_line
+    dcl = network.dc_line
+    xfr = network.two_winding_transformer
+    sh = network.shunt
+    sd = network.simple_dispatchable_device
+    pd = [i for i in network.simple_dispatchable_device if i.device_type == 'producer']
+    cd = [i for i in network.simple_dispatchable_device if i.device_type == 'consumer']
+    prz = network.active_zonal_reserve
+    qrz = network.reactive_zonal_reserve
+    
+    num_bus = len(bus)
+    num_acl = len(acl)
+    num_dcl = len(dcl)
+    num_xfr = len(xfr)
+    num_sh = len(sh)
+    num_sd = len(sd)
+    num_pd = len(pd)
+    num_cd = len(cd)
+    num_prz = len(prz)
+    num_qrz = len(qrz)
+    
+    summary['num buses'] = num_bus
+    summary['num ac lines'] = num_acl
+    summary['num dc lines'] = num_dcl
+    summary['num transformers'] = num_xfr
+    summary['num shunts'] = num_sh
+    summary['num simple dispatchable devices'] = num_sd
+    summary['num producing devices'] = num_pd
+    summary['num consuming devices'] = num_cd
+    summary['num real power reserve zones'] = num_prz
+    summary['num reactive power reserve zones'] = num_qrz
+    
+    time_series_input = data.time_series_input
+    
+    ts_general = time_series_input.general
+    
+    num_t = ts_general.time_periods
+    summary['num intervals'] = num_t
+    
+    ts_intervals = ts_general.interval_duration
+    ts_sd = time_series_input.simple_dispatchable_device
+    ts_prz = time_series_input.active_zonal_reserve
+    ts_qrz = time_series_input.reactive_zonal_reserve
+
+    ctgs = data.reliability.contingency
+    num_k = len(ctgs)
+    summary['num contingencies'] = num_k
+
+    summary['total duration'] = sum(ts_intervals)
+    summary['interval durations'] = ts_intervals
+    
+    return summary
+
+def model_checks(data):
 
     checks = [
         network_and_reliability_uids_not_repeated,
@@ -51,20 +184,19 @@ def all_checks(data):
         ts_sd_on_status_lb_le_ub,
         ts_sd_p_lb_le_ub,
         ts_sd_q_lb_le_ub,
-        connected,
         ]
     errors = []
     for c in checks:
         try:
             c(data)
-        except Exception as e:
+        except ModelError as e:
             errors.append(e)
     if len(errors) > 0:
         msg = (
-            'validation.all_checks found errors\n' + 
+            'validation.model_checks found errors\n' + 
             'number of errors: {}\n'.format(len(errors)) +
             '\n'.join([str(e) for e in errors]))
-        raise Exception(msg)        
+        raise ModelError(msg)        
 
 def ts_uids_not_repeated(data):
 
@@ -78,7 +210,7 @@ def ts_uids_not_repeated(data):
     if uids_num_max > 1:
         msg = "fails uid uniqueness in time_series_input section. repeated uids (uid, number of occurrences): {}".format(
             [(k, v) for k, v in uids_num.items() if v > 1])
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def network_and_reliability_uids_not_repeated(data):
     
@@ -92,7 +224,7 @@ def network_and_reliability_uids_not_repeated(data):
     if uids_num_max > 1:
         msg = "fails uid uniqueness in network and reliability sections. repeated uids (uid, number of occurrences): {}".format(
             [(k, v) for k, v in uids_num.items() if v > 1])
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ctg_dvc_uids_in_domain(data):
 
@@ -114,7 +246,7 @@ def ctg_dvc_uids_in_domain(data):
     if len(ctg_idx_comp_not_in_domain) > 0:
         msg = "fails contingency outaged devices in branches. failing contingencies (index, uid, failing devices): {}".format(
             ctg_comp_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def bus_prz_uids_in_domain(data):
 
@@ -133,7 +265,7 @@ def bus_prz_uids_in_domain(data):
     if len(bus_idx_prz_not_in_domain) > 0:
         msg = "fails bus real power reserve zones in real power reserve zones. failing buses (index, uid, failing zones): {}".format(
             bus_prz_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def bus_qrz_uids_in_domain(data):
 
@@ -152,7 +284,7 @@ def bus_qrz_uids_in_domain(data):
     if len(bus_idx_qrz_not_in_domain) > 0:
         msg = "fails bus reactive power reserve zones in reactive power reserve zones. failing buses (index, uid, failing zones): {}".format(
             bus_qrz_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def shunt_bus_uids_in_domain(data):
     
@@ -168,7 +300,7 @@ def shunt_bus_uids_in_domain(data):
     if len(shunt_idx_bus_not_in_domain) > 0:
         msg = "fails shunt bus in buses. failing shunts (index, uid, bus uid): {}".format(
             shunt_bus_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def sd_bus_uids_in_domain(data):
     
@@ -184,7 +316,7 @@ def sd_bus_uids_in_domain(data):
     if len(sd_idx_bus_not_in_domain) > 0:
         msg = "fails simple dispatchable device bus in buses. failing devices (index, uid, bus uid): {}".format(
             sd_bus_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def sd_type_in_domain(data):
 
@@ -198,7 +330,7 @@ def sd_type_in_domain(data):
         for i in sd_idx_type_not_in_domain]
     if len(sd_idx_type_not_in_domain) > 0:
         msg = "fails simple dispatchable device type in domain. domain: {}, failing devices (index, uid, type): {}".format(domain, sd_type_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def acl_fr_bus_uids_in_domain(data):
     
@@ -214,7 +346,7 @@ def acl_fr_bus_uids_in_domain(data):
     if len(dvc_idx_bus_not_in_domain) > 0:
         msg = "fails ac line from bus in buses. failing devices (index, uid, from bus uid): {}".format(
             dvc_bus_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def acl_to_bus_uids_in_domain(data):
     
@@ -230,7 +362,7 @@ def acl_to_bus_uids_in_domain(data):
     if len(dvc_idx_bus_not_in_domain) > 0:
         msg = "fails ac line to bus in buses. failing devices (index, uid, to bus uid): {}".format(
             dvc_bus_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def xfr_fr_bus_uids_in_domain(data):
     
@@ -246,7 +378,7 @@ def xfr_fr_bus_uids_in_domain(data):
     if len(dvc_idx_bus_not_in_domain) > 0:
         msg = "fails transformer from bus in buses. failing devices (index, uid, from bus uid): {}".format(
             dvc_bus_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def xfr_to_bus_uids_in_domain(data):
     
@@ -262,7 +394,7 @@ def xfr_to_bus_uids_in_domain(data):
     if len(dvc_idx_bus_not_in_domain) > 0:
         msg = "fails transformer to bus in buses. failing devices (index, uid, to bus uid): {}".format(
             dvc_bus_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def dcl_fr_bus_uids_in_domain(data):
     
@@ -278,7 +410,7 @@ def dcl_fr_bus_uids_in_domain(data):
     if len(dvc_idx_bus_not_in_domain) > 0:
         msg = "fails dc line from bus in buses. failing devices (index, uid, from bus uid): {}".format(
             dvc_bus_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def dcl_to_bus_uids_in_domain(data):
     
@@ -294,7 +426,7 @@ def dcl_to_bus_uids_in_domain(data):
     if len(dvc_idx_bus_not_in_domain) > 0:
         msg = "fails dc line to bus in buses. failing devices (index, uid, to bus uid): {}".format(
             dvc_bus_not_in_domain)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_uids_in_domain(data):
     
@@ -307,7 +439,7 @@ def ts_sd_uids_in_domain(data):
     if len(idx_in_ts_not_in_network) > 0:
         msg = "fails time_series_input simple_dispatchable_device uids in domain. failing devices (index, uid): {}".format(
             idx_uid_in_ts_not_in_network)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_uids_cover_domain(data):
     
@@ -320,7 +452,7 @@ def ts_sd_uids_cover_domain(data):
     if len(idx_in_network_not_in_ts) > 0:
         msg = "fails time_series_input simple_dispatchable_device uids cover domain. failing devices (index, uid): {}".format(
             idx_uid_in_network_not_in_ts)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_prz_uids_in_domain(data):
     
@@ -333,7 +465,7 @@ def ts_prz_uids_in_domain(data):
     if len(idx_in_ts_not_in_network) > 0:
         msg = "fails time_series_input active_zonal_reserve uids in domain. failing devices (index, uid): {}".format(
             idx_uid_in_ts_not_in_network)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_prz_uids_cover_domain(data):
     
@@ -346,7 +478,7 @@ def ts_prz_uids_cover_domain(data):
     if len(idx_in_network_not_in_ts) > 0:
         msg = "fails time_series_input active_zonal_reserve uids cover domain. failing devices (index, uid): {}".format(
             idx_uid_in_network_not_in_ts)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_qrz_uids_in_domain(data):
     
@@ -359,7 +491,7 @@ def ts_qrz_uids_in_domain(data):
     if len(idx_in_ts_not_in_network) > 0:
         msg = "fails time_series_input reactive_zonal_reserve uids in domain. failing devices (index, uid): {}".format(
             idx_uid_in_ts_not_in_network)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_qrz_uids_cover_domain(data):
     
@@ -372,7 +504,7 @@ def ts_qrz_uids_cover_domain(data):
     if len(idx_in_network_not_in_ts) > 0:
         msg = "fails time_series_input reactive_zonal_reserve uids cover domain. failing devices (index, uid): {}".format(
             idx_uid_in_network_not_in_ts)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_on_status_ub_len_eq_num_t(data):
     
@@ -385,7 +517,7 @@ def ts_sd_on_status_ub_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(on_status_ub) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(on_status_ub)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_on_status_lb_len_eq_num_t(data):
     
@@ -398,7 +530,7 @@ def ts_sd_on_status_lb_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(on_status_lb) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(on_status_lb)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_lb_len_eq_num_t(data):
     
@@ -411,7 +543,7 @@ def ts_sd_p_lb_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_lb) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_lb)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_ub_len_eq_num_t(data):
     
@@ -424,7 +556,7 @@ def ts_sd_p_ub_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_ub) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ub)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_q_lb_len_eq_num_t(data):
     
@@ -437,7 +569,7 @@ def ts_sd_q_lb_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(q_lb) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(q_lb)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_q_ub_len_eq_num_t(data):
     
@@ -450,7 +582,7 @@ def ts_sd_q_ub_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(q_ub) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(q_ub)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_cost_len_eq_num_t(data):
     
@@ -463,7 +595,7 @@ def ts_sd_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_reg_res_up_cost_len_eq_num_t(data):
     
@@ -476,7 +608,7 @@ def ts_sd_p_reg_res_up_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_reg_res_up_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_reg_res_up_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_reg_res_down_cost_len_eq_num_t(data):
     
@@ -489,7 +621,7 @@ def ts_sd_p_reg_res_down_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_reg_res_down_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_reg_res_down_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_syn_res_cost_len_eq_num_t(data):
     
@@ -502,7 +634,7 @@ def ts_sd_p_syn_res_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_syn_res_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_syn_res_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_nsyn_res_cost_len_eq_num_t(data):
     
@@ -515,7 +647,7 @@ def ts_sd_p_nsyn_res_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_nsyn_res_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_nsyn_res_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_ramp_res_up_online_cost_len_eq_num_t(data):
     
@@ -528,7 +660,7 @@ def ts_sd_p_ramp_res_up_online_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_ramp_res_up_online_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ramp_res_up_online_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_ramp_res_down_online_cost_len_eq_num_t(data):
     
@@ -541,7 +673,7 @@ def ts_sd_p_ramp_res_down_online_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_ramp_res_down_online_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ramp_res_down_online_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_ramp_res_down_offline_cost_len_eq_num_t(data):
     
@@ -554,7 +686,7 @@ def ts_sd_p_ramp_res_down_offline_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_ramp_res_down_offline_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ramp_res_down_offline_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_ramp_res_up_offline_cost_len_eq_num_t(data):
     
@@ -567,7 +699,7 @@ def ts_sd_p_ramp_res_up_offline_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(p_ramp_res_up_offline_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ramp_res_up_offline_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_q_res_up_cost_len_eq_num_t(data):
     
@@ -580,7 +712,7 @@ def ts_sd_q_res_up_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(q_res_up_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(q_res_up_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_q_res_down_cost_len_eq_num_t(data):
     
@@ -593,7 +725,7 @@ def ts_sd_q_res_down_cost_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device len(q_res_down_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(q_res_down_cost)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_prz_ramping_reserve_up_len_eq_num_t(data):
     
@@ -606,7 +738,7 @@ def ts_prz_ramping_reserve_up_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input active_zonal_reserve len(RAMPING_RESERVE_UP) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(RAMPING_RESERVE_UP)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_prz_ramping_reserve_down_len_eq_num_t(data):
     
@@ -619,7 +751,7 @@ def ts_prz_ramping_reserve_down_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input active_zonal_reserve len(RAMPING_RESERVE_DOWN) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(RAMPING_RESERVE_DOWN)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_qrz_react_up_len_eq_num_t(data):
     
@@ -632,7 +764,7 @@ def ts_qrz_react_up_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input reactive_zonal_reserve len(REACT_UP) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(REACT_UP)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_qrz_react_down_len_eq_num_t(data):
     
@@ -645,7 +777,7 @@ def ts_qrz_react_down_len_eq_num_t(data):
     if len(idx_err) > 0:
         msg = "fails time_series_input reactive_zonal_reserve len(REACT_DOWN) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(REACT_DOWN)): {}".format(
             num_t, idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_on_status_lb_le_ub(data):
 
@@ -657,7 +789,7 @@ def ts_sd_on_status_lb_le_ub(data):
     idx_err = [(i, uid[i], j, lb[i][j], ub[i][j]) for i in range(num_sd) for j in range(num_t) if lb[i][j] > ub[i][j]]
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device on_status_lb <= on_status_ub. failures (device index, device uid, interval index, on_status_lb, on_status_ub): {}".format(idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_p_lb_le_ub(data):
 
@@ -669,7 +801,7 @@ def ts_sd_p_lb_le_ub(data):
     idx_err = [(i, uid[i], j, lb[i][j], ub[i][j]) for i in range(num_sd) for j in range(num_t) if lb[i][j] > ub[i][j]]
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device p_lb <= p_ub. failures (device index, device uid, interval index, p_lb, p_ub): {}".format(idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def ts_sd_q_lb_le_ub(data):
 
@@ -681,7 +813,7 @@ def ts_sd_q_lb_le_ub(data):
     idx_err = [(i, uid[i], j, lb[i][j], ub[i][j]) for i in range(num_sd) for j in range(num_t) if lb[i][j] > ub[i][j]]
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device q_lb <= q_ub. failures (device index, device uid, interval index, q_lb, q_ub): {}".format(idx_err)
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def connected(data):
 
@@ -782,7 +914,7 @@ def connected(data):
 
     # report the errors
     if len(msg) > 0:
-        raise ValueError(msg)
+        raise ModelError(msg)
 
 def get_buses_branches_ctgs_on_in_service_ac_network(data):
     '''
