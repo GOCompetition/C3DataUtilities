@@ -82,6 +82,10 @@ def summarize_problem_data(data):
     ts_prz = time_series_input.active_zonal_reserve
     ts_qrz = time_series_input.reactive_zonal_reserve
 
+    ctgs = data.reliability.contingency
+    num_k = len(ctgs)
+    print('num contingencies: {}'.format(num_k))
+
     print('total duration: {}'.format(sum(ts_intervals)))
     print('interval durations: {}'.format(ts_intervals))
 

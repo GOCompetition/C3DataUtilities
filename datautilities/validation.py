@@ -756,7 +756,7 @@ def connected(data):
         j = branches_pair[i]
         pair_branches[j].append(i)
     pair_num_branches = {i:len(pair_branches[i]) for i in pairs}
-    print('pair_num_branches: {}'.format(pair_num_branches))
+    #print('pair_num_branches: {}'.format(pair_num_branches))
 
     # what contingencies outage a branch spanning each pair?
     pair_ctgs = {i:[] for i in pairs}
@@ -767,18 +767,18 @@ def connected(data):
     # check connectedness under each contingency
     bridges_uid = list(networkx.bridges(graph))
     bridges = [(bus_uid_map[i[0]], bus_uid_map[i[1]]) for i in bridges_uid]
-    print('bridges: {}'.format(bridges))
+    #print('bridges: {}'.format(bridges))
     num_bridges = len(bridges)
     bridges_one_branch = [i for i in bridges if pair_num_branches[i] == 1]
-    print('bridges spanned by one branch: {}'.format(bridges_one_branch))
+    #print('bridges spanned by one branch: {}'.format(bridges_one_branch))
     num_bridges_one_branch = len(bridges_one_branch)
     #bridges_one_branch_ctgs = [pair_ctgs[i] for i in bridges_one_branch]
     #bridges_one_branch_at_least_one_ctg = [i for i in bridges_one_branch if len(bridges_one_branch_ctgs[i]) > 0]
     disconnecting_ctgs = [j for i in bridges_one_branch for j in pair_ctgs[i]]
     disconnecting_ctgs_uid = [ctgs_uid[i] for i in disconnecting_ctgs]
     if len(disconnecting_ctgs_uid) > 0:
-        msg += "fails connectedness of graph on all buses and post-contingency in service AC branches. failing contingencies (i.e. contingencies outaging a branch that is a bridge in the graph) uid: {}".format(
-            disconnecting_ctgs_uid)
+        msg += "fails connectedness of graph on all buses and post-contingency in service AC branches. failing contingencies are those outaging a branch that is a bridge in the graph. num failing contingencies: {}, expected: 0, failing contingencies uid: {}".format(
+            len(disconnecting_ctgs_uid), disconnecting_ctgs_uid)
 
     # report the errors
     if len(msg) > 0:
