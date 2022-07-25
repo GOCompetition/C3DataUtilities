@@ -12,7 +12,7 @@ from datautilities import utils, validation
 #
 
 # this file is OK
-data_file = '/people/holz501/gocomp/c3/data/Jesse/14bus/14bus_20220707.json'
+data_file = '/people/holz501/gocomp/c3/C3DataUtilites/test_data/14bus_20220707.json'
 summary_file = 'summary.txt'
 data_errors_file = 'data_errors.txt'
 ignored_errors_file = 'ignored_errors.txt'

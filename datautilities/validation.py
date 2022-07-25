@@ -78,6 +78,8 @@ def check(data_file, summary_file, data_errors_file, ignored_errors_file):
 
 def get_summary(data):
 
+    summary = {}
+
     network = data.network
     
     summary['general'] = network.general
