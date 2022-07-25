@@ -25,7 +25,7 @@ Follow installation directions in the Bid-DS-data-model repository, primarily:
 
 ```
 cd Bid-DS-data-model
-pip install .
+pip install -e .
 ```
 
 Next clone this repository:
@@ -38,7 +38,7 @@ Then install with pip:
 
 ```
 cd C3DataUtilities
-pip install .
+pip install -e .
 ```
 
 # Checking problem data formatting and properties
