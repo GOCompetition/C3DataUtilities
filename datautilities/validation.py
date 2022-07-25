@@ -8,6 +8,7 @@ from datamodel.input.data import InputDataFile
 from datautilities import utils
 from datautilities.errors import ModelError, GitError
 import traceback
+import pprint
 
 def write(file_name, mode, text):
 
@@ -74,7 +75,8 @@ def check(data_file, summary_file, data_errors_file, ignored_errors_file):
     # summary
     summary = get_summary(data_model)
     with open(summary_file, 'a') as f:
-        f.write('data summary: {}'.format(summary))
+        pp = pprint.PrettyPrinter()
+        f.write('data summary: {}'.format(pp.pprint(summary)))
 
 def get_summary(data):
 
