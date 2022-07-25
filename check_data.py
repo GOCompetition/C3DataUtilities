@@ -27,11 +27,26 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("problem", help="The problem file that we are checking")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("problem_opt", nargs="?", help="The problem file that we are checking - optional positional argument for backward compatibility, do not use with -p")
+    group.add_argument("-p", "--problem", help="The problem file that we are checking")
+
+    parser.add_argument("-s", "--solution", help="The solution file that we are checking - not supported yet")
+    parser.add_argument("-c", "--configuration", help="Configuration file - not supported yet")
+    parser.add_argument("-m", "--summary", default=summary_file, help="Summary output file", )
+    parser.add_argument("-d", "--data_errors", default=data_errors_file, help="Data errors output file")
+    parser.add_argument("-i", "--ignored_errors", default=ignored_errors_file, help="Ignored errors output file")
 
     args = parser.parse_args()
 
-    print('args:')
-    print(args)
+    # assert(args.problem is None or args.problem_opt is None)
 
-    validation.check(args.problem, summary_file, data_errors_file, ignored_errors_file)
+    # print('args:')
+    # print(args)
+
+    if args.problem is not None:
+        problem = args.problem
+    else:
+        problem = args.problem_opt
+
+    validation.check(problem, args.summary, args.data_errors, args.ignored_errors)
