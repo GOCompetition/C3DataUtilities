@@ -25,7 +25,14 @@ ignored_errors_file = 'ignored_errors.txt'
 
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser()
+    msg = '\n'.join([
+            'check a problem file.',
+            'output files',
+            '  summary',
+            '  data errors',
+            '  ignored errors',
+            ])
+    parser = argparse.ArgumentParser(description=msg, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument("problem_opt", nargs="?", help="The problem file that we are checking - optional positional argument for backward compatibility, do not use with -p")
