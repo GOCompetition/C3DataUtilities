@@ -16,9 +16,10 @@ python check_data.py [-p, --problem] <problem_file_name>
 # * this is mainly about formatting
 '''
 
-import argparse
-from datautilities import validation
-    
+import argparse, pathlib
+from datautilities import validation, utils
+
+config_file = 'config.json'
 summary_file = 'summary.txt'
 data_errors_file = 'data_errors.txt'
 ignored_errors_file = 'ignored_errors.txt'
@@ -33,13 +34,16 @@ if __name__ == '__main__':
             '  ignored errors',
             ])
     parser = argparse.ArgumentParser(description=msg, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
     group = parser.add_mutually_exclusive_group()
-    group.add_argument("problem_opt", nargs="?", help="The problem file that we are checking - optional positional argument for backward compatibility, do not use with -p")
+    group.add_argument(
+        "problem_opt", nargs="?",
+        help="The problem file that we are checking - optional positional argument for backward compatibility, do not use with -p")
     group.add_argument("-p", "--problem", help="The problem file that we are checking")
-
     parser.add_argument("-s", "--solution", help="The solution file that we are checking - not supported yet")
-    parser.add_argument("-c", "--configuration", help="Configuration file - not supported yet")
+    parser.add_argument(
+        "-c", "--configuration",
+        default=str(pathlib.Path(utils.get_C3DataUtilities_dir(), config_file)),
+        help="Configuration file")
     parser.add_argument("-m", "--summary", default=summary_file, help="Summary output file", )
     parser.add_argument("-d", "--data_errors", default=data_errors_file, help="Data errors output file")
     parser.add_argument("-i", "--ignored_errors", default=ignored_errors_file, help="Ignored errors output file")
@@ -56,4 +60,4 @@ if __name__ == '__main__':
     else:
         problem = args.problem_opt
 
-    validation.check(problem, args.summary, args.data_errors, args.ignored_errors)
+    validation.check(problem, args.configuration, args.summary, args.data_errors, args.ignored_errors)

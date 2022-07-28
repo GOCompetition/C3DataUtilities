@@ -2,20 +2,28 @@
 
 '''
 
-import networkx
+import networkx, traceback, pprint, json
 from pydantic.error_wrappers import ValidationError
 from datamodel.input.data import InputDataFile
 from datautilities import utils
 from datautilities.errors import ModelError, GitError
-import traceback
-import pprint
 
 def write(file_name, mode, text):
 
     with open(file_name, mode) as f:
         f.write(text)
 
-def check(data_file, summary_file, data_errors_file, ignored_errors_file):
+def read_config(config_file):
+
+    with open(config_file, 'r') as f:
+        config = json.load(f)
+    return config
+
+def check(data_file, config_file, summary_file, data_errors_file, ignored_errors_file):
+
+    # read config
+    config = read_config(config_file)
+    print('config: {}'.format(config))
 
     # open files
     for fn in [summary_file, data_errors_file, ignored_errors_file]:
@@ -195,11 +203,20 @@ def model_checks(data):
             c(data)
         except ModelError as e:
             errors.append(e)
+        except Exception as e:
+            msg = (
+                'validation.model_checks found errors\n' + 
+                'number of errors: {}\n'.format(len(errors)) +
+                '\n'.join([str(e) for e in errors]))
+            if len(errors) > 0:
+                raise ModelError(msg)
+            else:
+                raise e
     if len(errors) > 0:
         msg = (
             'validation.model_checks found errors\n' + 
             'number of errors: {}\n'.format(len(errors)) +
-            '\n'.join([str(e) for e in errors]))
+            '\n'.join([str(r) for r in errors]))
         raise ModelError(msg)        
 
 def ts_uids_not_repeated(data):

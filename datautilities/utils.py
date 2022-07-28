@@ -1,10 +1,14 @@
 '''
 '''
 
-import os, sys, subprocess, traceback
+import os, sys, subprocess, traceback, pathlib
 
 import datamodel
 from datautilities.errors import GitError
+
+def get_C3DataUtilities_dir():
+    
+    return str(pathlib.Path(get_data_utils_dir()).parents[0])
 
 def get_data_utils_dir():
 

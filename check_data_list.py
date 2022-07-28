@@ -16,7 +16,7 @@ i.e. summary.txt, data_errors.txt, ignored_errors.txt
 import os, sys, traceback, argparse, subprocess, pathlib
 import pandas
 
-out_dir = 'checker_output'
+out_dir_default = 'checker_output'
 out_csv = 'results.csv'
 stdout_file = 'stdout.txt'
 stderr_file = 'stderr.txt'
@@ -29,15 +29,21 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("list", help="List file - a CSV formatted text file containing a list of problems to check. Each problem should be on one row.")
+    parser.add_argument("-l", "--list", help="List file - a CSV formatted text file containing a list of problems to check. Each problem should be on one row.")
+
+    out_dir = out_dir_default
+    out_dir = pathlib.Path(out_dir).resolve()
+    parser.add_argument("-o", "--out_dir", default=str(out_dir), help="Output directory")
 
     args = parser.parse_args()
+    probs_sols = args.list
+    out_dir = str(pathlib.Path(args.out_dir).resolve())
 
-    checks = pandas.read_csv(args.list, names=['problem', 'solution'])
+    checks = pandas.read_csv(probs_sols, names=['problem', 'solution'])
     num_checks = checks.shape[0]
     checks['problem'] = [str((pathlib.Path(i).resolve()) if not pandas.isna(i) else i) for i in checks['problem']]
     checks['solution'] = [str((pathlib.Path(i).resolve()) if not pandas.isna(i) else i) for i in checks['solution']]
-    checks['results_dir'] = [str(pathlib.Path(out_dir + '/' + str(i)).resolve()) for i in range(num_checks)]
+    checks['results_dir'] = [str(pathlib.Path(out_dir, str(i)).resolve()) for i in range(num_checks)]
     checks['return_code'] = -1
     os.mkdir(out_dir)
     for i in range(num_checks):
