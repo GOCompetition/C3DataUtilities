@@ -2,11 +2,27 @@
 
 '''
 
-import networkx, traceback, pprint, json
+# todo
+# check timestamp format YYYY-MM-DDThh:mm:ss - done
+# need a regular expression format string [0-9][0-9][0-9][0-9]-[0-9] etc
+# use pandas.Timestamp(timestamp) - done
+# timestamp_stop - timestamp_start == total_horizon - TODO
+# timestamp_min <= timestamp_start - done
+# timestamp_stop <= timestamp_max - done
+# interval_duratations in interval_duration_schedules - TODO
+# timestamp format - is this already being checked? - apparently not
+# timestamp existence - currently these are optional fields, so use the config file to require them - if not exist they will be None - done
+# need to convert timestamps in our config file from strings to real time stamps - how does Pydantic do it?
+# pydantic keeps them as strings
+
+import networkx, traceback, pprint, json, re, pandas
 from pydantic.error_wrappers import ValidationError
 from datamodel.input.data import InputDataFile
+#from datamodel.output.data import OutputDataFile
 from datautilities import utils
 from datautilities.errors import ModelError, GitError
+
+timestamp_pattern_str = '\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\Z'
 
 def write(file_name, mode, text):
 
@@ -19,64 +35,66 @@ def read_config(config_file):
         config = json.load(f)
     return config
 
-def check(data_file, config_file, summary_file, data_errors_file, ignored_errors_file):
+def check_data(problem_file, solution_file, config_file, summary_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
     # read config
     config = read_config(config_file)
-    print('config: {}'.format(config))
+    #print('config: {}'.format(config))
 
     # open files
-    for fn in [summary_file, data_errors_file, ignored_errors_file]:
+    for fn in [summary_file, problem_errors_file, ignored_errors_file, solution_errors_file]:
         with open(fn, 'w') as f:
             pass
 
     # data file
     with open(summary_file, 'a') as f:
-        f.write('problem data file: {}'.format(data_file))
+        f.write('problem data file: {}\n'.format(problem_file))
+    with open(summary_file, 'a') as f:
+        f.write('solution data file: {}\n'.format(solution_file))
 
     # git info
     try:
         git_info = utils.get_git_info_all()
         with open(summary_file, 'a') as f:
-            f.write('git info: {}'.format(git_info))
+            f.write('git info: {}\n'.format(git_info))
     except GitError:
         with open(summary_file, 'a') as f:
-            f.write('git info error ignored')
+            f.write('git info error ignored\n')
         with open(ignored_errors_file, 'a') as f:
             f.write(traceback.format_exc())
     except Exception:
         with open(summary_file, 'a') as f:
-            f.write('git info error ignored')
+            f.write('git info error ignored\n')
         with open(ignored_errors_file, 'a') as f:
             f.write(traceback.format_exc())
 
     # read data
     try:
-        data_model = InputDataFile.load(data_file)
+        data_model = InputDataFile.load(problem_file)
     except ValidationError as e:
         with open(summary_file, 'a') as f:
-            f.write('data read error - pydantic validation')
-        with open(data_errors_file, 'a') as f:
+            f.write('data read error - pydantic validation\n')
+        with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
 
     # independent data model checks
     try:
-        model_checks(data_model)
+        model_checks(data_model, config)
     except ModelError as e:
         with open(summary_file, 'a') as f:
-            f.write('model error - independent checks')
-        with open(data_errors_file, 'a') as f:
+            f.write('model error - independent checks\n')
+        with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
 
     # connectedness check
     try:
-        connected(data_model)
+        connected(data_model, config)
     except ModelError as e:
         with open(summary_file, 'a') as f:
-            f.write('model error - connectedness')
-        with open(data_errors_file, 'a') as f:
+            f.write('model error - connectedness\n')
+        with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
 
@@ -84,7 +102,23 @@ def check(data_file, config_file, summary_file, data_errors_file, ignored_errors
     summary = get_summary(data_model)
     with open(summary_file, 'a') as f:
         pp = pprint.PrettyPrinter()
-        f.write('data summary: {}'.format(pp.pprint(summary)))
+        pp.pprint(summary)
+        #f.write('data summary: {}'.format(pp.pprint(summary)))
+        f.write('data summary:\n')
+        f.write(pp.pformat(summary))
+        f.write('\n')
+
+    # read solution
+    if solution_file is not None:
+        print('solution file: {}'.format(solution_file))
+        # try:
+        #     solution_data_model = OutputDataFile.load(solution_file)
+        # except ValidationError as e:
+        #     with open(summary_file, 'a') as f:
+        #         f.write('solution read error - pydantic validation')
+        #     with open(solution_errors_file, 'a') as f:
+        #         f.write(traceback.format_exc())
+        #     raise e
 
 def get_summary(data):
 
@@ -149,9 +183,16 @@ def get_summary(data):
     
     return summary
 
-def model_checks(data):
+def model_checks(data, config):
 
     checks = [
+        timestamp_start_required,
+        timestamp_stop_required,
+        timestamp_start_valid,
+        timestamp_stop_valid,
+        timestamp_start_ge_min,
+        timestamp_stop_le_max,
+        timestamp_stop_minus_start_eq_total_horizon,
         network_and_reliability_uids_not_repeated,
         ts_uids_not_repeated,
         ctg_dvc_uids_in_domain,
@@ -198,9 +239,22 @@ def model_checks(data):
         ts_sd_q_lb_le_ub,
         ]
     errors = []
+    # try:
+    #     timestamp_start_ge_min(data, config)
+    # except ModelError as e:
+    #     errors.append(e)
+    # except Exception as e:
+    #     msg = (
+    #         'validation.model_checks found errors\n' + 
+    #         'number of errors: {}\n'.format(len(errors)) +
+    #         '\n'.join([str(e) for e in errors]))
+    #     if len(errors) > 0:
+    #         raise ModelError(msg)
+    #     else:
+    #         raise e
     for c in checks:
         try:
-            c(data)
+            c(data, config)
         except ModelError as e:
             errors.append(e)
         except Exception as e:
@@ -219,7 +273,92 @@ def model_checks(data):
             '\n'.join([str(r) for r in errors]))
         raise ModelError(msg)        
 
-def ts_uids_not_repeated(data):
+def valid_timestamp_str(data):
+    '''
+    returns True if data is a valid timestamp string else False
+    '''
+
+    valid = True
+    if not isinstance(data, str):
+        valid = False
+    elif re.search(timestamp_pattern_str, data) is None:
+        valid = False
+    return valid
+
+def timestamp_start_required(data, config):
+
+    if config['timestamps_required']:
+        if data.network.general.timestamp_start is None:
+            msg = 'data -> general -> timestamp_start required by config, not present in data'
+            raise ModelError(msg)
+
+def timestamp_stop_required(data, config):
+
+    if config['timestamps_required']:
+        if data.network.general.timestamp_stop is None:
+            msg = 'data -> general -> timestamp_stop required by config, not present in data'
+            raise ModelError(msg)
+
+def timestamp_start_valid(data, config):
+
+    start = data.network.general.timestamp_start
+    if start is not None:
+        if not valid_timestamp_str(start):
+            raise ModelError(
+                'data -> general -> timestamp_start not a valid timestamp string - incorrect format. expected: "{}", got: "{}"'.format(
+                    timestamp_pattern_str, start))
+        try:
+            timestamp = pandas.Timestamp(start)
+        except:
+            raise ModelError(
+                'data -> general -> timestamp_start not a valid timestamp string - could not parse data: "{}"'.format(start))            
+
+def timestamp_stop_valid(data, config):
+
+    end = data.network.general.timestamp_stop
+    if end is not None:
+        if not valid_timestamp_str(end):
+            raise ModelError(
+                'data -> general -> timestamp_stop not a valid timestamp string - incorrect format. expected: "{}", got: "{}"'.format(
+                    timestamp_pattern_str, end))
+        try:
+            timestamp = pandas.Timestamp(end)
+        except:
+            raise ModelError(
+                'data -> general -> timestamp_stop not a valid timestamp string - could not parse data: "{}"'.format(end))            
+
+def timestamp_start_ge_min(data, config):
+
+    start = data.network.general.timestamp_start
+    if start is not None:
+        min_time = config['timestamp_min']
+        if pandas.Timestamp(min_time) > pandas.Timestamp(start):
+            msg = 'fails {} <= {}. {}: {}, {}: {}'.format(
+                'config.timestamp_min', 'data.network.general.timestamp_start',
+                'config.timestamp_min', min_time, 'data.network.general.timestamp_start', start)
+            raise ModelError(msg)
+
+def timestamp_stop_le_max(data, config):
+
+    stop = data.network.general.timestamp_stop
+    if stop is not None:
+        max_time = config['timestamp_max']
+        if pandas.Timestamp(max_time) < pandas.Timestamp(stop):
+            msg = 'fails {} <= {}. {}: {}, {}: {}'.format(
+                'data.network.general.timestamp_stop',
+                'config.timestamp_max',
+                'data.network.general.timestamp_stop', stop,
+                'config.timestamp_max', max_time)
+            raise ModelError(msg)
+
+def timestamp_stop_minus_start_eq_total_horizon(data, config):
+
+    start = data.network.general.timestamp_start
+    stop = data.network.general.timestamp_stop
+    if (start is not None) and (stop is not None):
+        pass # todo
+
+def ts_uids_not_repeated(data, config):
 
     uids = data.time_series_input.get_uids()
     uids_sorted = sorted(uids)
@@ -233,7 +372,7 @@ def ts_uids_not_repeated(data):
             [(k, v) for k, v in uids_num.items() if v > 1])
         raise ModelError(msg)
 
-def network_and_reliability_uids_not_repeated(data):
+def network_and_reliability_uids_not_repeated(data, config):
     
     uids = data.network.get_uids() + data.reliability.get_uids()
     uids_sorted = sorted(uids)
@@ -247,7 +386,7 @@ def network_and_reliability_uids_not_repeated(data):
             [(k, v) for k, v in uids_num.items() if v > 1])
         raise ModelError(msg)
 
-def ctg_dvc_uids_in_domain(data):
+def ctg_dvc_uids_in_domain(data, config):
 
     domain = (
         data.network.get_ac_line_uids() +
@@ -269,7 +408,7 @@ def ctg_dvc_uids_in_domain(data):
             ctg_comp_not_in_domain)
         raise ModelError(msg)
 
-def bus_prz_uids_in_domain(data):
+def bus_prz_uids_in_domain(data, config):
 
     domain = data.network.get_active_zonal_reserve_uids()
     domain = set(domain)
@@ -288,7 +427,7 @@ def bus_prz_uids_in_domain(data):
             bus_prz_not_in_domain)
         raise ModelError(msg)
 
-def bus_qrz_uids_in_domain(data):
+def bus_qrz_uids_in_domain(data, config):
 
     domain = data.network.get_reactive_zonal_reserve_uids()
     domain = set(domain)
@@ -307,7 +446,7 @@ def bus_qrz_uids_in_domain(data):
             bus_qrz_not_in_domain)
         raise ModelError(msg)
 
-def shunt_bus_uids_in_domain(data):
+def shunt_bus_uids_in_domain(data, config):
     
     domain = data.network.get_bus_uids()
     domain = set(domain)
@@ -323,7 +462,7 @@ def shunt_bus_uids_in_domain(data):
             shunt_bus_not_in_domain)
         raise ModelError(msg)
 
-def sd_bus_uids_in_domain(data):
+def sd_bus_uids_in_domain(data, config):
     
     domain = data.network.get_bus_uids()
     domain = set(domain)
@@ -339,7 +478,7 @@ def sd_bus_uids_in_domain(data):
             sd_bus_not_in_domain)
         raise ModelError(msg)
 
-def sd_type_in_domain(data):
+def sd_type_in_domain(data, config):
 
     domain = set(['producer', 'consumer'])
     num_sd = len(data.network.simple_dispatchable_device)
@@ -353,7 +492,7 @@ def sd_type_in_domain(data):
         msg = "fails simple dispatchable device type in domain. domain: {}, failing devices (index, uid, type): {}".format(domain, sd_type_not_in_domain)
         raise ModelError(msg)
 
-def acl_fr_bus_uids_in_domain(data):
+def acl_fr_bus_uids_in_domain(data, config):
     
     domain = data.network.get_bus_uids()
     domain = set(domain)
@@ -369,7 +508,7 @@ def acl_fr_bus_uids_in_domain(data):
             dvc_bus_not_in_domain)
         raise ModelError(msg)
 
-def acl_to_bus_uids_in_domain(data):
+def acl_to_bus_uids_in_domain(data, config):
     
     domain = data.network.get_bus_uids()
     domain = set(domain)
@@ -385,7 +524,7 @@ def acl_to_bus_uids_in_domain(data):
             dvc_bus_not_in_domain)
         raise ModelError(msg)
 
-def xfr_fr_bus_uids_in_domain(data):
+def xfr_fr_bus_uids_in_domain(data, config):
     
     domain = data.network.get_bus_uids()
     domain = set(domain)
@@ -401,7 +540,7 @@ def xfr_fr_bus_uids_in_domain(data):
             dvc_bus_not_in_domain)
         raise ModelError(msg)
 
-def xfr_to_bus_uids_in_domain(data):
+def xfr_to_bus_uids_in_domain(data, config):
     
     domain = data.network.get_bus_uids()
     domain = set(domain)
@@ -417,7 +556,7 @@ def xfr_to_bus_uids_in_domain(data):
             dvc_bus_not_in_domain)
         raise ModelError(msg)
 
-def dcl_fr_bus_uids_in_domain(data):
+def dcl_fr_bus_uids_in_domain(data, config):
     
     domain = data.network.get_bus_uids()
     domain = set(domain)
@@ -433,7 +572,7 @@ def dcl_fr_bus_uids_in_domain(data):
             dvc_bus_not_in_domain)
         raise ModelError(msg)
 
-def dcl_to_bus_uids_in_domain(data):
+def dcl_to_bus_uids_in_domain(data, config):
     
     domain = data.network.get_bus_uids()
     domain = set(domain)
@@ -449,7 +588,7 @@ def dcl_to_bus_uids_in_domain(data):
             dvc_bus_not_in_domain)
         raise ModelError(msg)
 
-def ts_sd_uids_in_domain(data):
+def ts_sd_uids_in_domain(data, config):
     
     network_num = len(data.network.simple_dispatchable_device)
     ts_num = len(data.time_series_input.simple_dispatchable_device)
@@ -462,7 +601,7 @@ def ts_sd_uids_in_domain(data):
             idx_uid_in_ts_not_in_network)
         raise ModelError(msg)
 
-def ts_sd_uids_cover_domain(data):
+def ts_sd_uids_cover_domain(data, config):
     
     network_num = len(data.network.simple_dispatchable_device)
     ts_num = len(data.time_series_input.simple_dispatchable_device)
@@ -475,7 +614,7 @@ def ts_sd_uids_cover_domain(data):
             idx_uid_in_network_not_in_ts)
         raise ModelError(msg)
 
-def ts_prz_uids_in_domain(data):
+def ts_prz_uids_in_domain(data, config):
     
     network_num = len(data.network.active_zonal_reserve)
     ts_num = len(data.time_series_input.active_zonal_reserve)
@@ -488,7 +627,7 @@ def ts_prz_uids_in_domain(data):
             idx_uid_in_ts_not_in_network)
         raise ModelError(msg)
 
-def ts_prz_uids_cover_domain(data):
+def ts_prz_uids_cover_domain(data, config):
     
     network_num = len(data.network.active_zonal_reserve)
     ts_num = len(data.time_series_input.active_zonal_reserve)
@@ -501,7 +640,7 @@ def ts_prz_uids_cover_domain(data):
             idx_uid_in_network_not_in_ts)
         raise ModelError(msg)
 
-def ts_qrz_uids_in_domain(data):
+def ts_qrz_uids_in_domain(data, config):
     
     network_num = len(data.network.reactive_zonal_reserve)
     ts_num = len(data.time_series_input.reactive_zonal_reserve)
@@ -514,7 +653,7 @@ def ts_qrz_uids_in_domain(data):
             idx_uid_in_ts_not_in_network)
         raise ModelError(msg)
 
-def ts_qrz_uids_cover_domain(data):
+def ts_qrz_uids_cover_domain(data, config):
     
     network_num = len(data.network.reactive_zonal_reserve)
     ts_num = len(data.time_series_input.reactive_zonal_reserve)
@@ -527,7 +666,7 @@ def ts_qrz_uids_cover_domain(data):
             idx_uid_in_network_not_in_ts)
         raise ModelError(msg)
 
-def ts_sd_on_status_ub_len_eq_num_t(data):
+def ts_sd_on_status_ub_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.on_status_ub) for c in data.time_series_input.simple_dispatchable_device]
@@ -540,7 +679,7 @@ def ts_sd_on_status_ub_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_on_status_lb_len_eq_num_t(data):
+def ts_sd_on_status_lb_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.on_status_lb) for c in data.time_series_input.simple_dispatchable_device]
@@ -553,7 +692,7 @@ def ts_sd_on_status_lb_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_lb_len_eq_num_t(data):
+def ts_sd_p_lb_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_lb) for c in data.time_series_input.simple_dispatchable_device]
@@ -566,7 +705,7 @@ def ts_sd_p_lb_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_ub_len_eq_num_t(data):
+def ts_sd_p_ub_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_ub) for c in data.time_series_input.simple_dispatchable_device]
@@ -579,7 +718,7 @@ def ts_sd_p_ub_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_q_lb_len_eq_num_t(data):
+def ts_sd_q_lb_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.q_lb) for c in data.time_series_input.simple_dispatchable_device]
@@ -592,7 +731,7 @@ def ts_sd_q_lb_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_q_ub_len_eq_num_t(data):
+def ts_sd_q_ub_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.q_ub) for c in data.time_series_input.simple_dispatchable_device]
@@ -605,7 +744,7 @@ def ts_sd_q_ub_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_cost_len_eq_num_t(data):
+def ts_sd_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -618,7 +757,7 @@ def ts_sd_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_reg_res_up_cost_len_eq_num_t(data):
+def ts_sd_p_reg_res_up_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_reg_res_up_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -631,7 +770,7 @@ def ts_sd_p_reg_res_up_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_reg_res_down_cost_len_eq_num_t(data):
+def ts_sd_p_reg_res_down_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_reg_res_down_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -644,7 +783,7 @@ def ts_sd_p_reg_res_down_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_syn_res_cost_len_eq_num_t(data):
+def ts_sd_p_syn_res_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_syn_res_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -657,7 +796,7 @@ def ts_sd_p_syn_res_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_nsyn_res_cost_len_eq_num_t(data):
+def ts_sd_p_nsyn_res_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_nsyn_res_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -670,7 +809,7 @@ def ts_sd_p_nsyn_res_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_ramp_res_up_online_cost_len_eq_num_t(data):
+def ts_sd_p_ramp_res_up_online_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_ramp_res_up_online_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -683,7 +822,7 @@ def ts_sd_p_ramp_res_up_online_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_ramp_res_down_online_cost_len_eq_num_t(data):
+def ts_sd_p_ramp_res_down_online_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_ramp_res_down_online_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -696,7 +835,7 @@ def ts_sd_p_ramp_res_down_online_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_ramp_res_down_offline_cost_len_eq_num_t(data):
+def ts_sd_p_ramp_res_down_offline_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_ramp_res_down_offline_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -709,7 +848,7 @@ def ts_sd_p_ramp_res_down_offline_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_ramp_res_up_offline_cost_len_eq_num_t(data):
+def ts_sd_p_ramp_res_up_offline_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.p_ramp_res_up_offline_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -722,7 +861,7 @@ def ts_sd_p_ramp_res_up_offline_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_q_res_up_cost_len_eq_num_t(data):
+def ts_sd_q_res_up_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.q_res_up_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -735,7 +874,7 @@ def ts_sd_q_res_up_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_q_res_down_cost_len_eq_num_t(data):
+def ts_sd_q_res_down_cost_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.q_res_down_cost) for c in data.time_series_input.simple_dispatchable_device]
@@ -748,7 +887,7 @@ def ts_sd_q_res_down_cost_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_prz_ramping_reserve_up_len_eq_num_t(data):
+def ts_prz_ramping_reserve_up_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.RAMPING_RESERVE_UP) for c in data.time_series_input.active_zonal_reserve]
@@ -761,7 +900,7 @@ def ts_prz_ramping_reserve_up_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_prz_ramping_reserve_down_len_eq_num_t(data):
+def ts_prz_ramping_reserve_down_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.RAMPING_RESERVE_DOWN) for c in data.time_series_input.active_zonal_reserve]
@@ -774,7 +913,7 @@ def ts_prz_ramping_reserve_down_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_qrz_react_up_len_eq_num_t(data):
+def ts_qrz_react_up_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.REACT_UP) for c in data.time_series_input.reactive_zonal_reserve]
@@ -787,7 +926,7 @@ def ts_qrz_react_up_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_qrz_react_down_len_eq_num_t(data):
+def ts_qrz_react_down_len_eq_num_t(data, config):
     
     num_t = len(data.time_series_input.general.interval_duration)
     component_lens = [len(c.REACT_DOWN) for c in data.time_series_input.reactive_zonal_reserve]
@@ -800,7 +939,7 @@ def ts_qrz_react_down_len_eq_num_t(data):
             num_t, idx_err)
         raise ModelError(msg)
 
-def ts_sd_on_status_lb_le_ub(data):
+def ts_sd_on_status_lb_le_ub(data, config):
 
     num_t = len(data.time_series_input.general.interval_duration)
     num_sd = len(data.time_series_input.simple_dispatchable_device)
@@ -812,7 +951,7 @@ def ts_sd_on_status_lb_le_ub(data):
         msg = "fails time_series_input simple_dispatchable_device on_status_lb <= on_status_ub. failures (device index, device uid, interval index, on_status_lb, on_status_ub): {}".format(idx_err)
         raise ModelError(msg)
 
-def ts_sd_p_lb_le_ub(data):
+def ts_sd_p_lb_le_ub(data, config):
 
     num_t = len(data.time_series_input.general.interval_duration)
     num_sd = len(data.time_series_input.simple_dispatchable_device)
@@ -824,7 +963,7 @@ def ts_sd_p_lb_le_ub(data):
         msg = "fails time_series_input simple_dispatchable_device p_lb <= p_ub. failures (device index, device uid, interval index, p_lb, p_ub): {}".format(idx_err)
         raise ModelError(msg)
 
-def ts_sd_q_lb_le_ub(data):
+def ts_sd_q_lb_le_ub(data, config):
 
     num_t = len(data.time_series_input.general.interval_duration)
     num_sd = len(data.time_series_input.simple_dispatchable_device)
@@ -836,7 +975,7 @@ def ts_sd_q_lb_le_ub(data):
         msg = "fails time_series_input simple_dispatchable_device q_lb <= q_ub. failures (device index, device uid, interval index, q_lb, q_ub): {}".format(idx_err)
         raise ModelError(msg)
 
-def connected(data):
+def connected(data, config):
 
     msg = ""
 

@@ -15,6 +15,7 @@ i.e. summary.txt, data_errors.txt, ignored_errors.txt
 
 import os, sys, traceback, argparse, subprocess, pathlib
 import pandas
+from datautilities import utils
 
 out_dir_default = 'checker_output'
 out_csv = 'results.csv'
@@ -23,6 +24,7 @@ stderr_file = 'stderr.txt'
 summary_file = 'summary.txt'
 data_errors_file = 'data_errors.txt'
 ignored_errors_file = 'ignored_errors.txt'
+solution_errors_file = 'solution_errors.txt'
 config_file = 'config.json'
     
 if __name__ == '__main__':
@@ -30,6 +32,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument("-l", "--list", help="List file - a CSV formatted text file containing a list of problems to check. Each problem should be on one row.")
+    parser.add_argument(
+        "-c", "--configuration",
+        default=str(pathlib.Path(utils.get_C3DataUtilities_dir(), config_file)),
+        help="Configuration file")
 
     out_dir = out_dir_default
     out_dir = pathlib.Path(out_dir).resolve()
@@ -58,10 +64,11 @@ if __name__ == '__main__':
             ['python', 'C3DataUtilities/check_data.py'] +
             ['-p', problem] +
             ([] if pandas.isna(solution) else ['-s', solution]) +
-            ['-c', config_file] +
+            ['-c', args.configuration] +
             ['-m', check_dir + '/' + summary_file] +
             ['-d', check_dir + '/' + data_errors_file] +
-            ['-i', check_dir + '/' + ignored_errors_file],
+            ['-i', check_dir + '/' + ignored_errors_file] +
+            ['-u', check_dir + '/' + solution_errors_file],
             stdout=stdout, stderr=stderr)
         print('return_code: {}'.format(results.returncode))
         stdout.close()
