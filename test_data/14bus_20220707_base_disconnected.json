@@ -2,8 +2,8 @@
   "network": {
     "general": {
       "base_norm_mva": 100.0,
-      "timestamp_start": "2021-01-10T00:00:00",
-      "timestamp_stop": "2021-01-11T00:00:00"
+      "timestamp_start": "2021-01-10T00:00",
+      "timestamp_stop": "2021-01-11T00:00"
     },
     "violation_cost": {
       "p_bus_vio_cost": 1000000.0,
@@ -2019,23 +2019,6 @@
         "to_bus": "Bus 13",
         "r": 0.06615,
         "x": 0.13027,
-        "b": 0.0,
-        "mva_ub_nom": 2.23,
-        "mva_ub_sht": 2.4530000000000003,
-        "mva_ub_em": 2.5645,
-        "connection_cost": 0.01,
-        "disconnection_cost": 0.01,
-        "initial_status": {
-          "on_status": 1
-        },
-        "additional_shunt": 0
-      },
-      {
-        "uid": "Line 10",
-        "fr_bus": "Bus 7",
-        "to_bus": "Bus 8",
-        "r": 0.0,
-        "x": 0.17615,
         "b": 0.0,
         "mva_ub_nom": 2.23,
         "mva_ub_sht": 2.4530000000000003,

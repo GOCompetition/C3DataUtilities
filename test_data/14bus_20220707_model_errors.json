@@ -2,8 +2,8 @@
   "network": {
     "general": {
       "base_norm_mva": 100.0,
-      "timestamp_start": "2021-01-10T00:00",
-      "timestamp_stop": "2021-01-11T00:00"
+      "timestamp_start": "2001-01-10T00:00:00",
+      "timestamp_stop": "2021-01-11T00:00:00"
     },
     "violation_cost": {
       "p_bus_vio_cost": 1000000.0,
