@@ -6,7 +6,7 @@
 # check timestamp format YYYY-MM-DDThh:mm:ss - done
 # need a regular expression format string [0-9][0-9][0-9][0-9]-[0-9] etc
 # use pandas.Timestamp(timestamp) - done
-# timestamp_stop - timestamp_start == total_horizon - TODO
+# timestamp_stop - timestamp_start == total_horizon - done
 # timestamp_min <= timestamp_start - done
 # timestamp_stop <= timestamp_max - done
 # interval_duratations in interval_duration_schedules - TODO
@@ -356,7 +356,12 @@ def timestamp_stop_minus_start_eq_total_horizon(data, config):
     start = data.network.general.timestamp_start
     stop = data.network.general.timestamp_stop
     if (start is not None) and (stop is not None):
-        pass # todo
+        timestamp_delta = (pandas.Timestamp(stop) - pandas.Timestamp(start)).total_seconds() / 3600.0
+        total_horizon = sum(data.time_series_input.general.interval_duration)
+        if abs(timestamp_delta - total_horizon) > config['time_eq_tol']:
+            msg = 'fails timestamp_stop - timestamp_start == sum(interval_duration). timestamp_stop: {}, timestamp_start: {}, interval_duration: {}, timestamp_stop - timestamp_start: {}, sum(interval_duration): {}, config.time_eq_tol: {}'.format(
+                stop, start, data.time_series_input.general.interval_duration, timestamp_delta, total_horizon, config['time_eq_tol'])
+            raise ModelError(msg)
 
 def ts_uids_not_repeated(data, config):
 

@@ -2,6 +2,7 @@
     "timestamps_required": true,
     "timestamp_min": "2012-01-01T00:00:00",
     "timestamp_max": "2013-01-01T00:00:00",
+    "time_eq_tol": 0.000001,
     "interval_duration_schedules": [
         [
             0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,
