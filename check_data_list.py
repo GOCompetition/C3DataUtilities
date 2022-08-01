@@ -13,7 +13,7 @@ the output of the check for that entry
 i.e. summary.txt, data_errors.txt, ignored_errors.txt
 '''
 
-import os, sys, traceback, argparse, subprocess, pathlib
+import os, sys, traceback, argparse, subprocess, pathlib, shutil
 import pandas
 from datautilities import utils
 
@@ -52,6 +52,7 @@ if __name__ == '__main__':
     checks['results_dir'] = [str(pathlib.Path(out_dir, str(i)).resolve()) for i in range(num_checks)]
     checks['return_code'] = -1
     os.mkdir(out_dir)
+    shutil.copy2(str(pathlib.Path(args.configuration)), out_dir)
     for i in range(num_checks):
         problem = checks['problem'].iloc[i]
         solution = checks['solution'].iloc[i]
