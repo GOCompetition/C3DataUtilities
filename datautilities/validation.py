@@ -2,19 +2,6 @@
 
 '''
 
-# todo
-# check timestamp format YYYY-MM-DDThh:mm:ss - done
-# need a regular expression format string [0-9][0-9][0-9][0-9]-[0-9] etc
-# use pandas.Timestamp(timestamp) - done
-# timestamp_stop - timestamp_start == total_horizon - done
-# timestamp_min <= timestamp_start - done
-# timestamp_stop <= timestamp_max - done
-# interval_duratations in interval_duration_schedules - TODO
-# timestamp format - is this already being checked? - apparently not
-# timestamp existence - currently these are optional fields, so use the config file to require them - if not exist they will be None - done
-# need to convert timestamps in our config file from strings to real time stamps - how does Pydantic do it?
-# pydantic keeps them as strings
-
 import networkx, traceback, pprint, json, re, pandas
 from pydantic.error_wrappers import ValidationError
 from datamodel.input.data import InputDataFile
@@ -193,6 +180,8 @@ def model_checks(data, config):
         timestamp_start_ge_min,
         timestamp_stop_le_max,
         timestamp_stop_minus_start_eq_total_horizon,
+        # interval_duratations in interval_duration_schedules - TODO
+        interval_duration_in_schedules,
         network_and_reliability_uids_not_repeated,
         ts_uids_not_repeated,
         ctg_dvc_uids_in_domain,
@@ -362,6 +351,22 @@ def timestamp_stop_minus_start_eq_total_horizon(data, config):
             msg = 'fails timestamp_stop - timestamp_start == sum(interval_duration). timestamp_stop: {}, timestamp_start: {}, interval_duration: {}, timestamp_stop - timestamp_start: {}, sum(interval_duration): {}, config.time_eq_tol: {}'.format(
                 stop, start, data.time_series_input.general.interval_duration, timestamp_delta, total_horizon, config['time_eq_tol'])
             raise ModelError(msg)
+
+# interval_duratations in interval_duration_schedules - TODO
+def interval_duration_in_schedules(data, config):
+    
+    interval_durations = data.time_series_input.general.interval_duration
+    num_intervals = len(interval_durations)
+    schedules = config['interval_duration_schedules']
+    schedules_right_len = [s for s in schedules if len(s) == num_intervals]
+    schedules_match = [
+        s for s in schedules_right_len
+        if all([(s[i] == interval_durations[i]) for i in range(num_intervals)])]
+    found = (len(schedules_match) > 0)
+    if not found:
+        msg = "fails data.time_series_input.general.interval_duration in config.interval_duration_schedules. data: {}, config: {}".format(
+            interval_durations, schedules)
+        raise ModelError(msg)
 
 def ts_uids_not_repeated(data, config):
 
