@@ -71,11 +71,17 @@ if __name__ == '__main__':
             ['-i', check_dir + '/' + ignored_errors_file] +
             ['-u', check_dir + '/' + solution_errors_file],
             stdout=stdout, stderr=stderr)
-        print('return_code: {}'.format(results.returncode))
+        print({'problem': problem, 'solution': solution, 'return_code': results.returncode})
         stdout.close()
         stderr.close()
-        checks['return_code'].iloc[i] = results.returncode # SettingWithCopyWarning but it seems to work
+        #checks['return_code'].iloc[i] = results.returncode # SettingWithCopyWarning but it seems to work
+        checks.loc[i, 'return_code'] = results.returncode # SettingWithCopyWarning but it seems to work
 
+    pandas.set_option('display.max_rows', None)
+    pandas.set_option('display.max_columns', None)
+    #pandas.set_option('display.width', 2000)
+    #pandas.set_option('display.float_format', '{:20,.2f}'.format)
+    pandas.set_option('display.max_colwidth', None)
     print('checks:')
     print(checks)
 
