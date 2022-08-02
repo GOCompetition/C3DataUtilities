@@ -178,9 +178,10 @@ def model_checks(data, config):
         timestamp_start_valid,
         timestamp_stop_valid,
         timestamp_start_ge_min,
+        total_horizon_le_timestamp_max_minus_start,
         timestamp_stop_le_max,
         timestamp_stop_minus_start_eq_total_horizon,
-        # interval_duratations in interval_duration_schedules - TODO
+        # interval_duratations in interval_duration_schedules - distinguish between divisions - TODO
         interval_duration_in_schedules,
         network_and_reliability_uids_not_repeated,
         ts_uids_not_repeated,
@@ -276,14 +277,14 @@ def valid_timestamp_str(data):
 
 def timestamp_start_required(data, config):
 
-    if config['timestamps_required']:
+    if config['timestamp_start_required']:
         if data.network.general.timestamp_start is None:
             msg = 'data -> general -> timestamp_start required by config, not present in data'
             raise ModelError(msg)
 
 def timestamp_stop_required(data, config):
 
-    if config['timestamps_required']:
+    if config['timestamp_stop_required']:
         if data.network.general.timestamp_stop is None:
             msg = 'data -> general -> timestamp_stop required by config, not present in data'
             raise ModelError(msg)
@@ -325,6 +326,18 @@ def timestamp_start_ge_min(data, config):
             msg = 'fails {} <= {}. {}: {}, {}: {}'.format(
                 'config.timestamp_min', 'data.network.general.timestamp_start',
                 'config.timestamp_min', min_time, 'data.network.general.timestamp_start', start)
+            raise ModelError(msg)
+
+def total_horizon_le_timestamp_max_minus_start(data, config):
+
+    start = data.network.general.timestamp_start
+    if start is not None:
+        max_time = config['timestamp_max']
+        timestamp_delta = (pandas.Timestamp(max_time) - pandas.Timestamp(start)).total_seconds() / 3600.0
+        total_horizon = sum(data.time_series_input.general.interval_duration)
+        if total_horizon > timestamp_delta:
+            msg = 'fails total_horizon <= timestamp_max - timestamp_start. config.timestamp_max: {}, data.timestamp_start: {}, data.interval_duration: {}, timestamp_max - timestamp_start: {}, sum(interval_duration): {}'.format(
+                max_time, start, data.time_series_input.general.interval_duration, timestamp_delta, total_horizon)
             raise ModelError(msg)
 
 def timestamp_stop_le_max(data, config):
