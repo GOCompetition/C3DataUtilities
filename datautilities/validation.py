@@ -5,7 +5,7 @@
 import networkx, traceback, pprint, json, re, pandas
 from pydantic.error_wrappers import ValidationError
 from datamodel.input.data import InputDataFile
-#from datamodel.output.data import OutputDataFile
+from datamodel.output.data import OutputDataFile
 from datautilities import utils
 from datautilities.errors import ModelError, GitError
 
@@ -98,14 +98,15 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     # read solution
     if solution_file is not None:
         print('solution file: {}'.format(solution_file))
-        # try:
-        #     solution_data_model = OutputDataFile.load(solution_file)
-        # except ValidationError as e:
-        #     with open(summary_file, 'a') as f:
-        #         f.write('solution read error - pydantic validation')
-        #     with open(solution_errors_file, 'a') as f:
-        #         f.write(traceback.format_exc())
-        #     raise e
+        try:
+            solution_data_model = OutputDataFile.load(solution_file)
+        except ValidationError as e:
+            with open(summary_file, 'a') as f:
+                f.write('solution read error - pydantic validation')
+            with open(solution_errors_file, 'a') as f:
+                f.write(traceback.format_exc())
+            raise e
+        print(solution_data_model.__dict__)
 
 def get_summary(data):
 

@@ -15,11 +15,12 @@ setup(
         "datautilities": "datautilities"
         },
     install_requires=[
-        "scipy",
-        "numpy",
-        "pandas",
-        "pydantic",
-        "networkx",
+        # "scipy",
+        # "numpy",
+        # "pandas",
+        # "pydantic",
+        # "networkx",
+
         # "datamodel",
         # "Bid-DS-data-model",
         ]
