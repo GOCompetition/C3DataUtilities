@@ -19905,7 +19905,7 @@
           0.1,
           0.1,
           0.1,
-          0.1,
+          false,
           false
         ],
         "p_ramp_res_down_offline_cost": [
