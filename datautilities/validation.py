@@ -58,6 +58,14 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             f.write(traceback.format_exc())
 
     # read data
+    # this is the main part of the run time of the problem data checker
+    # on 6000 bus case on constance, this is ~20 sec and the rest is <1 sec
+    # in particular, set membership and connectedness are fast even if not implemented efficiently
+    # solution read time seems to be about comparable to problem read time
+    # (i.e. 5 on D1 which could translate to 10 to 20 sec on D2)
+    # not sure yet about larger cases or solution data check or solution eval
+    # have not yet implemented more expensive problem data checks - initial AC feas, independent device feas
+    # have not yet implemented scrubber - i.e. UID anonymization
     start_time = time.time()
     try:
         data_model = InputDataFile.load(problem_file)
@@ -765,7 +773,7 @@ def sd_type_in_domain(data, config):
 
 def acl_fr_bus_uids_in_domain(data, config):
 
-    #start_time = time.time()
+    start_time = time.time()
 
     ### should be fast
     items = data.network.ac_line
@@ -775,7 +783,7 @@ def acl_fr_bus_uids_in_domain(data, config):
     domain_name = 'network.bus.uid'
     items_field_in_domain(items, field, domain, items_name, domain_name)
 
-    ### might be slower
+    ### might be slower - no difference though on 6000 bus case on constance
     # domain = data.network.get_bus_uids()
     # domain = set(domain)
     # num_dvc = len(data.network.ac_line)
@@ -790,8 +798,8 @@ def acl_fr_bus_uids_in_domain(data, config):
     #         dvc_bus_not_in_domain)
     #     raise ModelError(msg)
 
-    #end_time = time.time()
-    #print('acl_fr_bus_uids_in_domain time: {}'.format(end_time - start_time))
+    end_time = time.time()
+    print('acl_fr_bus_uids_in_domain time: {}'.format(end_time - start_time))
 
 def acl_to_bus_uids_in_domain(data, config):
 
