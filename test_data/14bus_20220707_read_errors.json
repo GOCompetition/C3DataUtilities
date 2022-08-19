@@ -3895,7 +3895,6 @@
           "accu_up_time": 1.0
         },
         "q_linear_cap": 0,
-        "q_bound_cap": 1,
         "p_reg_res_up_ub": 0.09567,
         "p_reg_res_down_ub": 0.09567,
         "p_syn_res_ub": 0.09567,
@@ -3980,7 +3979,6 @@
           "accu_down_time": 0.0,
           "accu_up_time": 1.0
         },
-        "q_linear_cap": 0,
         "q_bound_cap": 1,
         "p_reg_res_up_ub": 0.30618000000000006,
         "p_reg_res_down_ub": 0.30618000000000006,
@@ -4291,8 +4289,7 @@
         "disconnection_cost": 0.01,
         "initial_status": {
           "on_status": 1
-        },
-        "additional_shunt": 0
+        }
       }
     ],
     "two_winding_transformer": [

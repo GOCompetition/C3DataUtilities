@@ -32,6 +32,8 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     for fn in [summary_file, problem_errors_file, ignored_errors_file, solution_errors_file]:
         with open(fn, 'w') as f:
             pass
+    # - todo solution summary file? for now just use the problem summary file. that may be the right way anyway
+    solution_summary_file = summary_file
 
     # data file
     with open(summary_file, 'a') as f:
@@ -95,9 +97,10 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         f.write(pp.pformat(summary))
         f.write('\n')
 
-    # read solution
     if solution_file is not None:
-        print('solution file: {}'.format(solution_file))
+
+        # read solution
+        #print('solution file: {}'.format(solution_file))
         try:
             solution_data_model = OutputDataFile.load(solution_file)
         except ValidationError as e:
@@ -106,7 +109,35 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
-        print(solution_data_model.__dict__)
+        
+        # solution data model checks
+        try:
+            solution_model_checks(data_model, solution_data_model, config)
+        except ModelError as e:
+            with open(summary_file, 'a') as f:
+                f.write('solution model error - independent checks\n')
+            with open(solution_errors_file, 'a') as f:
+                f.write(traceback.format_exc())
+            raise e
+
+        # summary
+        solution_summary = get_solution_summary(data_model, solution_data_model)
+        with open(solution_summary_file, 'a') as f:
+            pp = pprint.PrettyPrinter()
+            pp.pprint(solution_summary)
+            f.write('solution data summary:\n')
+            f.write(pp.pformat(solution_summary))
+            f.write('\n')
+
+        print('solution data')
+        for s in ['bus', 'shunt', 'simple_dispatchable_device', 'ac_line', 'dc_line', 'two_winding_transformer']:
+            print('section: {}'.format(s))
+            for i in solution_data_model.time_series_output.__dict__[s]:
+                for k, v in i.__dict__.items():
+                    if k == 'uid':
+                        print('  {}: {}'.format(k, v))
+                    else:
+                        print('    {}: {}'.format(k, v))            
 
 def get_summary(data):
 
@@ -170,6 +201,13 @@ def get_summary(data):
     summary['interval durations'] = ts_intervals
     
     return summary
+
+def get_solution_summary(problem_data, solution_data):
+
+    problem_summary = get_summary(problem_data)
+    # todo add solution info - is there anything?
+    solution_summary = {}
+    return solution_summary
 
 def model_checks(data, config):
 
@@ -263,6 +301,75 @@ def model_checks(data, config):
             'number of errors: {}\n'.format(len(errors)) +
             '\n'.join([str(r) for r in errors]))
         raise ModelError(msg)        
+
+def solution_model_checks(data, solution_data, config):
+
+    # todo add checks
+    # uids unique - done
+    # uids in domain - done
+    # uids cover domain - done
+    # len of time series lists
+    # anything else?
+    # bus, shunt, simple_dispatchable_device, ac_line, dc_line, two_winding_transformer
+    checks = [
+        output_ts_uids_not_repeated,
+        output_ts_bus_uids_in_domain,
+        output_ts_bus_uids_cover_domain,
+        output_ts_shunt_uids_in_domain,
+        output_ts_shunt_uids_cover_domain,
+        output_ts_simple_dispatchable_device_uids_in_domain,
+        output_ts_simple_dispatchable_device_uids_cover_domain,
+        output_ts_ac_line_uids_in_domain,
+        output_ts_ac_line_uids_cover_domain,
+        output_ts_dc_line_uids_in_domain,
+        output_ts_dc_line_uids_cover_domain,
+        output_ts_two_winding_transformer_uids_in_domain,
+        output_ts_two_winding_transformer_uids_cover_domain,
+        output_ts_bus_vm_len_eq_num_t,
+        output_ts_bus_va_len_eq_num_t,
+        output_ts_shunt_step_len_eq_num_t,
+        output_ts_simple_dispatchable_device_on_status_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_on_len_eq_num_t,
+        output_ts_simple_dispatchable_device_q_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_reg_res_up_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_reg_res_down_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_syn_res_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_nsyn_res_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_ramp_res_up_online_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_ramp_res_down_online_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_ramp_res_up_offline_len_eq_num_t,
+        output_ts_simple_dispatchable_device_p_ramp_res_down_offline_len_eq_num_t,
+        output_ts_simple_dispatchable_device_q_res_up_len_eq_num_t,
+        output_ts_simple_dispatchable_device_q_res_down_len_eq_num_t,
+        output_ts_ac_line_on_status_len_eq_num_t,
+        output_ts_dc_line_p_dc_fr_len_eq_num_t,
+        output_ts_dc_line_q_dc_fr_len_eq_num_t,
+        output_ts_dc_line_q_dc_to_len_eq_num_t,
+        output_ts_two_winding_transformer_on_status_len_eq_num_t,
+        output_ts_two_winding_transformer_tm_len_eq_num_t,
+        output_ts_two_winding_transformer_ta_len_eq_num_t,
+    ]
+    errors = []
+    for c in checks:
+        try:
+            c(data, solution_data, config)
+        except ModelError as e:
+            errors.append(e)
+        except Exception as e:
+            msg = (
+                'validation.solution_model_checks found errors\n' + 
+                'number of errors: {}\n'.format(len(errors)) +
+                '\n'.join([str(e) for e in errors]))
+            if len(errors) > 0:
+                raise ModelError(msg)
+            else:
+                raise e
+    if len(errors) > 0:
+        msg = (
+            'validation.solution_model_checks found errors\n' + 
+            'number of errors: {}\n'.format(len(errors)) +
+            '\n'.join([str(r) for r in errors]))
+        raise ModelError(msg)
 
 def valid_timestamp_str(data):
     '''
@@ -382,6 +489,20 @@ def interval_duration_in_schedules(data, config):
             interval_durations, schedules)
         raise ModelError(msg)
 
+def output_ts_uids_not_repeated(data, output_data, config):
+
+    uids = output_data.time_series_output.get_uids()
+    uids_sorted = sorted(uids)
+    uids_set = set(uids_sorted)
+    uids_num = {i:0 for i in uids_set}
+    for i in uids:
+        uids_num[i] += 1
+    uids_num_max = max([0] + list(uids_num.values()))
+    if uids_num_max > 1:
+        msg = "fails uid uniqueness in time_series_output section. repeated uids (uid, number of occurrences): {}".format(
+            [(k, v) for k, v in uids_num.items() if v > 1])
+        raise ModelError(msg)
+
 def ts_uids_not_repeated(data, config):
 
     uids = data.time_series_input.get_uids()
@@ -431,6 +552,138 @@ def ctg_dvc_uids_in_domain(data, config):
         msg = "fails contingency outaged devices in branches. failing contingencies (index, uid, failing devices): {}".format(
             ctg_comp_not_in_domain)
         raise ModelError(msg)
+
+def items_field_in_domain(items, field, domain, items_name, domain_name):
+    # todo - use this - more efficient than set membership in a loop
+
+    domain_set = set(domain)
+    domain_size = len(domain_set)
+    values = [getattr(i, field) for i in items]
+    values_not_in_domain = set(values).difference(domain_set)
+    all_values = list(domain_set) + list(values_not_in_domain)
+    all_values_map = {all_values[i]:i for i in range(len(all_values))}
+    failures = [(i, items[i].uid, values[i]) for i in range(len(items)) if all_values_map[values[i]] >= domain_size]
+    if len(failures) > 0:
+        msg = "fails items field in domain. items: {}, field: {}, domain: {}, failing items (index, uid, field value): {}".format(items_name, field, domain_name, failures)
+        raise ModelError(msg)
+
+def items_field_cover_domain(items, field, domain, items_name, domain_name):
+    # todo - use this - more efficient than set membership in a loop
+
+    values = [getattr(i, field) for i in items]
+    values = set(values)
+    failures = list(set(domain).difference(values))
+    if len(failures) > 0:
+        msg = "fails items field cover domain. items: {}, field: {}, domain: {}, failing domain elements: {}".format(items_name, field, domain_name, failures)
+        raise ModelError(msg)
+
+def output_ts_bus_uids_in_domain(data, solution, config):
+
+    items = solution.time_series_output.bus
+    field = 'uid'
+    domain = data.network.get_bus_uids()
+    items_name = 'time_series_output.bus'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_bus_uids_cover_domain(data, solution, config):
+
+    items = solution.time_series_output.bus
+    field = 'uid'
+    domain = data.network.get_bus_uids()
+    items_name = 'time_series_output.bus'
+    domain_name = 'network.bus.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_shunt_uids_in_domain(data, solution, config):
+
+    items = solution.time_series_output.shunt
+    field = 'uid'
+    domain = data.network.get_shunt_uids()
+    items_name = 'time_series_output.shunt'
+    domain_name = 'network.shunt.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_shunt_uids_cover_domain(data, solution, config):
+
+    items = solution.time_series_output.shunt
+    field = 'uid'
+    domain = data.network.get_shunt_uids()
+    items_name = 'time_series_output.shunt'
+    domain_name = 'network.shunt.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_simple_dispatchable_device_uids_in_domain(data, solution, config):
+
+    items = solution.time_series_output.simple_dispatchable_device
+    field = 'uid'
+    domain = data.network.get_simple_dispatchable_device_uids()
+    items_name = 'time_series_output.simple_dispatchable_device'
+    domain_name = 'network.simple_dispatchable_device.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_simple_dispatchable_device_uids_cover_domain(data, solution, config):
+
+    items = solution.time_series_output.simple_dispatchable_device
+    field = 'uid'
+    domain = data.network.get_simple_dispatchable_device_uids()
+    items_name = 'time_series_output.simple_dispatchable_device'
+    domain_name = 'network.simple_dispatchable_device.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_ac_line_uids_in_domain(data, solution, config):
+
+    items = solution.time_series_output.ac_line
+    field = 'uid'
+    domain = data.network.get_ac_line_uids()
+    items_name = 'time_series_output.ac_line'
+    domain_name = 'network.ac_line.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_ac_line_uids_cover_domain(data, solution, config):
+
+    items = solution.time_series_output.ac_line
+    field = 'uid'
+    domain = data.network.get_ac_line_uids()
+    items_name = 'time_series_output.ac_line'
+    domain_name = 'network.ac_line.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_dc_line_uids_in_domain(data, solution, config):
+
+    items = solution.time_series_output.dc_line
+    field = 'uid'
+    domain = data.network.get_dc_line_uids()
+    items_name = 'time_series_output.dc_line'
+    domain_name = 'network.dc_line.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_dc_line_uids_cover_domain(data, solution, config):
+
+    items = solution.time_series_output.dc_line
+    field = 'uid'
+    domain = data.network.get_dc_line_uids()
+    items_name = 'time_series_output.dc_line'
+    domain_name = 'network.dc_line.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_two_winding_transformer_uids_in_domain(data, solution, config):
+
+    items = solution.time_series_output.two_winding_transformer
+    field = 'uid'
+    domain = data.network.get_two_winding_transformer_uids()
+    items_name = 'time_series_output.two_winding_transformer'
+    domain_name = 'network.two_winding_transformer.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
+
+def output_ts_two_winding_transformer_uids_cover_domain(data, solution, config):
+
+    items = solution.time_series_output.two_winding_transformer
+    field = 'uid'
+    domain = data.network.get_two_winding_transformer_uids()
+    items_name = 'time_series_output.two_winding_transformer'
+    domain_name = 'network.two_winding_transformer.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
 
 def bus_prz_uids_in_domain(data, config):
 
@@ -692,276 +945,207 @@ def ts_qrz_uids_cover_domain(data, config):
 
 def ts_sd_on_status_ub_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.on_status_ub) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(on_status_ub) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(on_status_ub)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'on_status_ub')
 
 def ts_sd_on_status_lb_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.on_status_lb) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(on_status_lb) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(on_status_lb)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'on_status_lb')
 
 def ts_sd_p_lb_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_lb) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_lb) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_lb)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_lb')
 
 def ts_sd_p_ub_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_ub) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_ub) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ub)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_ub')
 
 def ts_sd_q_lb_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.q_lb) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(q_lb) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(q_lb)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'q_lb')
 
 def ts_sd_q_ub_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.q_ub) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(q_ub) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(q_ub)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'q_ub')
 
 def ts_sd_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'cost')
 
 def ts_sd_p_reg_res_up_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_reg_res_up_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_reg_res_up_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_reg_res_up_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_reg_res_up_cost')
 
 def ts_sd_p_reg_res_down_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_reg_res_down_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_reg_res_down_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_reg_res_down_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_reg_res_down_cost')
 
 def ts_sd_p_syn_res_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_syn_res_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_syn_res_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_syn_res_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_syn_res_cost')
 
 def ts_sd_p_nsyn_res_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_nsyn_res_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_nsyn_res_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_nsyn_res_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_nsyn_res_cost')
 
 def ts_sd_p_ramp_res_up_online_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_ramp_res_up_online_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_ramp_res_up_online_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ramp_res_up_online_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_ramp_res_up_online_cost')
 
 def ts_sd_p_ramp_res_down_online_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_ramp_res_down_online_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_ramp_res_down_online_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ramp_res_down_online_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_ramp_res_down_online_cost')
 
 def ts_sd_p_ramp_res_down_offline_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_ramp_res_down_offline_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_ramp_res_down_offline_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ramp_res_down_offline_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_ramp_res_down_offline_cost')
 
 def ts_sd_p_ramp_res_up_offline_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.p_ramp_res_up_offline_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(p_ramp_res_up_offline_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(p_ramp_res_up_offline_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'p_ramp_res_up_offline_cost')
 
 def ts_sd_q_res_up_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.q_res_up_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(q_res_up_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(q_res_up_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'q_res_up_cost')
 
 def ts_sd_q_res_down_cost_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.q_res_down_cost) for c in data.time_series_input.simple_dispatchable_device]
-    idx_err = [
-        (i, data.time_series_input.simple_dispatchable_device[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input simple_dispatchable_device len(q_res_down_cost) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(q_res_down_cost)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'simple_dispatchable_device', 'q_res_down_cost')
 
 def ts_prz_ramping_reserve_up_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.RAMPING_RESERVE_UP) for c in data.time_series_input.active_zonal_reserve]
-    idx_err = [
-        (i, data.time_series_input.active_zonal_reserve[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input active_zonal_reserve len(RAMPING_RESERVE_UP) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(RAMPING_RESERVE_UP)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'active_zonal_reserve', 'RAMPING_RESERVE_UP')
 
 def ts_prz_ramping_reserve_down_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.RAMPING_RESERVE_DOWN) for c in data.time_series_input.active_zonal_reserve]
-    idx_err = [
-        (i, data.time_series_input.active_zonal_reserve[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input active_zonal_reserve len(RAMPING_RESERVE_DOWN) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(RAMPING_RESERVE_DOWN)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'active_zonal_reserve', 'RAMPING_RESERVE_DOWN')
 
 def ts_qrz_react_up_len_eq_num_t(data, config):
     
-    num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.REACT_UP) for c in data.time_series_input.reactive_zonal_reserve]
-    idx_err = [
-        (i, data.time_series_input.reactive_zonal_reserve[i].uid, component_lens[i])
-        for i in range(len(component_lens))
-        if component_lens[i] != num_t]
-    if len(idx_err) > 0:
-        msg = "fails time_series_input reactive_zonal_reserve len(REACT_UP) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(REACT_UP)): {}".format(
-            num_t, idx_err)
-        raise ModelError(msg)
+    ts_component_field_len_eq_num_t(data, 'reactive_zonal_reserve', 'REACT_UP')
 
 def ts_qrz_react_down_len_eq_num_t(data, config):
     
+    ts_component_field_len_eq_num_t(data, 'reactive_zonal_reserve', 'REACT_DOWN')
+
+def ts_component_field_len_eq_num_t(data, component, field):
+
     num_t = len(data.time_series_input.general.interval_duration)
-    component_lens = [len(c.REACT_DOWN) for c in data.time_series_input.reactive_zonal_reserve]
+    component_uids = [c.uid for c in getattr(data.time_series_input, component)]
+    component_lens = [len(getattr(c, field)) for c in getattr(data.time_series_input, component)]
     idx_err = [
-        (i, data.time_series_input.reactive_zonal_reserve[i].uid, component_lens[i])
+        (i, component_uids[i], component_lens[i])
         for i in range(len(component_lens))
         if component_lens[i] != num_t]
     if len(idx_err) > 0:
-        msg = "fails time_series_input reactive_zonal_reserve len(REACT_DOWN) == len(intervals). len(intervals): {}. failing devices (idx, uid, len(REACT_DOWN)): {}".format(
-            num_t, idx_err)
+        msg = "fails time_series_input {} len({}) == len(intervals). len(intervals): {}. failing items (idx, uid, len({})): {}".format(
+            component, field, num_t, field, idx_err)
         raise ModelError(msg)
+
+def output_ts_component_field_len_eq_num_t(data, solution, component, field):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    component_uids = [c.uid for c in getattr(solution.time_series_output, component)]
+    component_lens = [len(getattr(c, field)) for c in getattr(solution.time_series_output, component)]
+    idx_err = [
+        (i, component_uids[i], component_lens[i])
+        for i in range(len(component_lens))
+        if component_lens[i] != num_t]
+    if len(idx_err) > 0:
+        msg = "fails time_series_output {} len({}) == len(time_series_input.intervals). len(intervals): {}. failing items (idx, uid, len({})): {}".format(
+            component, field, num_t, field, idx_err)
+        raise ModelError(msg)
+
+def output_ts_bus_vm_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'bus', 'vm')
+
+def output_ts_bus_va_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'bus', 'va')
+    
+def output_ts_shunt_step_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'shunt', 'step')
+
+def output_ts_simple_dispatchable_device_on_status_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'on_status')
+
+def output_ts_simple_dispatchable_device_p_on_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_on')
+
+def output_ts_simple_dispatchable_device_q_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'q')
+
+def output_ts_simple_dispatchable_device_p_reg_res_up_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_reg_res_up')
+
+def output_ts_simple_dispatchable_device_p_reg_res_down_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_reg_res_down')
+
+def output_ts_simple_dispatchable_device_p_syn_res_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_syn_res')
+
+def output_ts_simple_dispatchable_device_p_nsyn_res_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_nsyn_res')
+
+def output_ts_simple_dispatchable_device_p_ramp_res_up_online_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_ramp_res_up_online')
+
+def output_ts_simple_dispatchable_device_p_ramp_res_down_online_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_ramp_res_down_online')
+
+def output_ts_simple_dispatchable_device_p_ramp_res_up_offline_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_ramp_res_up_offline')
+
+def output_ts_simple_dispatchable_device_p_ramp_res_down_offline_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'p_ramp_res_down_offline')
+
+def output_ts_simple_dispatchable_device_q_res_up_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'q_res_up')
+
+def output_ts_simple_dispatchable_device_q_res_down_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'simple_dispatchable_device', 'q_res_down')
+
+def output_ts_ac_line_on_status_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'ac_line', 'on_status')
+
+def output_ts_dc_line_p_dc_fr_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'p_dc_fr')
+
+def output_ts_dc_line_q_dc_fr_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'q_dc_fr')
+
+def output_ts_dc_line_q_dc_to_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'q_dc_to')
+
+def output_ts_two_winding_transformer_on_status_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'two_winding_transformer', 'on_status')
+
+def output_ts_two_winding_transformer_tm_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'two_winding_transformer', 'tm')
+
+def output_ts_two_winding_transformer_ta_len_eq_num_t(data, solution, config):
+    
+    output_ts_component_field_len_eq_num_t(data, solution, 'two_winding_transformer', 'ta')
 
 def ts_sd_on_status_lb_le_ub(data, config):
 
