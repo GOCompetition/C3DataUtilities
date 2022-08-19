@@ -9,8 +9,6 @@ from datamodel.output.data import OutputDataFile
 from datautilities import utils
 from datautilities.errors import ModelError, GitError
 
-timestamp_pattern_str = '\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\Z'
-
 def write(file_name, mode, text):
 
     with open(file_name, mode) as f:
@@ -26,7 +24,8 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
 
     # read config
     config = read_config(config_file)
-    #print('config: {}'.format(config))
+    print('config: {}'.format(config))
+    print(config['timestamp_pattern_str'])
 
     # open files
     for fn in [summary_file, problem_errors_file, ignored_errors_file, solution_errors_file]:
@@ -387,7 +386,7 @@ def solution_model_checks(data, solution_data, config):
             '\n'.join([str(r) for r in errors]))
         raise ModelError(msg)
 
-def valid_timestamp_str(data):
+def valid_timestamp_str(timestamp_pattern_str, data):
     '''
     returns True if data is a valid timestamp string else False
     '''
@@ -417,10 +416,10 @@ def timestamp_start_valid(data, config):
 
     start = data.network.general.timestamp_start
     if start is not None:
-        if not valid_timestamp_str(start):
+        if not valid_timestamp_str(config['timestamp_pattern_str'], start):
             raise ModelError(
                 'data -> general -> timestamp_start not a valid timestamp string - incorrect format. expected: "{}", got: "{}"'.format(
-                    timestamp_pattern_str, start))
+                    config['timestamp_pattern_str'], start))
         try:
             timestamp = pandas.Timestamp(start)
         except:
@@ -431,10 +430,10 @@ def timestamp_stop_valid(data, config):
 
     end = data.network.general.timestamp_stop
     if end is not None:
-        if not valid_timestamp_str(end):
+        if not valid_timestamp_str(config['timestamp_pattern_str'], end):
             raise ModelError(
                 'data -> general -> timestamp_stop not a valid timestamp string - incorrect format. expected: "{}", got: "{}"'.format(
-                    timestamp_pattern_str, end))
+                    config['timestamp_pattern_str'], end))
         try:
             timestamp = pandas.Timestamp(end)
         except:
