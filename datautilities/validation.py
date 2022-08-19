@@ -2,7 +2,7 @@
 
 '''
 
-import networkx, traceback, pprint, json, re, pandas
+import networkx, traceback, pprint, json, re, pandas, time
 from pydantic.error_wrappers import ValidationError
 from datamodel.input.data import InputDataFile
 from datamodel.output.data import OutputDataFile
@@ -58,6 +58,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             f.write(traceback.format_exc())
 
     # read data
+    start_time = time.time()
     try:
         data_model = InputDataFile.load(problem_file)
     except ValidationError as e:
@@ -66,8 +67,11 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
+    end_time = time.time()
+    print('load time: {}'.format(end_time - start_time))
 
     # independent data model checks
+    start_time = time.time()
     try:
         model_checks(data_model, config)
     except ModelError as e:
@@ -76,8 +80,11 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
+    end_time = time.time()
+    print('model_checks time: {}'.format(end_time - start_time))
 
     # connectedness check
+    start_time = time.time()
     try:
         connected(data_model, config)
     except ModelError as e:
@@ -86,6 +93,8 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
+    end_time = time.time()
+    print('connected time: {}'.format(end_time - start_time))
 
     # summary
     summary = get_summary(data_model)
@@ -100,6 +109,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     if solution_file is not None:
 
         # read solution
+        start_time = time.time()
         #print('solution file: {}'.format(solution_file))
         try:
             solution_data_model = OutputDataFile.load(solution_file)
@@ -109,8 +119,11 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
+        end_time = time.time()
+        print('solution load time: {}'.format(end_time - start_time))
         
         # solution data model checks
+        start_time = time.time()
         try:
             solution_model_checks(data_model, solution_data_model, config)
         except ModelError as e:
@@ -119,6 +132,8 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
+        end_time = time.time()
+        print('solution model_checks time: {}'.format(end_time - start_time))
 
         # summary
         solution_summary = get_solution_summary(data_model, solution_data_model)
@@ -129,15 +144,15 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             f.write(pp.pformat(solution_summary))
             f.write('\n')
 
-        print('solution data')
-        for s in ['bus', 'shunt', 'simple_dispatchable_device', 'ac_line', 'dc_line', 'two_winding_transformer']:
-            print('section: {}'.format(s))
-            for i in solution_data_model.time_series_output.__dict__[s]:
-                for k, v in i.__dict__.items():
-                    if k == 'uid':
-                        print('  {}: {}'.format(k, v))
-                    else:
-                        print('    {}: {}'.format(k, v))            
+        # print('solution data')
+        # for s in ['bus', 'shunt', 'simple_dispatchable_device', 'ac_line', 'dc_line', 'two_winding_transformer']:
+        #     print('section: {}'.format(s))
+        #     for i in solution_data_model.time_series_output.__dict__[s]:
+        #         for k, v in i.__dict__.items():
+        #             if k == 'uid':
+        #                 print('  {}: {}'.format(k, v))
+        #             else:
+        #                 print('    {}: {}'.format(k, v))            
 
 def get_summary(data):
 
@@ -300,17 +315,10 @@ def model_checks(data, config):
             'validation.model_checks found errors\n' + 
             'number of errors: {}\n'.format(len(errors)) +
             '\n'.join([str(r) for r in errors]))
-        raise ModelError(msg)        
+        raise ModelError(msg)
 
 def solution_model_checks(data, solution_data, config):
 
-    # todo add checks
-    # uids unique - done
-    # uids in domain - done
-    # uids cover domain - done
-    # len of time series lists
-    # anything else?
-    # bus, shunt, simple_dispatchable_device, ac_line, dc_line, two_winding_transformer
     checks = [
         output_ts_uids_not_repeated,
         output_ts_bus_uids_in_domain,
@@ -473,7 +481,7 @@ def timestamp_stop_minus_start_eq_total_horizon(data, config):
                 stop, start, data.time_series_input.general.interval_duration, timestamp_delta, total_horizon, config['time_eq_tol'])
             raise ModelError(msg)
 
-# interval_duratations in interval_duration_schedules - TODO
+# interval_duratations in interval_duration_schedules - TODO - recognize division
 def interval_duration_in_schedules(data, config):
     
     interval_durations = data.time_series_input.general.interval_duration
@@ -533,6 +541,7 @@ def network_and_reliability_uids_not_repeated(data, config):
 
 def ctg_dvc_uids_in_domain(data, config):
 
+    # todo make this more efficient
     domain = (
         data.network.get_ac_line_uids() +
         data.network.get_two_winding_transformer_uids() +
@@ -687,6 +696,9 @@ def output_ts_two_winding_transformer_uids_cover_domain(data, solution, config):
 
 def bus_prz_uids_in_domain(data, config):
 
+    # todo - this might be inefficient - can we get it down to just one set difference operation? I think so,
+    # look at the set of (i, j) for i in buses for j in reserve_zones[i] and
+    # the set of (i, j) for i in buses for j in reserve_zones
     domain = data.network.get_active_zonal_reserve_uids()
     domain = set(domain)
     num_bus = len(data.network.bus)
@@ -706,6 +718,7 @@ def bus_prz_uids_in_domain(data, config):
 
 def bus_qrz_uids_in_domain(data, config):
 
+    # todo see above todo item in bus_prz_uids_in_domain
     domain = data.network.get_reactive_zonal_reserve_uids()
     domain = set(domain)
     num_bus = len(data.network.bus)
@@ -724,224 +737,160 @@ def bus_qrz_uids_in_domain(data, config):
         raise ModelError(msg)
 
 def shunt_bus_uids_in_domain(data, config):
-    
+
+    items = data.network.shunt
+    field = 'bus'
     domain = data.network.get_bus_uids()
-    domain = set(domain)
-    num_shunt = len(data.network.shunt)
-    shunt_idx_bus_not_in_domain = [
-        i for i in range(num_shunt)
-        if not (data.network.shunt[i].bus in domain)]
-    shunt_bus_not_in_domain = [
-        (i, data.network.shunt[i].uid, data.network.shunt[i].bus)
-        for i in shunt_idx_bus_not_in_domain]
-    if len(shunt_idx_bus_not_in_domain) > 0:
-        msg = "fails shunt bus in buses. failing shunts (index, uid, bus uid): {}".format(
-            shunt_bus_not_in_domain)
-        raise ModelError(msg)
+    items_name = 'network.shunt'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def sd_bus_uids_in_domain(data, config):
-    
+
+    items = data.network.simple_dispatchable_device
+    field = 'bus'
     domain = data.network.get_bus_uids()
-    domain = set(domain)
-    num_sd = len(data.network.simple_dispatchable_device)
-    sd_idx_bus_not_in_domain = [
-        i for i in range(num_sd)
-        if not (data.network.simple_dispatchable_device[i].bus in domain)]
-    sd_bus_not_in_domain = [
-        (i, data.network.simple_dispatchable_device[i].uid, data.network.simple_dispatchable_device[i].bus)
-        for i in sd_idx_bus_not_in_domain]
-    if len(sd_idx_bus_not_in_domain) > 0:
-        msg = "fails simple dispatchable device bus in buses. failing devices (index, uid, bus uid): {}".format(
-            sd_bus_not_in_domain)
-        raise ModelError(msg)
+    items_name = 'network.simple_dispatchable_device'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def sd_type_in_domain(data, config):
 
-    domain = set(['producer', 'consumer'])
-    num_sd = len(data.network.simple_dispatchable_device)
-    sd_idx_type_not_in_domain = [
-        i for i in range(num_sd)
-        if not (data.network.simple_dispatchable_device[i].device_type in domain)]
-    sd_type_not_in_domain = [
-        (i, data.network.simple_dispatchable_device[i].uid, data.network.simple_dispatchable_device[i].device_type)
-        for i in sd_idx_type_not_in_domain]
-    if len(sd_idx_type_not_in_domain) > 0:
-        msg = "fails simple dispatchable device type in domain. domain: {}, failing devices (index, uid, type): {}".format(domain, sd_type_not_in_domain)
-        raise ModelError(msg)
+    items = data.network.simple_dispatchable_device
+    field = 'device_type'
+    domain = ['producer', 'consumer']
+    items_name = 'network.simple_dispatchable_device'
+    domain_name = str(domain)
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def acl_fr_bus_uids_in_domain(data, config):
-    
+
+    #start_time = time.time()
+
+    ### should be fast
+    items = data.network.ac_line
+    field = 'fr_bus'
     domain = data.network.get_bus_uids()
-    domain = set(domain)
-    num_dvc = len(data.network.ac_line)
-    dvc_idx_bus_not_in_domain = [
-        i for i in range(num_dvc)
-        if not (data.network.ac_line[i].fr_bus in domain)]
-    dvc_bus_not_in_domain = [
-        (i, data.network.ac_line[i].uid, data.network.ac_line[i].fr_bus)
-        for i in dvc_idx_bus_not_in_domain]
-    if len(dvc_idx_bus_not_in_domain) > 0:
-        msg = "fails ac line from bus in buses. failing devices (index, uid, from bus uid): {}".format(
-            dvc_bus_not_in_domain)
-        raise ModelError(msg)
+    items_name = 'network.ac_line'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
+
+    ### might be slower
+    # domain = data.network.get_bus_uids()
+    # domain = set(domain)
+    # num_dvc = len(data.network.ac_line)
+    # dvc_idx_bus_not_in_domain = [
+    #     i for i in range(num_dvc)
+    #     if not (data.network.ac_line[i].fr_bus in domain)]
+    # dvc_bus_not_in_domain = [
+    #     (i, data.network.ac_line[i].uid, data.network.ac_line[i].fr_bus)
+    #     for i in dvc_idx_bus_not_in_domain]
+    # if len(dvc_idx_bus_not_in_domain) > 0:
+    #     msg = "fails ac line from bus in buses. failing devices (index, uid, from bus uid): {}".format(
+    #         dvc_bus_not_in_domain)
+    #     raise ModelError(msg)
+
+    #end_time = time.time()
+    #print('acl_fr_bus_uids_in_domain time: {}'.format(end_time - start_time))
 
 def acl_to_bus_uids_in_domain(data, config):
-    
+
+    items = data.network.ac_line
+    field = 'to_bus'
     domain = data.network.get_bus_uids()
-    domain = set(domain)
-    num_dvc = len(data.network.ac_line)
-    dvc_idx_bus_not_in_domain = [
-        i for i in range(num_dvc)
-        if not (data.network.ac_line[i].to_bus in domain)]
-    dvc_bus_not_in_domain = [
-        (i, data.network.ac_line[i].uid, data.network.ac_line[i].to_bus)
-        for i in dvc_idx_bus_not_in_domain]
-    if len(dvc_idx_bus_not_in_domain) > 0:
-        msg = "fails ac line to bus in buses. failing devices (index, uid, to bus uid): {}".format(
-            dvc_bus_not_in_domain)
-        raise ModelError(msg)
+    items_name = 'network.ac_line'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def xfr_fr_bus_uids_in_domain(data, config):
-    
+
+    items = data.network.two_winding_transformer
+    field = 'fr_bus'
     domain = data.network.get_bus_uids()
-    domain = set(domain)
-    num_dvc = len(data.network.two_winding_transformer)
-    dvc_idx_bus_not_in_domain = [
-        i for i in range(num_dvc)
-        if not (data.network.two_winding_transformer[i].fr_bus in domain)]
-    dvc_bus_not_in_domain = [
-        (i, data.network.two_winding_transformer[i].uid, data.network.two_winding_transformer[i].fr_bus)
-        for i in dvc_idx_bus_not_in_domain]
-    if len(dvc_idx_bus_not_in_domain) > 0:
-        msg = "fails transformer from bus in buses. failing devices (index, uid, from bus uid): {}".format(
-            dvc_bus_not_in_domain)
-        raise ModelError(msg)
+    items_name = 'network.two_winding_transformer'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def xfr_to_bus_uids_in_domain(data, config):
-    
+
+    items = data.network.two_winding_transformer
+    field = 'to_bus'
     domain = data.network.get_bus_uids()
-    domain = set(domain)
-    num_dvc = len(data.network.two_winding_transformer)
-    dvc_idx_bus_not_in_domain = [
-        i for i in range(num_dvc)
-        if not (data.network.two_winding_transformer[i].to_bus in domain)]
-    dvc_bus_not_in_domain = [
-        (i, data.network.two_winding_transformer[i].uid, data.network.two_winding_transformer[i].to_bus)
-        for i in dvc_idx_bus_not_in_domain]
-    if len(dvc_idx_bus_not_in_domain) > 0:
-        msg = "fails transformer to bus in buses. failing devices (index, uid, to bus uid): {}".format(
-            dvc_bus_not_in_domain)
-        raise ModelError(msg)
+    items_name = 'network.two_winding_transformer'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def dcl_fr_bus_uids_in_domain(data, config):
-    
+
+    items = data.network.dc_line
+    field = 'fr_bus'
     domain = data.network.get_bus_uids()
-    domain = set(domain)
-    num_dvc = len(data.network.dc_line)
-    dvc_idx_bus_not_in_domain = [
-        i for i in range(num_dvc)
-        if not (data.network.dc_line[i].fr_bus in domain)]
-    dvc_bus_not_in_domain = [
-        (i, data.network.dc_line[i].uid, data.network.dc_line[i].fr_bus)
-        for i in dvc_idx_bus_not_in_domain]
-    if len(dvc_idx_bus_not_in_domain) > 0:
-        msg = "fails dc line from bus in buses. failing devices (index, uid, from bus uid): {}".format(
-            dvc_bus_not_in_domain)
-        raise ModelError(msg)
+    items_name = 'network.dc_line'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def dcl_to_bus_uids_in_domain(data, config):
-    
+
+    items = data.network.dc_line
+    field = 'to_bus'
     domain = data.network.get_bus_uids()
-    domain = set(domain)
-    num_dvc = len(data.network.dc_line)
-    dvc_idx_bus_not_in_domain = [
-        i for i in range(num_dvc)
-        if not (data.network.dc_line[i].to_bus in domain)]
-    dvc_bus_not_in_domain = [
-        (i, data.network.dc_line[i].uid, data.network.dc_line[i].to_bus)
-        for i in dvc_idx_bus_not_in_domain]
-    if len(dvc_idx_bus_not_in_domain) > 0:
-        msg = "fails dc line to bus in buses. failing devices (index, uid, to bus uid): {}".format(
-            dvc_bus_not_in_domain)
-        raise ModelError(msg)
+    items_name = 'network.dc_line'
+    domain_name = 'network.bus.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def ts_sd_uids_in_domain(data, config):
-    
-    network_num = len(data.network.simple_dispatchable_device)
-    ts_num = len(data.time_series_input.simple_dispatchable_device)
-    network_uids = [data.network.simple_dispatchable_device[i].uid for i in range(network_num)]
-    ts_uids = [data.time_series_input.simple_dispatchable_device[i].uid for i in range(ts_num)]
-    idx_in_ts_not_in_network = [i for i in range(ts_num) if ts_uids[i] not in network_uids]
-    idx_uid_in_ts_not_in_network = [(i, ts_uids[i]) for i in idx_in_ts_not_in_network]
-    if len(idx_in_ts_not_in_network) > 0:
-        msg = "fails time_series_input simple_dispatchable_device uids in domain. failing devices (index, uid): {}".format(
-            idx_uid_in_ts_not_in_network)
-        raise ModelError(msg)
+
+    items = data.time_series_input.simple_dispatchable_device
+    field = 'uid'
+    domain = data.network.get_simple_dispatchable_device_uids()
+    items_name = 'time_series_input.simple_dispatchable_device'
+    domain_name = 'network.simple_dispatchable_device.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def ts_sd_uids_cover_domain(data, config):
-    
-    network_num = len(data.network.simple_dispatchable_device)
-    ts_num = len(data.time_series_input.simple_dispatchable_device)
-    network_uids = [data.network.simple_dispatchable_device[i].uid for i in range(network_num)]
-    ts_uids = [data.time_series_input.simple_dispatchable_device[i].uid for i in range(ts_num)]
-    idx_in_network_not_in_ts = [i for i in range(network_num) if network_uids[i] not in ts_uids]
-    idx_uid_in_network_not_in_ts = [(i, network_uids[i]) for i in idx_in_network_not_in_ts]
-    if len(idx_in_network_not_in_ts) > 0:
-        msg = "fails time_series_input simple_dispatchable_device uids cover domain. failing devices (index, uid): {}".format(
-            idx_uid_in_network_not_in_ts)
-        raise ModelError(msg)
+
+    items = data.time_series_input.simple_dispatchable_device
+    field = 'uid'
+    domain = data.network.get_simple_dispatchable_device_uids()
+    items_name = 'time_series_input.simple_dispatchable_device'
+    domain_name = 'network.simple_dispatchable_device.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
 
 def ts_prz_uids_in_domain(data, config):
-    
-    network_num = len(data.network.active_zonal_reserve)
-    ts_num = len(data.time_series_input.active_zonal_reserve)
-    network_uids = [data.network.active_zonal_reserve[i].uid for i in range(network_num)]
-    ts_uids = [data.time_series_input.active_zonal_reserve[i].uid for i in range(ts_num)]
-    idx_in_ts_not_in_network = [i for i in range(ts_num) if ts_uids[i] not in network_uids]
-    idx_uid_in_ts_not_in_network = [(i, ts_uids[i]) for i in idx_in_ts_not_in_network]
-    if len(idx_in_ts_not_in_network) > 0:
-        msg = "fails time_series_input active_zonal_reserve uids in domain. failing devices (index, uid): {}".format(
-            idx_uid_in_ts_not_in_network)
-        raise ModelError(msg)
+
+    items = data.time_series_input.active_zonal_reserve
+    field = 'uid'
+    domain = data.network.get_active_zonal_reserve_uids()
+    items_name = 'time_series_input.active_zonal_reserve'
+    domain_name = 'network.active_zonal_reserve.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def ts_prz_uids_cover_domain(data, config):
-    
-    network_num = len(data.network.active_zonal_reserve)
-    ts_num = len(data.time_series_input.active_zonal_reserve)
-    network_uids = [data.network.active_zonal_reserve[i].uid for i in range(network_num)]
-    ts_uids = [data.time_series_input.active_zonal_reserve[i].uid for i in range(ts_num)]
-    idx_in_network_not_in_ts = [i for i in range(network_num) if network_uids[i] not in ts_uids]
-    idx_uid_in_network_not_in_ts = [(i, network_uids[i]) for i in idx_in_network_not_in_ts]
-    if len(idx_in_network_not_in_ts) > 0:
-        msg = "fails time_series_input active_zonal_reserve uids cover domain. failing devices (index, uid): {}".format(
-            idx_uid_in_network_not_in_ts)
-        raise ModelError(msg)
+
+    items = data.time_series_input.active_zonal_reserve
+    field = 'uid'
+    domain = data.network.get_active_zonal_reserve_uids()
+    items_name = 'time_series_input.active_zonal_reserve'
+    domain_name = 'network.active_zonal_reserve.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
 
 def ts_qrz_uids_in_domain(data, config):
-    
-    network_num = len(data.network.reactive_zonal_reserve)
-    ts_num = len(data.time_series_input.reactive_zonal_reserve)
-    network_uids = [data.network.reactive_zonal_reserve[i].uid for i in range(network_num)]
-    ts_uids = [data.time_series_input.reactive_zonal_reserve[i].uid for i in range(ts_num)]
-    idx_in_ts_not_in_network = [i for i in range(ts_num) if ts_uids[i] not in network_uids]
-    idx_uid_in_ts_not_in_network = [(i, ts_uids[i]) for i in idx_in_ts_not_in_network]
-    if len(idx_in_ts_not_in_network) > 0:
-        msg = "fails time_series_input reactive_zonal_reserve uids in domain. failing devices (index, uid): {}".format(
-            idx_uid_in_ts_not_in_network)
-        raise ModelError(msg)
+
+    items = data.time_series_input.reactive_zonal_reserve
+    field = 'uid'
+    domain = data.network.get_reactive_zonal_reserve_uids()
+    items_name = 'time_series_input.reactive_zonal_reserve'
+    domain_name = 'network.reactive_zonal_reserve.uid'
+    items_field_in_domain(items, field, domain, items_name, domain_name)
 
 def ts_qrz_uids_cover_domain(data, config):
     
-    network_num = len(data.network.reactive_zonal_reserve)
-    ts_num = len(data.time_series_input.reactive_zonal_reserve)
-    network_uids = [data.network.reactive_zonal_reserve[i].uid for i in range(network_num)]
-    ts_uids = [data.time_series_input.reactive_zonal_reserve[i].uid for i in range(ts_num)]
-    idx_in_network_not_in_ts = [i for i in range(network_num) if network_uids[i] not in ts_uids]
-    idx_uid_in_network_not_in_ts = [(i, network_uids[i]) for i in idx_in_network_not_in_ts]
-    if len(idx_in_network_not_in_ts) > 0:
-        msg = "fails time_series_input reactive_zonal_reserve uids cover domain. failing devices (index, uid): {}".format(
-            idx_uid_in_network_not_in_ts)
-        raise ModelError(msg)
+    items = data.time_series_input.reactive_zonal_reserve
+    field = 'uid'
+    domain = data.network.get_reactive_zonal_reserve_uids()
+    items_name = 'time_series_input.reactive_zonal_reserve'
+    domain_name = 'network.reactive_zonal_reserve.uid'
+    items_field_cover_domain(items, field, domain, items_name, domain_name)
 
 def ts_sd_on_status_ub_len_eq_num_t(data, config):
     
