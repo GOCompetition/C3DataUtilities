@@ -8,24 +8,26 @@ from datamodel.input.data import InputDataFile
 from datamodel.output.data import OutputDataFile
 from datautilities import utils
 from datautilities.errors import ModelError, GitError
+from datautilities import arraydata
 
 def write(file_name, mode, text):
 
     with open(file_name, mode) as f:
         f.write(text)
 
-def read_config(config_file):
+def read_json(file_name):
 
-    with open(config_file, 'r') as f:
-        config = json.load(f)
-    return config
+    # todo fully decode json so that config prints as a normal python dict
+    with open(file_name, 'r') as f:
+        data = json.load(f)
+    #print('config: {}'.format(config))
+    #print(config['timestamp_pattern_str'])
+    return data
 
 def check_data(problem_file, solution_file, config_file, summary_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
     # read config
-    config = read_config(config_file)
-    print('config: {}'.format(config))
-    print(config['timestamp_pattern_str'])
+    config = read_json(config_file)
 
     # open files
     for fn in [summary_file, problem_errors_file, ignored_errors_file, solution_errors_file]:
@@ -34,11 +36,17 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     # - todo solution summary file? for now just use the problem summary file. that may be the right way anyway
     solution_summary_file = summary_file
 
-    # data file
+    # data files
     with open(summary_file, 'a') as f:
         f.write('problem data file: {}\n'.format(problem_file))
     with open(summary_file, 'a') as f:
         f.write('solution data file: {}\n'.format(solution_file))
+
+    # read problem data file without validation (faster)
+    start_time = time.time()
+    problem_data_dict = read_json(problem_file)
+    end_time = time.time()
+    print('read problem data file without validation time: {}'.format(end_time - start_time))
 
     # git info
     try:
@@ -115,6 +123,12 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
 
     if solution_file is not None:
 
+        # read solution data file without validation (faster)
+        start_time = time.time()
+        solution_data_dict = read_json(solution_file)
+        end_time = time.time()
+        print('read solution data file without validation time: {}'.format(end_time - start_time))
+
         # read solution
         start_time = time.time()
         #print('solution file: {}'.format(solution_file))
@@ -150,6 +164,20 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             f.write('solution data summary:\n')
             f.write(pp.pformat(solution_summary))
             f.write('\n')
+
+        # convert problem data to numpy arrays
+        start_time = time.time()
+        problem_data_array = arraydata.InputData()
+        problem_data_array.set_from_data_model(data_model)
+        end_time = time.time()
+        print('convert problem data to numpy arrays time: {}'.format(end_time - start_time))
+
+        # convert solution data to numpy arrays
+        start_time = time.time()
+        solution_data_array = arraydata.OutputData()
+        solution_data_array.set_from_data_model(problem_data_array, solution_data_model)
+        end_time = time.time()
+        print('convert solution data to numpy arrays time: {}'.format(end_time - start_time))
 
         # print('solution data')
         # for s in ['bus', 'shunt', 'simple_dispatchable_device', 'ac_line', 'dc_line', 'two_winding_transformer']:
