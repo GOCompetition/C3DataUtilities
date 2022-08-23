@@ -6,9 +6,8 @@ import networkx, traceback, pprint, json, re, pandas, time
 from pydantic.error_wrappers import ValidationError
 from datamodel.input.data import InputDataFile
 from datamodel.output.data import OutputDataFile
-from datautilities import utils
+from datautilities import utils, arraydata, evaluation
 from datautilities.errors import ModelError, GitError
-from datautilities import arraydata
 
 def write(file_name, mode, text):
 
@@ -178,6 +177,22 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         solution_data_array.set_from_data_model(problem_data_array, solution_data_model)
         end_time = time.time()
         print('convert solution data to numpy arrays time: {}'.format(end_time - start_time))
+        print('bus_t_v numpy array memory info. shape: {}, size: {}, itemsize: {}, size*itemsize: {}, nbytes: {}'.format(
+            solution_data_array.bus_t_v.shape,
+            solution_data_array.bus_t_v.size,
+            solution_data_array.bus_t_v.itemsize,
+            solution_data_array.bus_t_v.size *
+            solution_data_array.bus_t_v.itemsize,
+            solution_data_array.bus_t_v.nbytes))
+
+        # evaluate solution
+        start_time = time.time()
+        solution_evaluator = evaluation.SolutionEvaluator()
+        solution_evaluator.problem = problem_data_array
+        solution_evaluator.solution = solution_data_array
+        solution_evaluator.run()
+        end_time = time.time()
+        print('evaluate solution time: {}'.format(end_time - start_time))
 
         # print('solution data')
         # for s in ['bus', 'shunt', 'simple_dispatchable_device', 'ac_line', 'dc_line', 'two_winding_transformer']:
