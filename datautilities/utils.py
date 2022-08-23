@@ -111,6 +111,6 @@ def get_max_min(arr, use_max=True, idx_lists=None):
         out['abs'] = abs(val)
         out['idx_int'] = arg_tuple
         if idx_lists is not None:
-            idx = [idx_lists[i][arg_tuple[i]] for i in range(len(idx_lists))]
+            idx = tuple([idx_lists[i][arg_tuple[i]] for i in range(len(idx_lists))])
             out['idx'] = idx
     return out
