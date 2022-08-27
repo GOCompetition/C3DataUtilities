@@ -187,10 +187,17 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
 
         # evaluate solution
         start_time = time.time()
-        solution_evaluator = evaluation.SolutionEvaluator()
-        solution_evaluator.problem = problem_data_array
-        solution_evaluator.solution = solution_data_array
+        solution_evaluator = evaluation.SolutionEvaluator(problem_data_array, solution_data_array, config=config)
+        #solution_evaluator.problem = problem_data_array
+        #solution_evaluator.solution = solution_data_array
         solution_evaluator.run()
+        evaluation_summary = solution_evaluator.get_summary()
+        with open(solution_summary_file, 'a') as f:
+            pp = pprint.PrettyPrinter()
+            pp.pprint(evaluation_summary)
+            f.write('solution evaluation summary:\n')
+            f.write(pp.pformat(evaluation_summary))
+            f.write('\n')
         end_time = time.time()
         print('evaluate solution time: {}'.format(end_time - start_time))
 
@@ -400,9 +407,9 @@ def solution_model_checks(data, solution_data, config):
         output_ts_simple_dispatchable_device_q_res_up_len_eq_num_t,
         output_ts_simple_dispatchable_device_q_res_down_len_eq_num_t,
         output_ts_ac_line_on_status_len_eq_num_t,
-        output_ts_dc_line_p_dc_fr_len_eq_num_t,
-        output_ts_dc_line_q_dc_fr_len_eq_num_t,
-        output_ts_dc_line_q_dc_to_len_eq_num_t,
+        output_ts_dc_line_pdc_fr_len_eq_num_t,
+        output_ts_dc_line_qdc_fr_len_eq_num_t,
+        output_ts_dc_line_qdc_to_len_eq_num_t,
         output_ts_two_winding_transformer_on_status_len_eq_num_t,
         output_ts_two_winding_transformer_tm_len_eq_num_t,
         output_ts_two_winding_transformer_ta_len_eq_num_t,
@@ -1122,17 +1129,17 @@ def output_ts_ac_line_on_status_len_eq_num_t(data, solution, config):
     
     output_ts_component_field_len_eq_num_t(data, solution, 'ac_line', 'on_status')
 
-def output_ts_dc_line_p_dc_fr_len_eq_num_t(data, solution, config):
+def output_ts_dc_line_pdc_fr_len_eq_num_t(data, solution, config):
     
-    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'p_dc_fr')
+    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'pdc_fr')
 
-def output_ts_dc_line_q_dc_fr_len_eq_num_t(data, solution, config):
+def output_ts_dc_line_qdc_fr_len_eq_num_t(data, solution, config):
     
-    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'q_dc_fr')
+    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'qdc_fr')
 
-def output_ts_dc_line_q_dc_to_len_eq_num_t(data, solution, config):
+def output_ts_dc_line_qdc_to_len_eq_num_t(data, solution, config):
     
-    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'q_dc_to')
+    output_ts_component_field_len_eq_num_t(data, solution, 'dc_line', 'qdc_to')
 
 def output_ts_two_winding_transformer_on_status_len_eq_num_t(data, solution, config):
     

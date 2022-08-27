@@ -8,7 +8,31 @@ class InputData(object):
     
     def set_from_data_model(self, data):
 
-        #print(data.network.__dir__())
+        self.set_structure(data)
+        self.set_bus(data)
+        self.set_sh(data)
+        self.set_sd(data)
+        self.set_acl(data)
+        self.set_dcl(data)
+        self.set_xfr(data)
+        self.set_prz(data)
+        self.set_qrz(data)
+        self.set_t(data)
+        self.set_k(data)
+        self.set_sd_t(data)
+        self.set_sd_t_cost(data)
+
+    def set_structure(self, data):
+
+        self.set_num(data)
+        self.set_uid(data)
+        self.num_all = self.all_uid.size
+        self.set_range(data)
+        self.set_map(data)
+        self.set_type_indicator(data)
+
+    def set_num(self, data):
+
         self.num_bus = len(data.network.bus)
         self.num_acl = len(data.network.ac_line)
         self.num_dcl = len(data.network.dc_line)
@@ -21,6 +45,8 @@ class InputData(object):
         self.num_qrz = len(data.network.reactive_zonal_reserve)
         self.num_t = len(data.time_series_input.general.interval_duration)
         self.num_k = len(data.reliability.contingency)
+
+    def set_uid(self, data):
 
         # establish an order of elements in each type
         self.bus_uid = numpy.array([i.uid for i in data.network.bus])
@@ -42,11 +68,14 @@ class InputData(object):
             self.qrz_uid,
             self.k_uid))
 
-        self.num_all = self.all_uid.size
+    def set_range(self, data):
 
         # ranges
         self.t_num = numpy.array(list(range(self.num_t)))
 
+    def set_map(self, data):
+
+        # maps
         self.bus_map = {self.bus_uid[i]:i for i in range(self.num_bus)}
         self.acl_map = {self.acl_uid[i]:i for i in range(self.num_acl)}
         self.dcl_map = {self.dcl_uid[i]:i for i in range(self.num_dcl)}
@@ -57,6 +86,10 @@ class InputData(object):
         self.qrz_map = {self.qrz_uid[i]:i for i in range(self.num_qrz)}
         self.k_map = {self.k_uid[i]:i for i in range(self.num_k)}
         self.all_map = {self.all_uid[i]:i for i in range(self.num_all)}
+
+    def set_type_indicator(self, data):
+
+        # boolean type indicators
         
         start = 0
         end = 0
@@ -96,8 +129,96 @@ class InputData(object):
         end += self.num_k
         self.all_is_k = numpy.array([(start <= i and i < end) for i in range(self.num_all)])
         start += self.num_k
+
+    def set_bus(self, data):
+
+        # todo
+        pass
+
+    def set_sh(self, data):
+
+        # todo
+        pass
+
+    def set_sd(self, data):
+
+        data_map = {x.uid:x for x in data.network.simple_dispatchable_device}
+        self.sd_bus_uid = numpy.array([data_map[i].bus for i in self.sd_uid])
+        self.sd_bus = numpy.array([self.bus_map[i] for i in self.sd_bus_uid])
+        self.sd_is_pr = numpy.array([1 if data_map[i].device_type == 'producer' else 0 for i in self.sd_uid])
+        self.sd_is_cs = numpy.array([1 if data_map[i].device_type == 'consumer' else 0 for i in self.sd_uid])
+        self.sd_c_su = numpy.array([data_map[i].startup_cost for i in self.sd_uid])
+        # startup_states - a list
+        self.sd_c_sd = numpy.array([data_map[i].shutdown_cost for i in self.sd_uid])
+        # startups_ub - list
+        # energy_req_ub - llist
+        # energy_req_lb - list
+        self.sd_c_on = numpy.array([data_map[i].on_cost for i in self.sd_uid])
+        self.sd_d_up_min = numpy.array([data_map[i].in_service_time_lb for i in self.sd_uid])
+        self.sd_d_dn_min = numpy.array([data_map[i].down_time_lb for i in self.sd_uid])
+        self.sd_p_ramp_up_max = numpy.array([data_map[i].p_ramp_up_ub for i in self.sd_uid])
+        self.sd_p_ramp_dn_max = numpy.array([data_map[i].p_ramp_down_ub for i in self.sd_uid])
+        self.sd_p_startup_ramp_up_max = numpy.array([data_map[i].p_startup_ramp_ub for i in self.sd_uid])
+        self.sd_p_shutdown_ramp_dn_max = numpy.array([data_map[i].p_shutdown_ramp_ub for i in self.sd_uid])
+        self.sd_u_on_0 = numpy.array([data_map[i].initial_status.on_status for i in self.sd_uid])
+        self.sd_p_0 = numpy.array([data_map[i].initial_status.p for i in self.sd_uid])
+        self.sd_q_0 = numpy.array([data_map[i].initial_status.q for i in self.sd_uid])
+        self.sd_d_dn_0 = numpy.array([data_map[i].initial_status.accu_down_time for i in self.sd_uid])
+        self.sd_d_up_0 = numpy.array([data_map[i].initial_status.accu_up_time for i in self.sd_uid])
+        #
+        # p-q indicators:
+        # self.sd_is_pqe q_linear_cap
+        # self.sd_is_pqmax q_bound_cap
+        # self.sd_is_pqmin
+        #
+        # reserves:
+        # p_reg_res_up_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        # p_reg_res_down_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        # p_syn_res_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        # p_nsyn_res_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        # p_ramp_res_up_online_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        # p_ramp_res_down_online_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        # p_ramp_res_up_offline_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        # p_ramp_res_down_offline_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        #
+        # optionals:
+        # self.sd_q_p0 = numpy.array([data_map[i].q_0 optional    )
+        # beta: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
+        # q_0_ub: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
+        # q_0_lb: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
+        # beta_ub: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
+        # beta_lb: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
         
-        self.t_duration = numpy.array(data.time_series_input.general.interval_duration)
+    def set_acl(self, data):
+
+        # todo
+        pass
+
+    def set_dcl(self, data):
+
+        # todo
+        pass
+
+    def set_xfr(self, data):
+
+        # todo
+        pass
+
+    def set_prz(self, data):
+
+        # todo
+        pass
+
+    def set_qrz(self, data):
+
+        # todo
+        pass
+
+    def set_t(self, data):
+
+        self.t_d = numpy.array(data.time_series_input.general.interval_duration)
+
+    def set_k(self, data):
 
         self.k_out_device_uid = numpy.array([k.components[0] for k in data.reliability.contingency])
         self.k_out_device = numpy.array([self.all_map[self.k_out_device_uid[i]] for i in range(self.num_k)])
@@ -108,18 +229,37 @@ class InputData(object):
         self.k_out_dcl = numpy.array([self.dcl_map[self.k_out_device_uid[i]] if self.k_out_is_dcl[i] else 0 for i in range(self.num_k)])
         self.k_out_xfr = numpy.array([self.xfr_map[self.k_out_device_uid[i]] if self.k_out_is_xfr[i] else 0 for i in range(self.num_k)])
 
-        #summary['violation costs'] = network.violation_cost
-        # ts_sd = time_series_input.simple_dispatchable_device
-        # ts_prz = time_series_input.active_zonal_reserve
-        # ts_qrz = time_series_input.reactive_zonal_reserve
-
-        self.set_sd_t_from_data_model(data)
-
-    def set_sd_t_from_data_model(self, data):
+    def set_sd_t(self, data):
 
         data_map = {x.uid:x for x in data.time_series_input.simple_dispatchable_device}
         self.sd_t_u_on_max = numpy.array([data_map[i].on_status_ub for i in self.sd_uid])
         self.sd_t_u_on_min = numpy.array([data_map[i].on_status_lb for i in self.sd_uid])
+        self.sd_t_p_max = numpy.array([data_map[i].p_ub for i in self.sd_uid])
+        self.sd_t_p_min = numpy.array([data_map[i].p_lb for i in self.sd_uid])
+        self.sd_t_q_max = numpy.array([data_map[i].q_ub for i in self.sd_uid])
+        self.sd_t_q_min = numpy.array([data_map[i].q_lb for i in self.sd_uid])
+        self.sd_t_c_rgu = numpy.array([data_map[i].p_reg_res_up_cost for i in self.sd_uid])
+        self.sd_t_c_rgd = numpy.array([data_map[i].p_reg_res_down_cost for i in self.sd_uid])
+        self.sd_t_c_scr = numpy.array([data_map[i].p_syn_res_cost for i in self.sd_uid])
+        self.sd_t_c_nsc = numpy.array([data_map[i].p_nsyn_res_cost for i in self.sd_uid])
+        self.sd_t_c_rru_on = numpy.array([data_map[i].p_ramp_res_up_online_cost for i in self.sd_uid])
+        self.sd_t_c_rrd_on = numpy.array([data_map[i].p_ramp_res_down_online_cost for i in self.sd_uid])
+        self.sd_t_c_rru_off = numpy.array([data_map[i].p_ramp_res_up_offline_cost for i in self.sd_uid])
+        self.sd_t_c_rrd_off = numpy.array([data_map[i].p_ramp_res_down_offline_cost for i in self.sd_uid])
+        self.sd_t_c_qru = numpy.array([data_map[i].q_res_up_cost for i in self.sd_uid])
+        self.sd_t_c_qrd = numpy.array([data_map[i].q_res_down_cost for i in self.sd_uid])
+
+    def set_sd_t_cost(self, data):
+
+        # todo cost list(list(tuple(float))) - dims = (t, cost_block, block_entry), t = 1...24, cost_block = b1, ..., b5 (e.g.), block_entry = (c, pmax)
+
+        # cost: List[List[Tuple[confloat(gt=-float('inf'), lt=float('inf'), strict=False), confloat(gt=-float('inf'), lt=float('inf'), strict=False)]]] = Field(
+        #     title = "cost",
+        #     description = "Array of cost blocks, where   each cost block is an array with exactly two elements:     1) marginal cost in \$/p.u.-hr (Float), and 2) block size in p.u. (Float) "
+        # )
+
+        pass
+
 
 class OutputData(object):
 
@@ -129,25 +269,25 @@ class OutputData(object):
 
     def set_from_data_model(self, input_data, output_data_model):
         
-        self.set_bus_t_from_data_model(input_data, output_data_model)
-        self.set_sh_t_from_data_model(input_data, output_data_model)
-        self.set_sd_t_from_data_model(input_data, output_data_model)
-        self.set_acl_t_from_data_model(input_data, output_data_model)
-        self.set_dcl_t_from_data_model(input_data, output_data_model)
-        self.set_xfr_t_from_data_model(input_data, output_data_model)
+        self.set_bus_t(input_data, output_data_model)
+        self.set_sh_t(input_data, output_data_model)
+        self.set_sd_t(input_data, output_data_model)
+        self.set_acl_t(input_data, output_data_model)
+        self.set_dcl_t(input_data, output_data_model)
+        self.set_xfr_t(input_data, output_data_model)
 
-    def set_bus_t_from_data_model(self, input_data, output_data_model):
+    def set_bus_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.bus}
         self.bus_t_v = numpy.array([data_map[i].vm for i in input_data.bus_uid])
         self.bus_t_theta = numpy.array([data_map[i].va for i in input_data.bus_uid])
 
-    def set_sh_t_from_data_model(self, input_data, output_data_model):
+    def set_sh_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.shunt}
         self.sh_t_u_st = numpy.array([data_map[i].step for i in input_data.sh_uid])
 
-    def set_sd_t_from_data_model(self, input_data, output_data_model):
+    def set_sd_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.simple_dispatchable_device}
         self.sd_t_u_on = numpy.array([data_map[i].on_status for i in input_data.sd_uid])
@@ -164,19 +304,19 @@ class OutputData(object):
         self.sd_t_q_qru = numpy.array([data_map[i].q_res_up for i in input_data.sd_uid])
         self.sd_t_q_qrd = numpy.array([data_map[i].q_res_down for i in input_data.sd_uid])
 
-    def set_acl_t_from_data_model(self, input_data, output_data_model):
+    def set_acl_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.ac_line}
-        self.acl_t_u_on = numpy.array([data_map[i].on_status for i in input_data.acl_uid])
+        self.acl_t_u_on = numpy.array([data_map[i].on_status for i in input_data.acl_uid]) # , dtype=numpy.int8) # could help, but not much
 
-    def set_dcl_t_from_data_model(self, input_data, output_data_model):
+    def set_dcl_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.dc_line}
         self.dcl_t_p = numpy.array([data_map[i].pdc_fr for i in input_data.dcl_uid])
         self.dcl_t_q_fr = numpy.array([data_map[i].qdc_fr for i in input_data.dcl_uid])
         self.dcl_t_q_to = numpy.array([data_map[i].qdc_to for i in input_data.dcl_uid])
 
-    def set_xfr_t_from_data_model(self, input_data, output_data_model):
+    def set_xfr_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.two_winding_transformer}
         self.xfr_t_u_on = numpy.array([data_map[i].on_status for i in input_data.xfr_uid])
