@@ -132,13 +132,24 @@ class InputData(object):
 
     def set_bus(self, data):
 
-        # todo
-        pass
+        data_map = {x.uid:x for x in data.network.bus}
+        self.bus_v_max = numpy.array([data_map[i].vm_ub for i in self.bus_uid])
+        self.bus_v_min = numpy.array([data_map[i].vm_lb for i in self.bus_uid])
+        # active_reserve_uids: List[str] = Field(
+        # reactive_reserve_uids: List[str] = Field( # todo
+        self.bus_v_0 = numpy.array([data_map[i].initial_status.vm for i in self.bus_uid])
+        self.bus_theta_0 = numpy.array([data_map[i].initial_status.va for i in self.bus_uid])
 
     def set_sh(self, data):
 
-        # todo
-        pass
+        data_map = {x.uid:x for x in data.network.shunt}
+        self.sh_bus_uid = numpy.array([data_map[i].bus for i in self.sh_uid])
+        self.sh_bus = numpy.array([self.bus_map[i] for i in self.sh_bus_uid])
+        self.sh_g_st = numpy.array([data_map[i].gs for i in self.sh_uid])
+        self.sh_b_st = numpy.array([data_map[i].bs for i in self.sh_uid])
+        self.sh_u_st_max = numpy.array([data_map[i].step_ub for i in self.sh_uid])
+        self.sh_u_st_min = numpy.array([data_map[i].step_lb for i in self.sh_uid])
+        self.sh_u_st_0 = numpy.array([data_map[i].initial_status.step for i in self.sh_uid])
 
     def set_sd(self, data):
 
@@ -191,18 +202,69 @@ class InputData(object):
         
     def set_acl(self, data):
 
-        # todo
-        pass
+        data_map = {x.uid:x for x in data.network.ac_line}
+        self.acl_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.acl_uid])
+        self.acl_tbus_uid = numpy.array([data_map[i].to_bus for i in self.acl_uid])
+        self.acl_fbus = numpy.array([self.bus_map[i] for i in self.acl_fbus_uid])
+        self.acl_tbus = numpy.array([self.bus_map[i] for i in self.acl_tbus_uid])
+        self.acl_r_sr = numpy.array([data_map[i].r for i in self.acl_uid])
+        self.acl_x_sr = numpy.array([data_map[i].x for i in self.acl_uid])
+        self.acl_g_sr = self.acl_r_sr / (self.acl_r_sr**2 + self.acl_x_sr**2)
+        self.acl_b_sr = - self.acl_x_sr / (self.acl_r_sr**2 + self.acl_x_sr**2)
+        self.acl_b_ch = numpy.array([data_map[i].b for i in self.acl_uid])
+        self.acl_s_max = numpy.array([data_map[i].mva_ub_nom for i in self.acl_uid])
+        self.acl_s_max_ctg = numpy.array([data_map[i].mva_ub_em for i in self.acl_uid])
+        self.acl_c_su = numpy.array([data_map[i].connection_cost for i in self.acl_uid])
+        self.acl_c_sd = numpy.array([data_map[i].disconnection_cost for i in self.acl_uid])
+        self.acl_u_on_0 = numpy.array([data_map[i].initial_status.on_status for i in self.acl_uid])
+        self.acl_g_fr = numpy.array([data_map[i].g_fr if data_map[i].additional_shunt == 1 else 0.0 for i in self.acl_uid])
+        self.acl_b_fr = numpy.array([data_map[i].b_fr if data_map[i].additional_shunt == 1 else 0.0 for i in self.acl_uid])
+        self.acl_g_to = numpy.array([data_map[i].g_to if data_map[i].additional_shunt == 1 else 0.0 for i in self.acl_uid])
+        self.acl_b_to = numpy.array([data_map[i].b_to if data_map[i].additional_shunt == 1 else 0.0 for i in self.acl_uid])
 
     def set_dcl(self, data):
 
-        # todo
-        pass
+        data_map = {x.uid:x for x in data.network.dc_line}
+        self.dcl_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.dcl_uid])
+        self.dcl_tbus_uid = numpy.array([data_map[i].to_bus for i in self.dcl_uid])
+        self.dcl_fbus = numpy.array([self.bus_map[i] for i in self.dcl_fbus_uid])
+        self.dcl_tbus = numpy.array([self.bus_map[i] for i in self.dcl_tbus_uid])
+        self.dcl_p_max = numpy.array([data_map[i].pdc_ub for i in self.dcl_uid])
+        self.dcl_q_fr_max = numpy.array([data_map[i].qdc_fr_ub for i in self.dcl_uid])
+        self.dcl_q_fr_min = numpy.array([data_map[i].qdc_fr_lb for i in self.dcl_uid])
+        self.dcl_q_to_max = numpy.array([data_map[i].qdc_to_ub for i in self.dcl_uid])
+        self.dcl_q_to_min = numpy.array([data_map[i].qdc_to_lb for i in self.dcl_uid])
+        self.dcl_p_0 = numpy.array([data_map[i].initial_status.pdc_fr for i in self.dcl_uid])
+        self.dcl_q_fr_0 = numpy.array([data_map[i].initial_status.qdc_fr for i in self.dcl_uid])
+        self.dcl_q_to_0 = numpy.array([data_map[i].initial_status.qdc_to for i in self.dcl_uid])
 
     def set_xfr(self, data):
 
-        # todo
-        pass
+        data_map = {x.uid:x for x in data.network.two_winding_transformer}
+        self.xfr_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.xfr_uid])
+        self.xfr_tbus_uid = numpy.array([data_map[i].to_bus for i in self.xfr_uid])
+        self.xfr_fbus = numpy.array([self.bus_map[i] for i in self.xfr_fbus_uid])
+        self.xfr_tbus = numpy.array([self.bus_map[i] for i in self.xfr_tbus_uid])
+        self.xfr_r_sr = numpy.array([data_map[i].r for i in self.xfr_uid])
+        self.xfr_x_sr = numpy.array([data_map[i].x for i in self.xfr_uid])
+        self.xfr_g_sr = self.xfr_r_sr / (self.xfr_r_sr**2 + self.xfr_x_sr**2)
+        self.xfr_b_sr = - self.xfr_x_sr / (self.xfr_r_sr**2 + self.xfr_x_sr**2)
+        self.xfr_b_ch = numpy.array([data_map[i].b for i in self.xfr_uid])
+        self.xfr_tau_max = numpy.array([data_map[i].tm_ub for i in self.xfr_uid])
+        self.xfr_tau_min = numpy.array([data_map[i].tm_lb for i in self.xfr_uid])
+        self.xfr_phi_max = numpy.array([data_map[i].ta_ub for i in self.xfr_uid])
+        self.xfr_phi_min = numpy.array([data_map[i].ta_lb for i in self.xfr_uid])
+        self.xfr_s_max = numpy.array([data_map[i].mva_ub_nom for i in self.xfr_uid])
+        self.xfr_s_max_ctg = numpy.array([data_map[i].mva_ub_em for i in self.xfr_uid])
+        self.xfr_c_su = numpy.array([data_map[i].connection_cost for i in self.xfr_uid])
+        self.xfr_c_sd = numpy.array([data_map[i].disconnection_cost for i in self.xfr_uid])
+        self.xfr_u_on_0 = numpy.array([data_map[i].initial_status.on_status for i in self.xfr_uid])
+        self.xfr_tau_0 = numpy.array([data_map[i].initial_status.tm for i in self.xfr_uid])
+        self.xfr_phi_0 = numpy.array([data_map[i].initial_status.ta for i in self.xfr_uid])
+        self.xfr_g_fr = numpy.array([data_map[i].g_fr if data_map[i].additional_shunt == 1 else 0.0 for i in self.xfr_uid])
+        self.xfr_b_fr = numpy.array([data_map[i].b_fr if data_map[i].additional_shunt == 1 else 0.0 for i in self.xfr_uid])
+        self.xfr_g_to = numpy.array([data_map[i].g_to if data_map[i].additional_shunt == 1 else 0.0 for i in self.xfr_uid])
+        self.xfr_b_to = numpy.array([data_map[i].b_to if data_map[i].additional_shunt == 1 else 0.0 for i in self.xfr_uid])
 
     def set_prz(self, data):
 
