@@ -9,6 +9,7 @@ class InputData(object):
     def set_from_data_model(self, data):
 
         self.set_structure(data)
+        self.set_scalars(data)
         self.set_bus(data)
         self.set_sh(data)
         self.set_sd(data)
@@ -129,6 +130,12 @@ class InputData(object):
         end += self.num_k
         self.all_is_k = numpy.array([(start <= i and i < end) for i in range(self.num_all)])
         start += self.num_k
+
+    def set_scalars(self, data):
+
+        self.c_p = float(data.network.violation_cost.p_bus_vio_cost)
+        self.c_q = float(data.network.violation_cost.p_bus_vio_cost)
+        self.c_s = float(data.network.violation_cost.s_vio_cost)
 
     def set_bus(self, data):
 
