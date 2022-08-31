@@ -74,6 +74,17 @@ class SolutionEvaluator(object):
 
         #self.eval_acl_t_u_su_sd_test()
 
+        self.eval_t_z_base()
+        self.eval_t_z_ctg_worst_case()
+        self.eval_t_z_ctg_average_case()
+        self.eval_t_z()
+        self.eval_z_base()
+        self.eval_z_ctg_worst_case()
+        self.eval_z_ctg_average_case()
+        self.eval_z()
+
+        self.eval_infeas()
+        
     def set_problem(self, prob):
 
         # todo - might be more convenient to flatten the problem attributes into SolutionEvaluator
@@ -165,6 +176,63 @@ class SolutionEvaluator(object):
         self.xfr_t_float_1 = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
         self.xfr_t_float_2 = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
 
+    def eval_infeas(self):
+        '''
+        set infeas
+        1 if infeasible
+        0 else
+        '''
+
+        summary = self.get_summary()
+        keys = [
+            'viol_sd_t_u_on_max',
+            'viol_sd_t_u_on_min',
+            'viol_sd_t_d_up_min',
+            'viol_sd_t_d_dn_min',
+            #'viol_bus_t_v_max', # projected
+            #'viol_bus_t_v_min', # projected
+            'viol_sh_t_u_st_max',
+            'viol_sh_t_u_st_min',
+            #'viol_dcl_t_p_max', # projected
+            #'viol_dcl_t_p_min', # projected
+            #'viol_dcl_t_q_fr_max', # projected
+            #'viol_dcl_t_q_fr_min', # projected
+            #'viol_dcl_t_q_to_max', # projected
+            #'viol_dcl_t_q_to_min', # projected
+            #'viol_xfr_t_tau_max', # projected
+            #'viol_xfr_t_tau_min', # projected
+            #'viol_xfr_t_phi_max', # projected
+            #'viol_xfr_t_phi_min', # projected
+            'viol_acl_t_u_su_max',
+            'viol_acl_t_u_sd_max',
+            'viol_xfr_t_u_su_max',
+            'viol_xfr_t_u_sd_max',
+            #'viol_acl_t_s_max', # penalized
+            #'viol_xfr_t_s_max', # penalized
+        ] # todo others
+        infeas_keys = [
+            k for k in set(keys).intersection(set(summary.keys()))
+            if summary[k] is not None
+            and summary[k]['val'] > 0]
+        infeas_summary = {k:summary[k] for k in infeas_keys}
+        self.infeas = int(len(infeas_summary) > 0)
+
+    def get_infeas(self):
+        '''
+        return an indicator of infeasibility
+        1 if infeasible
+        0 else
+        '''
+
+        return self.infeas
+
+    def get_obj(self):
+        '''
+        return the computed objective
+        '''
+
+        return self.z
+
     def get_summary(self):
 
         keys = [
@@ -207,9 +275,58 @@ class SolutionEvaluator(object):
             'viol_acl_t_s_max',
             'sum_xfr_t_z_s',
             'viol_xfr_t_s_max',
-            ]
+            'z',
+            'z_base',
+            'z_ctg_worst_case',
+            'z_ctg_average_case',
+            'infeas',
+            ] # todo others
         summary = {k: getattr(self, k, None) for k in keys}
         return summary
+
+    def eval_z(self):
+
+        self.z = numpy.sum(self.t_z)
+
+    def eval_z_base(self):
+
+        self.z_base = numpy.sum(self.t_z_base)
+
+    def eval_z_ctg_worst_case(self):
+
+        self.z_ctg_worst_case = numpy.sum(self.t_z_ctg_worst_case)
+
+    def eval_z_ctg_average_case(self):
+
+        self.z_ctg_average_case = numpy.sum(self.t_z_ctg_average_case)
+
+    def eval_t_z(self):
+
+        self.t_z = self.t_z_base + self.t_z_ctg_worst_case + self. t_z_ctg_average_case
+
+    def eval_t_z_base(self):
+
+        #self.t_z_base = numpy.zeros(shape=(self.problem.num_t, ), dtype=float) # todo add everything
+        # note "cost" terms have a minus sign, "benefit" terms have a plus sign
+        self.t_z_base = sum([
+            -self.t_sum_sd_t_z_on,
+            -self.t_sum_sd_t_z_su,
+            -self.t_sum_sd_t_z_sd,
+            -self.t_sum_acl_t_z_su,
+            -self.t_sum_acl_t_z_sd,
+            -self.t_sum_acl_t_z_s,
+            -self.t_sum_xfr_t_z_su,
+            -self.t_sum_xfr_t_z_sd,
+            -self.t_sum_xfr_t_z_s,
+        ])
+
+    def eval_t_z_ctg_worst_case(self):
+
+        self.t_z_ctg_worst_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float) # todo add everything
+
+    def eval_t_z_ctg_average_case(self):
+
+        self.t_z_ctg_average_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float) # todo add everything
 
     def eval_sd_t_u_on_max(self):
 
@@ -301,6 +418,7 @@ class SolutionEvaluator(object):
             numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
         numpy.add(self.sd_t_z, self.sd_t_float, out=self.sd_t_z)
         self.sum_sd_t_z_on = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_on = numpy.sum(self.sd_t_float, axis=0)
 
     def eval_sd_t_z_su(self):
 
@@ -308,6 +426,7 @@ class SolutionEvaluator(object):
             numpy.reshape(self.problem.sd_c_su, newshape=(self.problem.num_sd, 1)), self.sd_t_u_su, out=self.sd_t_float)
         numpy.add(self.sd_t_z, self.sd_t_float, out=self.sd_t_z)
         self.sum_sd_t_z_su = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_su = numpy.sum(self.sd_t_float, axis=0)
 
     def eval_sd_t_z_sd(self):
 
@@ -315,6 +434,7 @@ class SolutionEvaluator(object):
             numpy.reshape(self.problem.sd_c_sd, newshape=(self.problem.num_sd, 1)), self.sd_t_u_sd, out=self.sd_t_float)
         numpy.add(self.sd_t_z, self.sd_t_float, out=self.sd_t_z)
         self.sum_sd_t_z_sd = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_sd = numpy.sum(self.sd_t_float, axis=0)
 
     def eval_bus_t_v_max(self):
         '''
@@ -608,6 +728,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.acl_c_su, newshape=(self.problem.num_acl, 1)), self.acl_t_int, out=self.acl_t_float)
         self.sum_acl_t_z_su = numpy.sum(self.acl_t_float)
+        self.t_sum_acl_t_z_su = numpy.sum(self.acl_t_float, axis=0)
 
     def eval_acl_t_u_sd(self):
         '''
@@ -627,6 +748,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.acl_c_sd, newshape=(self.problem.num_acl, 1)), self.acl_t_int, out=self.acl_t_float)
         self.sum_acl_t_z_sd = numpy.sum(self.acl_t_float)
+        self.t_sum_acl_t_z_sd = numpy.sum(self.acl_t_float, axis=0)
 
     def eval_xfr_t_u_su(self):
         '''
@@ -645,6 +767,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.xfr_c_su, newshape=(self.problem.num_xfr, 1)), self.xfr_t_int, out=self.xfr_t_float)
         self.sum_xfr_t_z_su = numpy.sum(self.xfr_t_float)
+        self.t_sum_xfr_t_z_su = numpy.sum(self.xfr_t_float, axis=0)
 
     def eval_xfr_t_u_sd(self):
         '''
@@ -664,6 +787,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.xfr_c_sd, newshape=(self.problem.num_xfr, 1)), self.xfr_t_int, out=self.xfr_t_float)
         self.sum_xfr_t_z_sd = numpy.sum(self.xfr_t_float)
+        self.t_sum_xfr_t_z_sd = numpy.sum(self.xfr_t_float, axis=0)
 
     def eval_acl_t_p_q_fr_to(self):
         '''
@@ -966,6 +1090,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.acl_t_float, out=self.acl_t_float)
         self.sum_acl_t_z_s = self.problem.c_s * numpy.sum(self.acl_t_float)
+        self.t_sum_acl_t_z_s = self.problem.c_s * numpy.sum(self.acl_t_float, axis=0)
 
     def eval_xfr_t_s_max_fr_to(self):
         '''
@@ -994,6 +1119,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.xfr_t_float, out=self.xfr_t_float)
         self.sum_xfr_t_z_s = self.problem.c_s * numpy.sum(self.xfr_t_float)
+        self.t_sum_xfr_t_z_s = self.problem.c_s * numpy.sum(self.xfr_t_float, axis=0)
 
     def eval_acl_t_u_su_sd_test(self):
         

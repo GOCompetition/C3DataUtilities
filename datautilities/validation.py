@@ -192,11 +192,17 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         #solution_evaluator.solution = solution_data_array
         solution_evaluator.run()
         evaluation_summary = solution_evaluator.get_summary()
+        obj = solution_evaluator.get_obj()
+        infeas = solution_evaluator.get_infeas()
         with open(solution_summary_file, 'a') as f:
             pp = pprint.PrettyPrinter()
             pp.pprint(evaluation_summary)
+            print('infeas: {}'.format(infeas))
+            print('obj: {}'.format(obj))
             f.write('solution evaluation summary:\n')
             f.write(pp.pformat(evaluation_summary))
+            f.write('infeas: {}'.format(infeas))
+            f.write('obj: {}'.format(obj))
             f.write('\n')
         end_time = time.time()
         print('evaluate solution time: {}'.format(end_time - start_time))
