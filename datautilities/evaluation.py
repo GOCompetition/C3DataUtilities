@@ -19,6 +19,8 @@ class SolutionEvaluator(object):
 
     def run(self):
 
+        # simple dispatchable device
+        # on/off state
         self.eval_sd_t_u_on_max()
         self.eval_sd_t_u_on_min()
         self.eval_sd_t_d_up_dn()
@@ -28,17 +30,22 @@ class SolutionEvaluator(object):
         self.eval_sd_t_z_on()
         self.eval_sd_t_z_su()
         self.eval_sd_t_z_sd()
+        self.eval_sd_max_startup()
+        self.eval_sd_t_z_sus()
 
+        # bus voltage
         self.eval_bus_t_v_max()
         self.eval_bus_t_v_min()
         self.proj_bus_t_v_max()
         self.proj_bus_t_v_min()
 
+        # shunts
         # no proj needed because integer
         self.eval_sh_t_u_st_max()
         self.eval_sh_t_u_st_min()
         self.eval_sh_t_p_q()
 
+        # DC line bounds
         self.eval_dcl_t_p_max()
         self.eval_dcl_t_p_min()
         self.proj_dcl_t_p_max()
@@ -52,6 +59,7 @@ class SolutionEvaluator(object):
         self.proj_dcl_t_q_to_max()
         self.proj_dcl_t_q_to_min()
 
+        # transformer controls
         self.eval_xfr_t_tau_max()
         self.eval_xfr_t_tau_min()
         self.proj_xfr_t_tau_max()
@@ -61,26 +69,30 @@ class SolutionEvaluator(object):
         self.proj_xfr_t_phi_max()
         self.proj_xfr_t_phi_min()
 
+        # AC branch switching
         self.eval_acl_t_u_su()
         self.eval_acl_t_u_sd()
         self.eval_xfr_t_u_su()
         self.eval_xfr_t_u_sd()
 
+        # AC branch p/q
         self.eval_acl_t_p_q_fr_to()
         self.eval_xfr_t_p_q_fr_to()
 
+        # AC branch s max
         self.eval_acl_t_s_max_fr_to()
         self.eval_xfr_t_s_max_fr_to()
 
         #self.eval_acl_t_u_su_sd_test()
 
+        self.eval_t_k_z_k()
         self.eval_t_z_base()
-        self.eval_t_z_ctg_worst_case()
-        self.eval_t_z_ctg_average_case()
+        self.eval_t_z_k_worst_case()
+        self.eval_t_z_k_average_case()
         self.eval_t_z()
         self.eval_z_base()
-        self.eval_z_ctg_worst_case()
-        self.eval_z_ctg_average_case()
+        self.eval_z_k_worst_case()
+        self.eval_z_k_average_case()
         self.eval_z()
 
         self.eval_infeas()
@@ -152,9 +164,19 @@ class SolutionEvaluator(object):
         self.acl_float = numpy.zeros(shape=(self.problem.num_acl, ), dtype=float)
         self.dcl_float = numpy.zeros(shape=(self.problem.num_dcl, ), dtype=float)
         self.xfr_float = numpy.zeros(shape=(self.problem.num_xfr, ), dtype=float)
+        self.t_float = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
+        self.k_float = numpy.zeros(shape=(self.problem.num_k, ), dtype=float)
         
+        self.bus_int = numpy.zeros(shape=(self.problem.num_bus, ), dtype=int)
+        self.sh_int = numpy.zeros(shape=(self.problem.num_sh, ), dtype=int)
+        self.sd_int = numpy.zeros(shape=(self.problem.num_sd, ), dtype=int)
         self.acl_int = numpy.zeros(shape=(self.problem.num_acl, ), dtype=int)
+        self.dcl_int = numpy.zeros(shape=(self.problem.num_dcl, ), dtype=int)
         self.xfr_int = numpy.zeros(shape=(self.problem.num_xfr, ), dtype=int)
+        self.t_int = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
+        self.t_int_1 = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
+        self.t_int_2 = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
+        self.k_int = numpy.zeros(shape=(self.problem.num_k, ), dtype=int)
 
         self.sd_t_int = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_float = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
@@ -189,6 +211,7 @@ class SolutionEvaluator(object):
             'viol_sd_t_u_on_min',
             'viol_sd_t_d_up_min',
             'viol_sd_t_d_dn_min',
+            'viol_sd_max_startup_constr',
             #'viol_bus_t_v_max', # projected
             #'viol_bus_t_v_min', # projected
             'viol_sh_t_u_st_max',
@@ -242,6 +265,7 @@ class SolutionEvaluator(object):
             'sum_sd_t_sd',
             'viol_sd_t_d_up_min',
             'viol_sd_t_d_dn_min',
+            'viol_sd_max_startup_constr',
             'sum_sd_t_z_on',
             'sum_sd_t_z_su',
             'sum_sd_t_z_sd',
@@ -275,10 +299,11 @@ class SolutionEvaluator(object):
             'viol_acl_t_s_max',
             'sum_xfr_t_z_s',
             'viol_xfr_t_s_max',
+            #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary
             'z',
             'z_base',
-            'z_ctg_worst_case',
-            'z_ctg_average_case',
+            'z_k_worst_case',
+            'z_k_average_case',
             'infeas',
             ] # todo others
         summary = {k: getattr(self, k, None) for k in keys}
@@ -292,17 +317,17 @@ class SolutionEvaluator(object):
 
         self.z_base = numpy.sum(self.t_z_base)
 
-    def eval_z_ctg_worst_case(self):
+    def eval_z_k_worst_case(self):
 
-        self.z_ctg_worst_case = numpy.sum(self.t_z_ctg_worst_case)
+        self.z_k_worst_case = numpy.sum(self.t_z_k_worst_case)
 
-    def eval_z_ctg_average_case(self):
+    def eval_z_k_average_case(self):
 
-        self.z_ctg_average_case = numpy.sum(self.t_z_ctg_average_case)
+        self.z_k_average_case = numpy.sum(self.t_z_k_average_case)
 
     def eval_t_z(self):
 
-        self.t_z = self.t_z_base + self.t_z_ctg_worst_case + self. t_z_ctg_average_case
+        self.t_z = self.t_z_base + self.t_z_k_worst_case + self. t_z_k_average_case
 
     def eval_t_z_base(self):
 
@@ -320,13 +345,24 @@ class SolutionEvaluator(object):
             -self.t_sum_xfr_t_z_s,
         ])
 
-    def eval_t_z_ctg_worst_case(self):
+    def eval_t_k_z_k(self):
 
-        self.t_z_ctg_worst_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float) # todo add everything
+        self.t_k_z_k = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float) # todo add everything
+        self.t_min_t_k_z_k = [utils.get_min(self.t_k_z_k[t, :].flatten(), idx_lists=[self.problem.k_uid]) for t in range(self.problem.num_t)]
 
-    def eval_t_z_ctg_average_case(self):
+    def eval_t_z_k_worst_case(self):
 
-        self.t_z_ctg_average_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float) # todo add everything
+        if self.problem.num_k > 0:
+            self.t_z_k_worst_case = numpy.amin(self.t_k_z_k, axis=1)
+        else:
+            self.t_z_k_worst_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
+
+    def eval_t_z_k_average_case(self):
+
+        if self.problem.num_k > 0:
+            self.t_z_k_average_case = numpy.mean(self.t_k_z_k, axis=1)
+        else:
+            self.t_z_k_average_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
 
     def eval_sd_t_u_on_max(self):
 
@@ -435,6 +471,50 @@ class SolutionEvaluator(object):
         numpy.add(self.sd_t_z, self.sd_t_float, out=self.sd_t_z)
         self.sum_sd_t_z_sd = numpy.sum(self.sd_t_float)
         self.t_sum_sd_t_z_sd = numpy.sum(self.sd_t_float, axis=0)
+
+    # this looks inefficient, but so far it is not a problem
+    def eval_sd_max_startup(self):
+
+        max_viol = 0
+        max_i = 0
+        max_j = 0
+        for i in range(self.problem.num_sd):
+            for j in range(self.problem.sd_num_max_startup_constr[i]):
+                #viol = 0
+                #self.sd_max_startup_constr_over[i][j] = ??
+                #self.t_int[:] = 1
+                a_start = self.problem.sd_max_startup_constr_a_start_list[i][j]
+                a_end = self.problem.sd_max_startup_constr_a_end_list[i][j]
+                numpy.less_equal(a_start - self.config['time_eq_tol'], self.problem.t_a_start, out=self.t_int_1)
+                numpy.less(self.problem.t_a_start, a_end - self.config['time_eq_tol'], out=self.t_int_2)
+                numpy.multiply(self.t_int_1, self.t_int_2, out=self.t_int)
+                #print('t_a_start: {}'.format(self.problem.t_a_start))
+                #print('t_a_end: {}'.format(self.problem.t_a_end))
+                #print('t_int_1: {}'.format(self.t_int_1))
+                #print('t_int_2: {}'.format(self.t_int_2))
+                #print('t_int: {}'.format(self.t_int))
+                numpy.multiply(self.sd_t_u_su[i, :], self.t_int, out=self.t_int)
+                #print('sd_t_u_su: {}'.format(self.sd_t_u_su[i, :]))
+                #print('t_int: {}'.format(self.t_int))
+                startups = numpy.sum(self.t_int)
+                viol = max(0, startups - self.problem.sd_max_startup_constr_max_startup_list[i][j])
+                #print('i: {}, j: {}, sd: {}, t: {}, a_start: {}, a_end: {}, max_startups: {}, startups: {}, viol: {}'.format(
+                #    i, j, self.problem.sd_uid[i], self.problem.t_num[j], a_start, a_end, self.problem.sd_max_startup_constr_max_startup_list[i][j], startups, viol))
+                if viol > max_viol:
+                    max_viol = viol
+                    max_i = i
+                    max_j = j
+        self.viol_sd_max_startup_constr = {
+            'val': max_viol,
+            'abs': abs(max_viol),
+            'idx': (self.problem.sd_uid[max_i], self.problem.t_num[max_j]),
+            'idx_lin': None,
+            'idx_int': (max_i, max_j)}
+
+    def eval_sd_t_z_sus(self):
+        
+        # todo
+        pass
 
     def eval_bus_t_v_max(self):
         '''
@@ -929,7 +1009,7 @@ class SolutionEvaluator(object):
         evaluate xfr p/q fr/to
         '''
 
-        do_debug = True
+        do_debug = False
         if do_debug:
             debug = {}
             xfr_uid = 'B15'

@@ -166,11 +166,7 @@ class InputData(object):
         self.sd_is_pr = numpy.array([1 if data_map[i].device_type == 'producer' else 0 for i in self.sd_uid])
         self.sd_is_cs = numpy.array([1 if data_map[i].device_type == 'consumer' else 0 for i in self.sd_uid])
         self.sd_c_su = numpy.array([data_map[i].startup_cost for i in self.sd_uid])
-        # startup_states - a list
         self.sd_c_sd = numpy.array([data_map[i].shutdown_cost for i in self.sd_uid])
-        # startups_ub - list
-        # energy_req_ub - llist
-        # energy_req_lb - list
         self.sd_c_on = numpy.array([data_map[i].on_cost for i in self.sd_uid])
         self.sd_d_up_min = numpy.array([data_map[i].in_service_time_lb for i in self.sd_uid])
         self.sd_d_dn_min = numpy.array([data_map[i].down_time_lb for i in self.sd_uid])
@@ -178,6 +174,37 @@ class InputData(object):
         self.sd_p_ramp_dn_max = numpy.array([data_map[i].p_ramp_down_ub for i in self.sd_uid])
         self.sd_p_startup_ramp_up_max = numpy.array([data_map[i].p_startup_ramp_ub for i in self.sd_uid])
         self.sd_p_shutdown_ramp_dn_max = numpy.array([data_map[i].p_shutdown_ramp_ub for i in self.sd_uid])
+
+        # downtime-dependent startup cost data
+        startup_states = {i:sorted(data_map[i].startup_states, key=(lambda x: x[0])) for i in self.sd_uid} # sort startup states so that cost is increasing within each sd
+        self.sd_num_startup_state = numpy.array([len(startup_states[i]) for i in self.sd_uid])
+        self.sd_startup_state_d_max_list = [numpy.array([s[1] for s in startup_states[i]], dtype=float) for i in self.sd_uid]
+        self.sd_startup_state_c_list = [numpy.array([s[0] for s in startup_states[i]], dtype=float) for i in self.sd_uid]
+        #self.sd_startup_state_d_max = numpy.array([s[1] for i in self.sd_uid for s in startup_states[i]])
+        #self.sd_startup_state_c = numpy.array([s[0] for i in self.sd_uid for s in startup_states[i]])
+
+        # max startups constraint data
+        self.sd_num_max_startup_constr = numpy.array([len(data_map[i].startups_ub) for i in self.sd_uid])
+        self.sd_max_startup_constr_a_start_list = [numpy.array([s[0] for s in data_map[i].startups_ub]) for i in self.sd_uid]
+        self.sd_max_startup_constr_a_end_list = [numpy.array([s[1] for s in data_map[i].startups_ub]) for i in self.sd_uid]
+        self.sd_max_startup_constr_max_startup_list = [numpy.array([s[2] for s in data_map[i].startups_ub]) for i in self.sd_uid]
+        # self.sd_max_startup_constr_t_start_list = [
+        #     numpy.array([ for a in sd_max_startup_constr_a_start_list[i]])
+        #     for i in self.sd_uid]
+
+        # max energy constraint data
+        self.sd_num_max_energy_constr = numpy.array([len(data_map[i].energy_req_ub) for i in self.sd_uid])
+        self.sd_max_energy_constr_a_start_list = [numpy.array([s[0] for s in data_map[i].energy_req_ub]) for i in self.sd_uid]
+        self.sd_max_energy_constr_a_end_list = [numpy.array([s[1] for s in data_map[i].energy_req_ub]) for i in self.sd_uid]
+        self.sd_max_energy_constr_max_energy_list = [numpy.array([s[2] for s in data_map[i].energy_req_ub]) for i in self.sd_uid]
+
+        # min energy constraint data
+        self.sd_num_min_energy_constr = numpy.array([len(data_map[i].energy_req_lb) for i in self.sd_uid])
+        self.sd_min_energy_constr_a_start_list = [numpy.array([s[0] for s in data_map[i].energy_req_lb]) for i in self.sd_uid]
+        self.sd_min_energy_constr_a_end_list = [numpy.array([s[1] for s in data_map[i].energy_req_lb]) for i in self.sd_uid]
+        self.sd_min_energy_constr_min_energy_list = [numpy.array([s[2] for s in data_map[i].energy_req_lb]) for i in self.sd_uid]
+
+        # prior state data
         self.sd_u_on_0 = numpy.array([data_map[i].initial_status.on_status for i in self.sd_uid])
         self.sd_p_0 = numpy.array([data_map[i].initial_status.p for i in self.sd_uid])
         self.sd_q_0 = numpy.array([data_map[i].initial_status.q for i in self.sd_uid])
@@ -286,6 +313,10 @@ class InputData(object):
     def set_t(self, data):
 
         self.t_d = numpy.array(data.time_series_input.general.interval_duration)
+        self.t_a_end = numpy.cumsum(self.t_d)
+        self.t_a_start = numpy.zeros(shape=(self.num_t, ), dtype=float)
+        self.t_a_start[1:self.num_t] = self.t_a_end[0:(self.num_t - 1)]
+        self.t_a_mid = 0.5 * (self.t_a_start + self.t_a_end)
 
     def set_k(self, data):
 
@@ -319,6 +350,9 @@ class InputData(object):
         self.sd_t_c_qrd = numpy.array([data_map[i].q_res_down_cost for i in self.sd_uid])
 
     def set_sd_t_cost(self, data):
+
+        data_map = {x.uid:x for x in data.time_series_input.simple_dispatchable_device}
+        #self.sd_t_
 
         # todo cost list(list(tuple(float))) - dims = (t, cost_block, block_entry), t = 1...24, cost_block = b1, ..., b5 (e.g.), block_entry = (c, pmax)
 
@@ -380,10 +414,15 @@ class OutputData(object):
 
     def set_dcl_t(self, input_data, output_data_model):
 
+        # todo note the reshape here to deal with empty set of DC lines
+        # in general we need this technique on all arraydata fields
+        # maybe ndmin=2 in the array constructor would work
+        # also need dtype in the array constructor
         data_map = {x.uid:x for x in output_data_model.time_series_output.dc_line}
-        self.dcl_t_p = numpy.array([data_map[i].pdc_fr for i in input_data.dcl_uid])
-        self.dcl_t_q_fr = numpy.array([data_map[i].qdc_fr for i in input_data.dcl_uid])
-        self.dcl_t_q_to = numpy.array([data_map[i].qdc_to for i in input_data.dcl_uid])
+        #self.dcl_t_p = numpy.array([data_map[i].pdc_fr for i in input_data.dcl_uid], ndmin=2)
+        self.dcl_t_p = numpy.reshape(numpy.array([data_map[i].pdc_fr for i in input_data.dcl_uid]), newshape=(input_data.num_dcl, input_data.num_t))
+        self.dcl_t_q_fr = numpy.reshape(numpy.array([data_map[i].qdc_fr for i in input_data.dcl_uid]), newshape=(input_data.num_dcl, input_data.num_t))
+        self.dcl_t_q_to = numpy.reshape(numpy.array([data_map[i].qdc_to for i in input_data.dcl_uid]), newshape=(input_data.num_dcl, input_data.num_t))
 
     def set_xfr_t(self, input_data, output_data_model):
 
