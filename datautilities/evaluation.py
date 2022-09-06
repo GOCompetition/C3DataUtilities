@@ -165,6 +165,7 @@ class SolutionEvaluator(object):
         self.dcl_float = numpy.zeros(shape=(self.problem.num_dcl, ), dtype=float)
         self.xfr_float = numpy.zeros(shape=(self.problem.num_xfr, ), dtype=float)
         self.t_float = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
+        self.t_float_1 = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
         self.k_float = numpy.zeros(shape=(self.problem.num_k, ), dtype=float)
         
         self.bus_int = numpy.zeros(shape=(self.problem.num_bus, ), dtype=int)
@@ -269,6 +270,7 @@ class SolutionEvaluator(object):
             'sum_sd_t_z_on',
             'sum_sd_t_z_su',
             'sum_sd_t_z_sd',
+            'sum_sd_t_z_sus',
             'viol_bus_t_v_max',
             'viol_bus_t_v_min',
             'viol_sh_t_u_st_max',
@@ -337,6 +339,7 @@ class SolutionEvaluator(object):
             -self.t_sum_sd_t_z_on,
             -self.t_sum_sd_t_z_su,
             -self.t_sum_sd_t_z_sd,
+            -self.t_sum_sd_t_z_sus,
             -self.t_sum_acl_t_z_su,
             -self.t_sum_acl_t_z_sd,
             -self.t_sum_acl_t_z_s,
@@ -513,8 +516,22 @@ class SolutionEvaluator(object):
 
     def eval_sd_t_z_sus(self):
         
-        # todo
-        pass
+        for i in range(self.problem.num_sd):
+            self.t_float[:] = 0.0 # selecting no startup state, with no startup state cost adjustment, is allowed
+            for j in range(self.problem.sd_num_startup_state[i]):
+                # qualify for this startup state if self.sd_t_d_dn_start[i, :] <= max_prior_d_dn + tol
+                max_downtime = self.problem.sd_startup_state_d_max_list[i][j]
+                numpy.less_equal(self.sd_t_d_dn_start[i, :], max_downtime + self.config['time_eq_tol'], out=self.t_int)
+                # if qualify for this state what is cost?
+                cost = self.problem.sd_startup_state_c_list[i][j]
+                numpy.multiply(cost, self.t_int, out=self.t_float_1)
+                # take the better of qualified cost for this state and prior best cost
+                numpy.minimum(self.t_float, self.t_float_1, out=self.t_float)
+            self.sd_t_float[i, :] = self.t_float
+        # cost adjustment applies only when starting up
+        numpy.multiply(self.sd_t_u_su, self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_sus = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_sus = numpy.sum(self.sd_t_float, axis=0)
 
     def eval_bus_t_v_max(self):
         '''
