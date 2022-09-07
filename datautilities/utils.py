@@ -1,11 +1,22 @@
 '''
+Functions needed in various places in datautilities
 '''
 
-import os, sys, subprocess, traceback, pathlib
-import numpy
+import os, sys, subprocess, traceback, pathlib, time
+import numpy, networkx
+from scipy.sparse import sparsetools
 
 import datamodel
 from datautilities.errors import GitError
+
+def timeit(function):
+    def timed(*args, **kw):
+        start_time = time.time()
+        result = function(*args, **kw)
+        end_time = time.time()
+        print('function: {}, time: {}'.format(function.__name__, end_time - start_time))
+        return result
+    return timed
 
 def get_C3DataUtilities_dir():
     
@@ -114,3 +125,105 @@ def get_max_min(arr, use_max=True, idx_lists=None):
             idx = tuple([idx_lists[i][arg_tuple[i]] for i in range(len(idx_lists))])
             out['idx'] = idx
     return out
+
+def csr_mat_vec_add_to_vec(a, x, out):
+    '''
+    csr_mat_vec_add_to_vec(a, x, out)
+
+    a - sparse matrix (csr)
+    x - vector or dense matrix
+    out - vector or dense matrix of the same shape as x
+    '''
+
+    # This should be a more efficient version of:
+    #
+    #     out += a.dot(x)
+    #
+    # or
+    #
+    #     out[:] += a.dot(x)
+    #
+    # either of which evidently would create a temporary variable to store the output of dot()
+    # before assigning it to out. Limited testing suggests they are about the same though.
+
+    # csr_matvec adds to the out vector, so we need to 0 it out first (or we could take advantage of this)
+    #out[:] = 0.0
+    #sparsetools.csr_matvec(a.shape[0], a.shape[1], a.indptr, a.indices, a.data, x, out)
+    
+    out[:] += a.dot(x)
+    #numpy.add(out
+
+def get_connected_components(vertices, od_pairs):
+    # vertices should be a list of ints
+    # od_pairs should be a list of pairs of ints
+    # each int in each element of od_pars should be in vertices
+
+    num_vertices = len(vertices)
+    num_edges = len(od_pairs)
+    edge_vertices = sorted(list(set([p[0] for p in od_pairs] + [p[1] for p in od_pairs])))
+    vertices_in_edges_not_in_vertices = sorted(list(set(edge_vertices).difference(set(vertices))))
+    if len(vertices_in_edges_not_in_vertices) > 0:
+        print('vertices in edge set but not in vertex set: {}'.format(vertices_in_edges_not_in_vertices))
+        assert(len(vertices_in_edges_not_in_vertices) <= 0)
+    if num_vertices == 0:
+        return []
+    g = networkx.Graph()
+    g.add_nodes_from(sorted(vertices))
+    g.add_edges_from(sorted(od_pairs))
+    g_connected_components = networkx.connected_components(g)
+    return [sorted(list(c)) for c in g_connected_components]
+
+def get_bridges(od_pairs):
+    # input should be a list of pairs of ints
+    
+    num_edges = len(od_pairs)
+    if num_edges == 0:
+        return []
+    o_nodes = [p[0] for p in od_pairs]
+    d_nodes = [p[1] for p in od_pairs]
+    nodes = sorted(list(set(o_nodes + d_nodes)))
+    num_nodes = len(nodes)
+    if num_nodes == 0:
+        return []
+    max_node = max(nodes)
+    pairs_o_lt_d = [
+        (o_nodes[i], d_nodes[i], i)
+        if o_nodes[i] <= d_nodes[i]
+        else (d_nodes[i], o_nodes[i], i)
+        for i in range(num_edges)]
+    pairs_sorted = sorted(pairs_o_lt_d)
+    pairs_unique = list(set([(p[0], p[1]) for p in pairs_sorted]))
+    pairs_dict = {p:[] for p in pairs_unique}
+    for p in pairs_sorted:
+        pairs_dict[(p[0], p[1])].append(p)
+    pairs_local_sorted = sorted(
+        [(v[i][0], v[i][1], i, v[i][2]) for k, v in pairs_dict.items() for i in range(len(v))])
+    pairs_first = [p for p in pairs_local_sorted if p[2] == 0]
+    pairs_with_extra_edges = sorted([k for k, v in pairs_dict.items() if len(v) > 1])
+    num_pairs_with_extra_edges = len(pairs_with_extra_edges)
+    extra_pairs = (
+        [(pairs_with_extra_edges[i][0], num_nodes + i, num_edges + i)
+         for i in range(num_pairs_with_extra_edges)] +
+        [(pairs_with_extra_edges[i][1], num_nodes + i, num_edges + i + num_pairs_with_extra_edges)
+         for i in range(num_pairs_with_extra_edges)])
+    pairs_augmented = sorted([(p[0], p[1], p[3]) for p in pairs_first] + extra_pairs)
+    pairs_augmented_dict = {(p[0], p[1]): p[2] for p in pairs_augmented}
+    g = networkx.Graph()
+    g.add_edges_from(sorted(pairs_augmented_dict.keys()))
+    g_bridges = networkx.bridges(g)
+    bridge_pair_indices = [pairs_augmented_dict[p] for p in list(g_bridges)]
+    # print('od_pairs: {}'.format(od_pairs))
+    # print('o_nodes: {}'.format(o_nodes))
+    # print('d_nodes: {}'.format(d_nodes))
+    # print('nodes: {}'.format(nodes))
+    # print('num_nodes: {}'.format(num_nodes))
+    # print('num_edges: {}'.format(num_edges))
+    # print('pairs_sorted: {}'.format(pairs_sorted))
+    # print('pairs_dict: {}'.format(pairs_dict))
+    # print('pairs_local_sorted: {}'.format(pairs_local_sorted))
+    # print('pairs_augmented: {}'.format(pairs_augmented))
+    # print('nodes(g): {}'.format(list(g.nodes)))
+    # print('edges(g): {}'.format(list(g.edges)))
+    # print('bridges(g): {}'.format(list(g_bridges)))
+    # print('bridge_pair_indices: {}'.format(bridge_pair_indices))
+    return bridge_pair_indices

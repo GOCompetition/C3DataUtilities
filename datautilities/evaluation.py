@@ -3,7 +3,7 @@ Evaluation of solutions to the GO Competition Challenge 3 problem.
 '''
 
 import time
-import numpy
+import numpy, scipy
 from datautilities import arraydata
 from datautilities import utils
 
@@ -16,6 +16,7 @@ class SolutionEvaluator(object):
         self.set_solution(solution)
         self.set_solution_zero()
         self.set_work_zero()
+        self.set_matrices()
 
     def run(self):
 
@@ -62,7 +63,7 @@ class SolutionEvaluator(object):
         # transformer controls
         self.eval_xfr_t_tau_max()
         self.eval_xfr_t_tau_min()
-        self.proj_xfr_t_tau_max()
+        self.proj_xfr_t_tau_max() # comment out these projections to highlight the power balance violation
         self.proj_xfr_t_tau_min()
         self.eval_xfr_t_phi_max()
         self.eval_xfr_t_phi_min()
@@ -84,6 +85,18 @@ class SolutionEvaluator(object):
         self.eval_xfr_t_s_max_fr_to()
 
         #self.eval_acl_t_u_su_sd_test()
+
+        # simple dispatchable device
+        # p_on, p_su, p_sd, q
+        # bounds, constraints, and projections
+        # temporarily, set p = p_on
+        # todo
+        self.eval_sd_t_p()
+
+        self.eval_bus_t_p()
+        self.eval_bus_t_q()
+        self.eval_prz_t_p()
+        self.eval_prz_t_q()
 
         self.eval_t_k_z_k()
         self.eval_t_z_base()
@@ -199,6 +212,51 @@ class SolutionEvaluator(object):
         self.xfr_t_float_1 = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
         self.xfr_t_float_2 = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
 
+    def set_matrices(self):
+
+        self.bus_sd_inj_mat = scipy.sparse.csr_matrix(
+            (self.problem.sd_is_pr - self.problem.sd_is_cs,
+             #[1.0 for i in range(self.problem.num_sd)],
+             #numpy.ones(shape=(self.problem.num_sd, )),
+             (self.problem.sd_bus,
+              range(self.problem.num_sd))),
+            (self.problem.num_bus, self.problem.num_sd))
+        self.bus_sh_inj_mat = scipy.sparse.csr_matrix(
+            (-1.0 * numpy.ones(shape=(self.problem.num_sh, )),
+             (self.problem.sh_bus,
+              range(self.problem.num_sh))),
+            (self.problem.num_bus, self.problem.num_sh))
+        self.bus_acl_fr_inj_mat = scipy.sparse.csr_matrix(
+            (-1.0 * numpy.ones(shape=(self.problem.num_acl, )),
+             (self.problem.acl_fbus,
+              range(self.problem.num_acl))),
+            (self.problem.num_bus, self.problem.num_acl))
+        self.bus_acl_to_inj_mat = scipy.sparse.csr_matrix(
+            (-1.0 * numpy.ones(shape=(self.problem.num_acl, )),
+             (self.problem.acl_tbus,
+              range(self.problem.num_acl))),
+            (self.problem.num_bus, self.problem.num_acl))
+        self.bus_dcl_fr_inj_mat = scipy.sparse.csr_matrix(
+            (-1.0 * numpy.ones(shape=(self.problem.num_dcl, )),
+             (self.problem.dcl_fbus,
+              range(self.problem.num_dcl))),
+            (self.problem.num_bus, self.problem.num_dcl))
+        self.bus_dcl_to_inj_mat = scipy.sparse.csr_matrix(
+            (-1.0 * numpy.ones(shape=(self.problem.num_dcl, )),
+             (self.problem.dcl_tbus,
+              range(self.problem.num_dcl))),
+            (self.problem.num_bus, self.problem.num_dcl))
+        self.bus_xfr_fr_inj_mat = scipy.sparse.csr_matrix(
+            (-1.0 * numpy.ones(shape=(self.problem.num_xfr, )),
+             (self.problem.xfr_fbus,
+              range(self.problem.num_xfr))),
+            (self.problem.num_bus, self.problem.num_xfr))
+        self.bus_xfr_to_inj_mat = scipy.sparse.csr_matrix(
+            (-1.0 * numpy.ones(shape=(self.problem.num_xfr, )),
+             (self.problem.xfr_tbus,
+              range(self.problem.num_xfr))),
+            (self.problem.num_bus, self.problem.num_xfr))
+
     def eval_infeas(self):
         '''
         set infeas
@@ -238,8 +296,15 @@ class SolutionEvaluator(object):
             k for k in set(keys).intersection(set(summary.keys()))
             if summary[k] is not None
             and summary[k]['val'] > 0]
-        infeas_summary = {k:summary[k] for k in infeas_keys}
-        self.infeas = int(len(infeas_summary) > 0)
+        self.infeas_summary = {k:summary[k] for k in infeas_keys}
+        self.infeas = int(len(self.infeas_summary) > 0)
+
+    def get_infeas_summary(self):
+        '''
+        return items from summary causing determination of infeasibility
+        '''
+
+        return self.infeas_summary
 
     def get_infeas(self):
         '''
@@ -301,7 +366,13 @@ class SolutionEvaluator(object):
             'viol_acl_t_s_max',
             'sum_xfr_t_z_s',
             'viol_xfr_t_s_max',
-            #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary
+            'viol_bus_t_p_balance_max',
+            'viol_bus_t_p_balance_min',
+            'sum_bus_t_z_p',
+            'viol_bus_t_q_balance_max',
+            'viol_bus_t_q_balance_min',
+            'sum_bus_t_z_q',
+            #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
             'z',
             'z_base',
             'z_k_worst_case',
@@ -346,6 +417,8 @@ class SolutionEvaluator(object):
             -self.t_sum_xfr_t_z_su,
             -self.t_sum_xfr_t_z_sd,
             -self.t_sum_xfr_t_z_s,
+            -self.t_sum_bus_t_z_p,
+            -self.t_sum_bus_t_z_q,
         ])
 
     def eval_t_k_z_k(self):
@@ -366,6 +439,75 @@ class SolutionEvaluator(object):
             self.t_z_k_average_case = numpy.mean(self.t_k_z_k, axis=1)
         else:
             self.t_z_k_average_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
+
+    def eval_sd_t_p(self):
+        '''
+        '''
+
+        # simple dispatchable device
+        # p_on, p_su, p_sd, q
+        # bounds, constraints, and projections
+        # todo
+
+        # temporarily, set p = p_on
+        self.sd_t_p = numpy.add(self.sd_t_p_on, 0.0)
+
+    def eval_bus_t_p(self):
+
+        self.bus_t_float[:] = 0.0
+        utils.csr_mat_vec_add_to_vec(self.bus_sd_inj_mat, self.sd_t_p, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_sh_inj_mat, self.sh_t_p, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_acl_fr_inj_mat, self.acl_t_p_fr, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_acl_to_inj_mat, self.acl_t_p_to, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_dcl_fr_inj_mat, self.dcl_t_p, out=self.bus_t_float)
+        numpy.negative(self.dcl_t_p, out=self.dcl_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_dcl_to_inj_mat, self.dcl_t_float, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_xfr_fr_inj_mat, self.xfr_t_p_fr, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_xfr_to_inj_mat, self.xfr_t_p_to, out=self.bus_t_float)
+        numpy.negative(self.bus_t_float, out=self.bus_t_float) # now bus_t_float contains net power shortfall - called p_{it} in formulation
+        #print('bus_t_p_shortfall:')
+        #print(self.bus_t_float)
+        self.viol_bus_t_p_balance_max = utils.get_max(self.bus_t_float, idx_lists=[self.problem.bus_uid, self.problem.t_num])
+        self.viol_bus_t_p_balance_min = utils.get_min(self.bus_t_float, idx_lists=[self.problem.bus_uid, self.problem.t_num])
+        numpy.absolute(self.bus_t_float, out=self.bus_t_float)
+        #numpy.multiply(self.problem.c_p, self.bus_t_float, out=self.bus_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.bus_t_float, out=self.bus_t_float)
+        self.sum_bus_t_z_p = self.problem.c_p * numpy.sum(self.bus_t_float)
+        self.t_sum_bus_t_z_p = self.problem.c_p * numpy.sum(self.bus_t_float, axis=0)
+
+    def eval_bus_t_q(self):
+
+        self.bus_t_float[:] = 0.0
+        utils.csr_mat_vec_add_to_vec(self.bus_sd_inj_mat, self.sd_t_q, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_sh_inj_mat, self.sh_t_q, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_acl_fr_inj_mat, self.acl_t_q_fr, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_acl_to_inj_mat, self.acl_t_q_to, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_dcl_fr_inj_mat, self.dcl_t_q_fr, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_dcl_to_inj_mat, self.dcl_t_q_to, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_xfr_fr_inj_mat, self.xfr_t_q_fr, out=self.bus_t_float)
+        utils.csr_mat_vec_add_to_vec(self.bus_xfr_to_inj_mat, self.xfr_t_q_to, out=self.bus_t_float)
+        numpy.negative(self.bus_t_float, out=self.bus_t_float) # now bus_t_float contains net reactive power shortfall - called q_{it} in formulation
+        #print('bus_t_q_shortfall:')
+        #print(self.bus_t_float)
+        self.viol_bus_t_q_balance_max = utils.get_max(self.bus_t_float, idx_lists=[self.problem.bus_uid, self.problem.t_num])
+        self.viol_bus_t_q_balance_min = utils.get_min(self.bus_t_float, idx_lists=[self.problem.bus_uid, self.problem.t_num])
+        numpy.absolute(self.bus_t_float, out=self.bus_t_float)
+        #numpy.multiply(self.problem.c_q, self.bus_t_float, out=self.bus_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.bus_t_float, out=self.bus_t_float)
+        self.sum_bus_t_z_q = self.problem.c_q * numpy.sum(self.bus_t_float)
+        self.t_sum_bus_t_z_q = self.problem.c_q * numpy.sum(self.bus_t_float, axis=0)
+
+    def eval_prz_t_p(self):
+
+        # todo
+        pass
+
+    def eval_prz_t_q(self):
+
+        # todo
+        pass
 
     def eval_sd_t_u_on_max(self):
 
@@ -1029,8 +1171,8 @@ class SolutionEvaluator(object):
         do_debug = False
         if do_debug:
             debug = {}
-            xfr_uid = 'B15'
-            t = 1
+            xfr_uid = 'ID2T862'
+            t = 2
             debug['t'] = t
             debug['xfr_uid'] = xfr_uid
             xfr = self.problem.xfr_map[xfr_uid]
@@ -1042,6 +1184,8 @@ class SolutionEvaluator(object):
             tbus = self.problem.xfr_tbus[xfr]
             debug['tbus'] = tbus
             debug['smax'] = self.problem.xfr_s_max[xfr]
+            debug['rsr'] = self.problem.xfr_r_sr[xfr]
+            debug['xsr'] = self.problem.xfr_x_sr[xfr]
             debug['gsr'] = self.problem.xfr_g_sr[xfr]
             debug['bsr'] = self.problem.xfr_b_sr[xfr]
             debug['bch'] = self.problem.xfr_b_ch[xfr]
@@ -1092,7 +1236,7 @@ class SolutionEvaluator(object):
         numpy.add(self.problem.xfr_b_to, self.xfr_float, out=self.xfr_float)
         numpy.add(self.problem.xfr_b_sr, self.xfr_float, out=self.xfr_float)
         numpy.negative(self.xfr_float, out=self.xfr_float)
-        numpy.multiply(numpy.reshape(self.xfr_float, newshape=(self.problem.num_xfr, 1)), self.xfr_t_float_1, out=self.xfr_t_q_to)
+        numpy.multiply(numpy.reshape(self.xfr_float, newshape=(self.problem.num_xfr, 1)), self.xfr_t_float_2, out=self.xfr_t_q_to)
         if do_debug:
             debug['bvt2'] = -self.xfr_t_q_to[xfr, t]
 
