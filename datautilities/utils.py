@@ -227,3 +227,19 @@ def get_bridges(od_pairs):
     # print('bridges(g): {}'.format(list(g_bridges)))
     # print('bridge_pair_indices: {}'.format(bridge_pair_indices))
     return bridge_pair_indices
+
+def eval_convex_cost_function(num_block, p_max, c, p):
+    '''
+    assumes
+    '''
+
+    p_remaining = float(p)
+    z_so_far = 0.0
+    for i in range(num_block):
+        if p_remaining > p_max[i]:
+            z_so_far += c[i] * p_max[i]
+            p_remaining -= p_max[i]
+        else:
+            z_so_far += c[i] * p_remaining
+            break
+    return z_so_far

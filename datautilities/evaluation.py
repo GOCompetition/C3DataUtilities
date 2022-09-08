@@ -93,6 +93,18 @@ class SolutionEvaluator(object):
         # todo
         self.eval_sd_t_p()
 
+        self.eval_sd_t_z_p()
+        self.eval_sd_t_z_rgu()
+        self.eval_sd_t_z_rgd()
+        self.eval_sd_t_z_scr()
+        self.eval_sd_t_z_nsc()
+        self.eval_sd_t_z_rru_on()
+        self.eval_sd_t_z_rrd_on()
+        self.eval_sd_t_z_rru_off()
+        self.eval_sd_t_z_rrd_off()
+        self.eval_sd_t_z_qru()
+        self.eval_sd_t_z_qrd()
+
         self.eval_bus_t_p()
         self.eval_bus_t_q()
         self.eval_prz_t_p()
@@ -194,6 +206,7 @@ class SolutionEvaluator(object):
 
         self.sd_t_int = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_float = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
+        self.sd_t_float_1 = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
 
         self.bus_t_float = numpy.zeros(shape=(self.problem.num_bus, self.problem.num_t), dtype=float)
 
@@ -372,6 +385,19 @@ class SolutionEvaluator(object):
             'viol_bus_t_q_balance_max',
             'viol_bus_t_q_balance_min',
             'sum_bus_t_z_q',
+            'sum_pr_t_z_p',
+            'sum_cs_t_z_p',
+            #'sum_sd_t_z_p', # separate to pr and cs
+            'sum_sd_t_z_rgu',
+            'sum_sd_t_z_rgd',
+            'sum_sd_t_z_scr',
+            'sum_sd_t_z_nsc',
+            'sum_sd_t_z_rru_on',
+            'sum_sd_t_z_rrd_on',
+            'sum_sd_t_z_rru_off',
+            'sum_sd_t_z_rrd_off',
+            'sum_sd_t_z_qru',
+            'sum_sd_t_z_qrd',
             #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
             'z',
             'z_base',
@@ -406,6 +432,7 @@ class SolutionEvaluator(object):
 
         #self.t_z_base = numpy.zeros(shape=(self.problem.num_t, ), dtype=float) # todo add everything
         # note "cost" terms have a minus sign, "benefit" terms have a plus sign
+        # t_z_base, t_z_ctg, t_z, z, etc. are all net benefits
         self.t_z_base = sum([
             -self.t_sum_sd_t_z_on,
             -self.t_sum_sd_t_z_su,
@@ -419,6 +446,19 @@ class SolutionEvaluator(object):
             -self.t_sum_xfr_t_z_s,
             -self.t_sum_bus_t_z_p,
             -self.t_sum_bus_t_z_q,
+            #-self.t_sum_sd_t_z_p, # split into pr and cs
+            -self.t_sum_pr_t_z_p, # pr is a cost with a minus
+            self.t_sum_cs_t_z_p, # cs is a benefit with a plus
+            -self.t_sum_sd_t_z_rgu,
+            -self.t_sum_sd_t_z_rgd,
+            -self.t_sum_sd_t_z_scr,
+            -self.t_sum_sd_t_z_nsc,
+            -self.t_sum_sd_t_z_rru_on,
+            -self.t_sum_sd_t_z_rrd_on,
+            -self.t_sum_sd_t_z_rru_off,
+            -self.t_sum_sd_t_z_rrd_off,
+            -self.t_sum_sd_t_z_qru,
+            -self.t_sum_sd_t_z_qrd,
         ])
 
     def eval_t_k_z_k(self):
@@ -439,6 +479,168 @@ class SolutionEvaluator(object):
             self.t_z_k_average_case = numpy.mean(self.t_k_z_k, axis=1)
         else:
             self.t_z_k_average_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
+
+    def eval_sd_t_z_p(self):
+        '''
+        evaluate simple dispatchable device energy cost/value
+
+        # these do not exist. we split into pr (cost) and cs (benefit)
+        # t_sum_sd_t_z_p
+        # sum_sd_t_z_p
+
+        # pr
+        t_sum_pr_t_z_p
+        sum_pr_t_z_p
+
+        # cs
+        t_sum_cs_t_z_p
+        sum_cs_t_z_p
+        '''
+
+        # evaluate sd_t_z_p and store in sd_t_float
+        # maybe passing in work arrays could make it more efficient,
+        # but probably not. really need cython on this if it becomes a problem
+        for i in range(self.problem.num_sd):
+            for j in range(self.problem.num_t):
+                self.sd_t_float[i,j] = utils.eval_convex_cost_function(
+                    self.problem.sd_t_num_block[i,j],
+                    self.problem.sd_t_block_p_max_list[i][j],
+                    self.problem.sd_t_block_c_list[i][j],
+                    self.sd_t_p[i,j])
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+
+        # add everything up
+        # consumers have a factor of -1 because we are translating a negative cost into a value
+        #self.sum_sd_t_z_p = numpy.sum(self.sd_t_float)
+        #self.t_sum_sd_t_z_p = numpy.sum(self.sd_t_float, axis=0)
+
+        # pr
+        numpy.multiply(numpy.reshape(self.problem.sd_is_pr, newshape=(self.problem.num_sd, 1)), self.sd_t_float, out= self.sd_t_float_1)
+        self.sum_pr_t_z_p = numpy.sum(self.sd_t_float_1)
+        self.t_sum_pr_t_z_p = numpy.sum(self.sd_t_float_1, axis=0)
+
+        # cs
+        numpy.multiply(numpy.reshape(self.problem.sd_is_cs, newshape=(self.problem.num_sd, 1)), self.sd_t_float, out= self.sd_t_float_1)
+        self.sum_cs_t_z_p = (-1.0) * numpy.sum(self.sd_t_float_1)
+        self.t_sum_cs_t_z_p = (-1.0) * numpy.sum(self.sd_t_float_1, axis=0)
+
+    def eval_sd_t_z_rgu(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product rgu
+        '''
+        
+        # print('sd_t_c_rgu:')
+        # print(self.problem.sd_t_c_rgu)
+
+        # print('sd_t_p_rgu:')
+        # print(self.sd_t_p_rgu)
+
+        #numpy.multiply(1.0, self.sd_t_p_rgu, out=self.sd_t_float)
+        numpy.multiply(self.problem.sd_t_c_rgu, self.sd_t_p_rgu, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_rgu = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_rgu = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_rgd(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product rgd
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_rgd, self.sd_t_p_rgd, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_rgd = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_rgd = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_scr(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product scr
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_scr, self.sd_t_p_scr, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_scr = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_scr = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_nsc(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product nsc
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_nsc, self.sd_t_p_nsc, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_nsc = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_nsc = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_rru_on(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product rru while online
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_rru_on, self.sd_t_p_rru_on, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_rru_on = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_rru_on = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_rrd_on(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product rrd while online
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_rrd_on, self.sd_t_p_rrd_on, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_rrd_on = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_rrd_on = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_rru_off(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product rru while offline
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_rru_off, self.sd_t_p_rru_off, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_rru_off = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_rru_off = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_rrd_off(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product rrd while offline
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_rrd_off, self.sd_t_p_rrd_off, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_rrd_off = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_rrd_off = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_qru(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product qru
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_qru, self.sd_t_q_qru, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_qru = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_qru = numpy.sum(self.sd_t_float, axis=0)
+
+    def eval_sd_t_z_qrd(self):
+        '''
+        evaluate simple dispatchable device cost of providing reserve product qrd
+        '''
+
+        numpy.multiply(self.problem.sd_t_c_qrd, self.sd_t_q_qrd, out=self.sd_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float, out=self.sd_t_float)
+        self.sum_sd_t_z_qrd = numpy.sum(self.sd_t_float)
+        self.t_sum_sd_t_z_qrd = numpy.sum(self.sd_t_float, axis=0)
 
     def eval_sd_t_p(self):
         '''

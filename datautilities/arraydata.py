@@ -350,19 +350,27 @@ class InputData(object):
         self.sd_t_c_qrd = numpy.array([data_map[i].q_res_down_cost for i in self.sd_uid])
 
     def set_sd_t_cost(self, data):
+        '''
+        cost blocks are processed in two ways beyond the raw data
+        1. marginal cost value is negated for consumer devices, i.e. positive benefit is transformed into negative cost
+        2. for each device and each time interval, the cost blocks are sorted in order of increasing marginal cost
+        then to evaluate the cost of a given p value, one loops over the cost blocks in order,
+        applying the cost to the remaining dispatched energy, subtracting pmax from the dispatched energy
+        '''
 
         data_map = {x.uid:x for x in data.time_series_input.simple_dispatchable_device}
-        #self.sd_t_
-
-        # todo cost list(list(tuple(float))) - dims = (t, cost_block, block_entry), t = 1...24, cost_block = b1, ..., b5 (e.g.), block_entry = (c, pmax)
-
-        # cost: List[List[Tuple[confloat(gt=-float('inf'), lt=float('inf'), strict=False), confloat(gt=-float('inf'), lt=float('inf'), strict=False)]]] = Field(
-        #     title = "cost",
-        #     description = "Array of cost blocks, where   each cost block is an array with exactly two elements:     1) marginal cost in \$/p.u.-hr (Float), and 2) block size in p.u. (Float) "
-        # )
-
-        pass
-
+        cost_blocks = [data_map[i].cost for i in self.sd_uid]
+        i = 0
+        t = 0
+        print(cost_blocks[i][t])
+        for i in range(self.num_sd): # negate the cost value for consumer blocks. keep producer blocks as is
+            if self.sd_is_cs[i]:
+                cost_blocks[i] = [[((-1.0) * t_b_c[0], t_b_c[1]) for t_b_c in t_c] for t_c in cost_blocks[i]]
+        for i in range(self.num_sd): # sort blocks in order of increasing cost
+            cost_blocks[i] = [sorted(t_c, key=(lambda x: x[0])) for t_c in cost_blocks[i]]
+        self.sd_t_num_block = numpy.array([[len(t_c) for t_c in c] for c in cost_blocks], dtype=int)
+        self.sd_t_block_c_list = [[numpy.array([t_b_c[0] for t_b_c in t_c], dtype=float) for t_c in c] for c in cost_blocks]
+        self.sd_t_block_p_max_list = [[numpy.array([t_b_c[1] for t_b_c in t_c], dtype=float) for t_c in c] for c in cost_blocks]
 
 class OutputData(object):
 
