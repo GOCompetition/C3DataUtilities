@@ -107,8 +107,14 @@ class SolutionEvaluator(object):
 
         self.eval_bus_t_p()
         self.eval_bus_t_q()
-        self.eval_prz_t_p()
-        self.eval_prz_t_q()
+        self.eval_prz_t_z_rgu()
+        self.eval_prz_t_z_rgd()
+        self.eval_prz_t_z_scr()
+        self.eval_prz_t_z_nsc()
+        self.eval_prz_t_z_rru()
+        self.eval_prz_t_z_rrd()
+        self.eval_qrz_t_z_qru()
+        self.eval_qrz_t_z_qrd()
 
         self.eval_t_k_z_k()
         self.eval_t_z_base()
@@ -189,6 +195,8 @@ class SolutionEvaluator(object):
         self.acl_float = numpy.zeros(shape=(self.problem.num_acl, ), dtype=float)
         self.dcl_float = numpy.zeros(shape=(self.problem.num_dcl, ), dtype=float)
         self.xfr_float = numpy.zeros(shape=(self.problem.num_xfr, ), dtype=float)
+        self.prz_float = numpy.zeros(shape=(self.problem.num_prz, ), dtype=float)
+        self.qrz_float = numpy.zeros(shape=(self.problem.num_qrz, ), dtype=float)
         self.t_float = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
         self.t_float_1 = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
         self.k_float = numpy.zeros(shape=(self.problem.num_k, ), dtype=float)
@@ -199,6 +207,8 @@ class SolutionEvaluator(object):
         self.acl_int = numpy.zeros(shape=(self.problem.num_acl, ), dtype=int)
         self.dcl_int = numpy.zeros(shape=(self.problem.num_dcl, ), dtype=int)
         self.xfr_int = numpy.zeros(shape=(self.problem.num_xfr, ), dtype=int)
+        self.prz_int = numpy.zeros(shape=(self.problem.num_prz, ), dtype=int)
+        self.qrz_int = numpy.zeros(shape=(self.problem.num_qrz, ), dtype=int)
         self.t_int = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
         self.t_int_1 = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
         self.t_int_2 = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
@@ -224,6 +234,9 @@ class SolutionEvaluator(object):
         self.xfr_t_float = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
         self.xfr_t_float_1 = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
         self.xfr_t_float_2 = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
+
+        self.prz_t_float = numpy.zeros(shape=(self.problem.num_prz, self.problem.num_t), dtype=float)
+        self.qrz_t_float = numpy.zeros(shape=(self.problem.num_qrz, self.problem.num_t), dtype=float)
 
     def set_matrices(self):
 
@@ -398,6 +411,22 @@ class SolutionEvaluator(object):
             'sum_sd_t_z_rrd_off',
             'sum_sd_t_z_qru',
             'sum_sd_t_z_qrd',
+            'viol_prz_t_p_rgu_balance',
+            'viol_prz_t_p_rgd_balance',
+            'viol_prz_t_p_scr_balance',
+            'viol_prz_t_p_nsc_balance',
+            'viol_prz_t_p_rru_balance',
+            'viol_prz_t_p_rrd_balance',
+            'viol_qrz_t_q_qru_balance',
+            'viol_qrz_t_q_qrd_balance',
+            'sum_prz_t_z_rgu',
+            'sum_prz_t_z_rgd',
+            'sum_prz_t_z_scr',
+            'sum_prz_t_z_nsc',
+            'sum_prz_t_z_rru',
+            'sum_prz_t_z_rrd',
+            'sum_qrz_t_z_qru',
+            'sum_qrz_t_z_qrd',
             #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
             'z',
             'z_base',
@@ -459,6 +488,14 @@ class SolutionEvaluator(object):
             -self.t_sum_sd_t_z_rrd_off,
             -self.t_sum_sd_t_z_qru,
             -self.t_sum_sd_t_z_qrd,
+            -self.t_sum_prz_t_z_rgu,
+            -self.t_sum_prz_t_z_rgd,
+            -self.t_sum_prz_t_z_scr,
+            -self.t_sum_prz_t_z_nsc,
+            -self.t_sum_prz_t_z_rru,
+            -self.t_sum_prz_t_z_rrd,
+            -self.t_sum_qrz_t_z_qru,
+            -self.t_sum_qrz_t_z_qrd,
         ])
 
     def eval_t_k_z_k(self):
@@ -701,15 +738,109 @@ class SolutionEvaluator(object):
         self.sum_bus_t_z_q = self.problem.c_q * numpy.sum(self.bus_t_float)
         self.t_sum_bus_t_z_q = self.problem.c_q * numpy.sum(self.bus_t_float, axis=0)
 
-    def eval_prz_t_p(self):
+    def eval_prz_t_z_rgu(self):
 
         # todo
-        pass
+        self.prz_t_float[:] = 0.0 # todo here prz_t_float should be b - A*x, where the constraint is A*x >= b
+        numpy.maximum(self.prz_t_float, 0.0, out=self.prz_t_float)
+        self.viol_prz_t_p_rgu_balance = utils.get_max(self.prz_t_float, idx_lists=[self.problem.prz_uid, self.problem.t_num])
+        numpy.multiply(
+            numpy.reshape(self.problem.prz_c_rgu, newshape=(self.problem.num_prz, 1)), self.prz_t_float, out=self.prz_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.prz_t_float, out=self.prz_t_float)
+        self.sum_prz_t_z_rgu = numpy.sum(self.prz_t_float)
+        self.t_sum_prz_t_z_rgu = numpy.sum(self.prz_t_float, axis=0)
 
-    def eval_prz_t_q(self):
+    def eval_prz_t_z_rgd(self):
 
         # todo
-        pass
+        self.prz_t_float[:] = 0.0
+        numpy.maximum(self.prz_t_float, 0.0, out=self.prz_t_float)
+        self.viol_prz_t_p_rgd_balance = utils.get_max(self.prz_t_float, idx_lists=[self.problem.prz_uid, self.problem.t_num])
+        numpy.multiply(
+            numpy.reshape(self.problem.prz_c_rgd, newshape=(self.problem.num_prz, 1)), self.prz_t_float, out=self.prz_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.prz_t_float, out=self.prz_t_float)
+        self.sum_prz_t_z_rgd = numpy.sum(self.prz_t_float)
+        self.t_sum_prz_t_z_rgd = numpy.sum(self.prz_t_float, axis=0)
+
+    def eval_prz_t_z_scr(self):
+
+        # todo
+        self.prz_t_float[:] = 0.0
+        numpy.maximum(self.prz_t_float, 0.0, out=self.prz_t_float)
+        self.viol_prz_t_p_scr_balance = utils.get_max(self.prz_t_float, idx_lists=[self.problem.prz_uid, self.problem.t_num])
+        numpy.multiply(
+            numpy.reshape(self.problem.prz_c_scr, newshape=(self.problem.num_prz, 1)), self.prz_t_float, out=self.prz_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.prz_t_float, out=self.prz_t_float)
+        self.sum_prz_t_z_scr = numpy.sum(self.prz_t_float)
+        self.t_sum_prz_t_z_scr = numpy.sum(self.prz_t_float, axis=0)
+
+    def eval_prz_t_z_nsc(self):
+
+        # todo
+        self.prz_t_float[:] = 0.0
+        numpy.maximum(self.prz_t_float, 0.0, out=self.prz_t_float)
+        self.viol_prz_t_p_nsc_balance = utils.get_max(self.prz_t_float, idx_lists=[self.problem.prz_uid, self.problem.t_num])
+        numpy.multiply(
+            numpy.reshape(self.problem.prz_c_nsc, newshape=(self.problem.num_prz, 1)), self.prz_t_float, out=self.prz_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.prz_t_float, out=self.prz_t_float)
+        self.sum_prz_t_z_nsc = numpy.sum(self.prz_t_float)
+        self.t_sum_prz_t_z_nsc = numpy.sum(self.prz_t_float, axis=0)
+
+    def eval_prz_t_z_rru(self):
+
+        # todo
+        self.prz_t_float[:] = 0.0
+        numpy.maximum(self.prz_t_float, 0.0, out=self.prz_t_float)
+        self.viol_prz_t_p_rru_balance = utils.get_max(self.prz_t_float, idx_lists=[self.problem.prz_uid, self.problem.t_num])
+        numpy.multiply(
+            numpy.reshape(self.problem.prz_c_rru, newshape=(self.problem.num_prz, 1)), self.prz_t_float, out=self.prz_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.prz_t_float, out=self.prz_t_float)
+        self.sum_prz_t_z_rru = numpy.sum(self.prz_t_float)
+        self.t_sum_prz_t_z_rru = numpy.sum(self.prz_t_float, axis=0)
+
+    def eval_prz_t_z_rrd(self):
+
+        # todo
+        self.prz_t_float[:] = 0.0
+        numpy.maximum(self.prz_t_float, 0.0, out=self.prz_t_float)
+        self.viol_prz_t_p_rrd_balance = utils.get_max(self.prz_t_float, idx_lists=[self.problem.prz_uid, self.problem.t_num])
+        numpy.multiply(
+            numpy.reshape(self.problem.prz_c_rrd, newshape=(self.problem.num_prz, 1)), self.prz_t_float, out=self.prz_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.prz_t_float, out=self.prz_t_float)
+        self.sum_prz_t_z_rrd = numpy.sum(self.prz_t_float)
+        self.t_sum_prz_t_z_rrd = numpy.sum(self.prz_t_float, axis=0)
+
+    def eval_qrz_t_z_qru(self):
+
+        # todo
+        self.qrz_t_float[:] = 0.0
+        numpy.maximum(self.qrz_t_float, 0.0, out=self.qrz_t_float)
+        self.viol_qrz_t_q_qru_balance = utils.get_max(self.qrz_t_float, idx_lists=[self.problem.qrz_uid, self.problem.t_num])
+        numpy.multiply(
+            numpy.reshape(self.problem.qrz_c_qru, newshape=(self.problem.num_qrz, 1)), self.qrz_t_float, out=self.qrz_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.qrz_t_float, out=self.qrz_t_float)
+        self.sum_qrz_t_z_qru = numpy.sum(self.qrz_t_float)
+        self.t_sum_qrz_t_z_qru = numpy.sum(self.qrz_t_float, axis=0)
+
+    def eval_qrz_t_z_qrd(self):
+
+        # todo
+        self.qrz_t_float[:] = 0.0
+        numpy.maximum(self.qrz_t_float, 0.0, out=self.qrz_t_float)
+        self.viol_qrz_t_q_qrd_balance = utils.get_max(self.qrz_t_float, idx_lists=[self.problem.qrz_uid, self.problem.t_num])
+        numpy.multiply(
+            numpy.reshape(self.problem.qrz_c_qrd, newshape=(self.problem.num_qrz, 1)), self.qrz_t_float, out=self.qrz_t_float)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.qrz_t_float, out=self.qrz_t_float)
+        self.sum_qrz_t_z_qrd = numpy.sum(self.qrz_t_float)
+        self.t_sum_qrz_t_z_qrd = numpy.sum(self.qrz_t_float, axis=0)
 
     def eval_sd_t_u_on_max(self):
 

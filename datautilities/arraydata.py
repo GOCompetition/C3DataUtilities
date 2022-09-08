@@ -22,6 +22,8 @@ class InputData(object):
         self.set_k(data)
         self.set_sd_t(data)
         self.set_sd_t_cost(data)
+        self.set_prz_t(data)
+        self.set_qrz_t(data)
 
     def set_structure(self, data):
 
@@ -302,13 +304,23 @@ class InputData(object):
 
     def set_prz(self, data):
 
-        # todo
-        pass
+        data_map = {x.uid:x for x in data.network.active_zonal_reserve}
+        self.prz_sigma_rgu = numpy.array([data_map[i].REG_UP for i in self.prz_uid])
+        self.prz_sigma_rgd = numpy.array([data_map[i].REG_DOWN for i in self.prz_uid])
+        self.prz_sigma_scr = numpy.array([data_map[i].SYN for i in self.prz_uid])
+        self.prz_sigma_nsc = numpy.array([data_map[i].NSYN for i in self.prz_uid])
+        self.prz_c_rgu = numpy.array([data_map[i].REG_UP_vio_cost for i in self.prz_uid])
+        self.prz_c_rgd = numpy.array([data_map[i].REG_DOWN_vio_cost for i in self.prz_uid])
+        self.prz_c_scr = numpy.array([data_map[i].SYN_vio_cost for i in self.prz_uid])
+        self.prz_c_nsc = numpy.array([data_map[i].NSYN_vio_cost for i in self.prz_uid])
+        self.prz_c_rru = numpy.array([data_map[i].RAMPING_RESERVE_UP_vio_cost for i in self.prz_uid])
+        self.prz_c_rrd = numpy.array([data_map[i].RAMPING_RESERVE_DOWN_vio_cost for i in self.prz_uid])
 
     def set_qrz(self, data):
 
-        # todo
-        pass
+        data_map = {x.uid:x for x in data.network.reactive_zonal_reserve}
+        self.qrz_c_qru = numpy.array([data_map[i].REACT_UP_vio_cost for i in self.qrz_uid])
+        self.qrz_c_qrd = numpy.array([data_map[i].REACT_DOWN_vio_cost for i in self.qrz_uid])
 
     def set_t(self, data):
 
@@ -371,6 +383,18 @@ class InputData(object):
         self.sd_t_num_block = numpy.array([[len(t_c) for t_c in c] for c in cost_blocks], dtype=int)
         self.sd_t_block_c_list = [[numpy.array([t_b_c[0] for t_b_c in t_c], dtype=float) for t_c in c] for c in cost_blocks]
         self.sd_t_block_p_max_list = [[numpy.array([t_b_c[1] for t_b_c in t_c], dtype=float) for t_c in c] for c in cost_blocks]
+
+    def set_prz_t(self, data):
+
+        data_map = {x.uid:x for x in data.time_series_input.active_zonal_reserve}
+        self.prz_t_p_rru_min = numpy.array([data_map[i].RAMPING_RESERVE_UP for i in self.prz_uid])
+        self.prz_t_p_rrd_min = numpy.array([data_map[i].RAMPING_RESERVE_DOWN for i in self.prz_uid])
+
+    def set_qrz_t(self, data):
+
+        data_map = {x.uid:x for x in data.time_series_input.reactive_zonal_reserve}
+        self.qrz_t_p_qru_min = numpy.array([data_map[i].REACT_UP for i in self.qrz_uid])
+        self.qrz_t_p_qrd_min = numpy.array([data_map[i].REACT_DOWN for i in self.qrz_uid])
 
 class OutputData(object):
 
