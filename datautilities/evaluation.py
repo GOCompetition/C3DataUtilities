@@ -2,6 +2,9 @@
 Evaluation of solutions to the GO Competition Challenge 3 problem.
 '''
 
+# todo
+# a = numpy.reshape(numpy.array([], dtype=int), newshape=(0, 24))
+
 import time
 import numpy, scipy
 from datautilities import arraydata
