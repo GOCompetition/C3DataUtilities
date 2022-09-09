@@ -239,6 +239,8 @@ class SolutionEvaluator(object):
         self.prz_t_float_1 = numpy.zeros(shape=(self.problem.num_prz, self.problem.num_t), dtype=float)
         self.prz_t_float_2 = numpy.zeros(shape=(self.problem.num_prz, self.problem.num_t), dtype=float)
         self.qrz_t_float = numpy.zeros(shape=(self.problem.num_qrz, self.problem.num_t), dtype=float)
+        self.qrz_t_float_1 = numpy.zeros(shape=(self.problem.num_qrz, self.problem.num_t), dtype=float)
+        self.qrz_t_float_2 = numpy.zeros(shape=(self.problem.num_qrz, self.problem.num_t), dtype=float)
 
     def set_matrices(self):
 
@@ -286,12 +288,12 @@ class SolutionEvaluator(object):
             (self.problem.num_bus, self.problem.num_xfr))
         self.prz_sd_inc_mat = scipy.sparse.csr_matrix(
             (numpy.ones(shape=(numpy.sum(self.problem.prz_num_sd), )),
-             ([i for i in range(self.problem.num_prz) for j in range(self.problem.prz_num_sd[i])],
+             ([i for i in range(self.problem.num_prz) for j in self.problem.prz_sd_list[i]],
               [j for i in range(self.problem.num_prz) for j in self.problem.prz_sd_list[i]])),
             (self.problem.num_prz, self.problem.num_sd))
         self.qrz_sd_inc_mat = scipy.sparse.csr_matrix(
             (numpy.ones(shape=(numpy.sum(self.problem.qrz_num_sd), )),
-             ([i for i in range(self.problem.num_qrz) for j in range(self.problem.qrz_num_sd[i])],
+             ([i for i in range(self.problem.num_qrz) for j in self.problem.qrz_sd_list[i]],
               [j for i in range(self.problem.num_qrz) for j in self.problem.qrz_sd_list[i]])),
             (self.problem.num_qrz, self.problem.num_sd))
 
@@ -752,6 +754,7 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_rgu(self):
 
+        print('sd_t_p_rgu: {}'.format(numpy.sum(self.sd_t_p_rgu)))
         self.prz_t_float_1[:] = 0.0 # todo here prz_t_float_1 should be b - A*x, where the constraint is A*x >= b - same in other products
         # todo - add/compute rgu reserve requirement
         # todo - subtract pr/cs rgu reserve provisions
@@ -766,6 +769,7 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_rgd(self):
 
+        print('sd_t_p_rgd: {}'.format(numpy.sum(self.sd_t_p_rgd)))
         self.prz_t_float[:] = 0.0
         # todo - add/compute reserve requirement
         # todo - subtract pr/cs reserve provisions
@@ -780,6 +784,7 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_scr(self):
 
+        print('sd_t_p_scr: {}'.format(numpy.sum(self.sd_t_p_scr)))
         #self.prz_t_float_1[:] = 0.0 # start with prz_t_float_1 values from rgu eval
         # todo - add/compute scr reserve requirement
         # todo - subtract pr/cs scr reserve provisions
@@ -794,6 +799,7 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_nsc(self):
 
+        print('sd_t_p_nsc: {}'.format(numpy.sum(self.sd_t_p_nsc)))
         #self.prz_t_float_1[:] = 0.0 # start with prz_t_float_1 values from scr eval
         # todo - add/compute nsc reserve requirement
         # todo - subtract pr/cs nsc reserve provisions
@@ -808,9 +814,13 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_rru(self):
 
+        print('sd_t_p_rru: {}'.format(numpy.sum(self.sd_t_p_rru_on) + numpy.sum(self.sd_t_p_rru_off)))
+        print('prz_t_p_rru_min: {}'.format(numpy.sum(self.problem.prz_t_p_rru_min)))
         self.prz_t_float[:] = self.problem.prz_t_p_rru_min # rhs/req
-        # todo - subtract pr/cs reserve provisions - on
-        # todo - subtract pr/cs reserve provisions - off
+        numpy.add(self.sd_t_p_rru_on, self.sd_t_p_rru_off, out=self.sd_t_float) # add on and off
+        self.prz_t_float_2[:] = 0.0
+        utils.csr_mat_vec_add_to_vec(self.prz_sd_inc_mat, self.sd_t_float, out=self.prz_t_float_2) # add sd reserves to zone
+        numpy.subtract(self.prz_t_float, self.prz_t_float_2, out=self.prz_t_float) # subtract total reserves from req
         numpy.maximum(self.prz_t_float, 0.0, out=self.prz_t_float)
         self.viol_prz_t_p_rru_balance = utils.get_max(self.prz_t_float, idx_lists=[self.problem.prz_uid, self.problem.t_num])
         numpy.multiply(
@@ -822,9 +832,13 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_rrd(self):
 
+        print('sd_t_p_rrd: {}'.format(numpy.sum(self.sd_t_p_rrd_on) + numpy.sum(self.sd_t_p_rrd_off)))
+        print('prz_t_p_rrd_min: {}'.format(numpy.sum(self.problem.prz_t_p_rrd_min)))
         self.prz_t_float[:] = self.problem.prz_t_p_rrd_min # rhs/req
-        # todo - subtract pr/cs reserve provisions - on
-        # todo - subtract pr/cs reserve provisions - off
+        numpy.add(self.sd_t_p_rrd_on, self.sd_t_p_rrd_off, out=self.sd_t_float) # add on and off
+        self.prz_t_float_2[:] = 0.0
+        utils.csr_mat_vec_add_to_vec(self.prz_sd_inc_mat, self.sd_t_float, out=self.prz_t_float_2) # add sd reserves to zone
+        numpy.subtract(self.prz_t_float, self.prz_t_float_2, out=self.prz_t_float) # subtract total reserves from req
         numpy.maximum(self.prz_t_float, 0.0, out=self.prz_t_float)
         self.viol_prz_t_p_rrd_balance = utils.get_max(self.prz_t_float, idx_lists=[self.problem.prz_uid, self.problem.t_num])
         numpy.multiply(
@@ -836,9 +850,13 @@ class SolutionEvaluator(object):
 
     def eval_qrz_t_z_qru(self):
 
+        print('sd_t_p_qru: {}'.format(numpy.sum(self.sd_t_q_qru)))
+        print('qrz_t_q_qru_min: {}'.format(numpy.sum(self.problem.qrz_t_q_qru_min)))
         self.qrz_t_float[:] = self.problem.qrz_t_q_qru_min # rhs/req
-        # todo - subtract pr/cs reserve provisions
-        numpy.maximum(self.qrz_t_float, 0.0, out=self.qrz_t_float)
+        self.qrz_t_float_2[:] = 0.0
+        utils.csr_mat_vec_add_to_vec(self.qrz_sd_inc_mat, self.sd_t_q_qru, out=self.qrz_t_float_2) # add sd reserves to zone
+        numpy.subtract(self.qrz_t_float, self.qrz_t_float_2, out=self.qrz_t_float) # subtract total reserves from req
+        numpy.maximum(self.qrz_t_float, 0.0, out=self.qrz_t_float) # get positive part
         self.viol_qrz_t_q_qru_balance = utils.get_max(self.qrz_t_float, idx_lists=[self.problem.qrz_uid, self.problem.t_num])
         numpy.multiply(
             numpy.reshape(self.problem.qrz_c_qru, newshape=(self.problem.num_qrz, 1)), self.qrz_t_float, out=self.qrz_t_float)
@@ -849,9 +867,13 @@ class SolutionEvaluator(object):
 
     def eval_qrz_t_z_qrd(self):
 
+        print('sd_t_p_qrd: {}'.format(numpy.sum(self.sd_t_q_qrd)))
+        print('qrz_t_q_qrd_min: {}'.format(numpy.sum(self.problem.qrz_t_q_qrd_min)))
         self.qrz_t_float[:] = self.problem.qrz_t_q_qrd_min # rhs/req
-        # todo - subtract pr/cs reserve provisions
-        numpy.maximum(self.qrz_t_float, 0.0, out=self.qrz_t_float)
+        self.qrz_t_float_2[:] = 0.0
+        utils.csr_mat_vec_add_to_vec(self.qrz_sd_inc_mat, self.sd_t_q_qrd, out=self.qrz_t_float_2) # add sd reserves to zone
+        numpy.subtract(self.qrz_t_float, self.qrz_t_float_2, out=self.qrz_t_float) # subtract total reserves from req
+        numpy.maximum(self.qrz_t_float, 0.0, out=self.qrz_t_float) # get positive part
         self.viol_qrz_t_q_qrd_balance = utils.get_max(self.qrz_t_float, idx_lists=[self.problem.qrz_uid, self.problem.t_num])
         numpy.multiply(
             numpy.reshape(self.problem.qrz_c_qrd, newshape=(self.problem.num_qrz, 1)), self.qrz_t_float, out=self.qrz_t_float)
