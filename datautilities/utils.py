@@ -153,6 +153,14 @@ def csr_mat_vec_add_to_vec(a, x, out):
     out[:] += a.dot(x)
     #numpy.add(out
 
+def csr_mat_vec_max_to_vec(a, x, out):
+    '''
+    analogous to csr_mat_vec_add_to_vec
+    instead of adding the products to the out vector, we take the maximum of them with the out vector
+    '''
+
+    pass
+
 def get_connected_components(vertices, od_pairs):
     # vertices should be a list of ints
     # od_pairs should be a list of pairs of ints
