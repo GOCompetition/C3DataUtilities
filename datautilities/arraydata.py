@@ -148,12 +148,18 @@ class InputData(object):
         # reactive_reserve_uids: List[str] = Field( # todo
         self.bus_v_0 = numpy.array([data_map[i].initial_status.vm for i in self.bus_uid])
         self.bus_theta_0 = numpy.array([data_map[i].initial_status.va for i in self.bus_uid])
+        self.bus_num_prz = numpy.array([len(data_map[i].active_reserve_uids) for i in self.bus_uid])
+        bus_prz_uid_list = [numpy.array(data_map[i].active_reserve_uids) for i in self.bus_uid]
+        self.bus_prz_list = [numpy.array([self.prz_map[j] for j in i]) for i in bus_prz_uid_list]
+        self.bus_num_qrz = numpy.array([len(data_map[i].reactive_reserve_uids) for i in self.bus_uid])
+        bus_qrz_uid_list = [numpy.array(data_map[i].reactive_reserve_uids) for i in self.bus_uid]
+        self.bus_qrz_list = [numpy.array([self.qrz_map[j] for j in i]) for i in bus_qrz_uid_list]
 
     def set_sh(self, data):
 
         data_map = {x.uid:x for x in data.network.shunt}
-        self.sh_bus_uid = numpy.array([data_map[i].bus for i in self.sh_uid])
-        self.sh_bus = numpy.array([self.bus_map[i] for i in self.sh_bus_uid])
+        sh_bus_uid = numpy.array([data_map[i].bus for i in self.sh_uid])
+        self.sh_bus = numpy.array([self.bus_map[i] for i in sh_bus_uid])
         self.sh_g_st = numpy.array([data_map[i].gs for i in self.sh_uid])
         self.sh_b_st = numpy.array([data_map[i].bs for i in self.sh_uid])
         self.sh_u_st_max = numpy.array([data_map[i].step_ub for i in self.sh_uid])
@@ -163,8 +169,8 @@ class InputData(object):
     def set_sd(self, data):
 
         data_map = {x.uid:x for x in data.network.simple_dispatchable_device}
-        self.sd_bus_uid = numpy.array([data_map[i].bus for i in self.sd_uid])
-        self.sd_bus = numpy.array([self.bus_map[i] for i in self.sd_bus_uid])
+        sd_bus_uid = numpy.array([data_map[i].bus for i in self.sd_uid])
+        self.sd_bus = numpy.array([self.bus_map[i] for i in sd_bus_uid])
         self.sd_is_pr = numpy.array([1 if data_map[i].device_type == 'producer' else 0 for i in self.sd_uid])
         self.sd_is_cs = numpy.array([1 if data_map[i].device_type == 'consumer' else 0 for i in self.sd_uid])
         self.sd_c_su = numpy.array([data_map[i].startup_cost for i in self.sd_uid])
@@ -239,10 +245,10 @@ class InputData(object):
     def set_acl(self, data):
 
         data_map = {x.uid:x for x in data.network.ac_line}
-        self.acl_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.acl_uid])
-        self.acl_tbus_uid = numpy.array([data_map[i].to_bus for i in self.acl_uid])
-        self.acl_fbus = numpy.array([self.bus_map[i] for i in self.acl_fbus_uid])
-        self.acl_tbus = numpy.array([self.bus_map[i] for i in self.acl_tbus_uid])
+        acl_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.acl_uid])
+        acl_tbus_uid = numpy.array([data_map[i].to_bus for i in self.acl_uid])
+        self.acl_fbus = numpy.array([self.bus_map[i] for i in acl_fbus_uid])
+        self.acl_tbus = numpy.array([self.bus_map[i] for i in acl_tbus_uid])
         self.acl_r_sr = numpy.array([data_map[i].r for i in self.acl_uid])
         self.acl_x_sr = numpy.array([data_map[i].x for i in self.acl_uid])
         self.acl_g_sr = self.acl_r_sr / (self.acl_r_sr**2 + self.acl_x_sr**2)
@@ -261,10 +267,10 @@ class InputData(object):
     def set_dcl(self, data):
 
         data_map = {x.uid:x for x in data.network.dc_line}
-        self.dcl_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.dcl_uid])
-        self.dcl_tbus_uid = numpy.array([data_map[i].to_bus for i in self.dcl_uid])
-        self.dcl_fbus = numpy.array([self.bus_map[i] for i in self.dcl_fbus_uid])
-        self.dcl_tbus = numpy.array([self.bus_map[i] for i in self.dcl_tbus_uid])
+        dcl_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.dcl_uid])
+        dcl_tbus_uid = numpy.array([data_map[i].to_bus for i in self.dcl_uid])
+        self.dcl_fbus = numpy.array([self.bus_map[i] for i in dcl_fbus_uid])
+        self.dcl_tbus = numpy.array([self.bus_map[i] for i in dcl_tbus_uid])
         self.dcl_p_max = numpy.array([data_map[i].pdc_ub for i in self.dcl_uid])
         self.dcl_q_fr_max = numpy.array([data_map[i].qdc_fr_ub for i in self.dcl_uid])
         self.dcl_q_fr_min = numpy.array([data_map[i].qdc_fr_lb for i in self.dcl_uid])
@@ -277,10 +283,10 @@ class InputData(object):
     def set_xfr(self, data):
 
         data_map = {x.uid:x for x in data.network.two_winding_transformer}
-        self.xfr_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.xfr_uid])
-        self.xfr_tbus_uid = numpy.array([data_map[i].to_bus for i in self.xfr_uid])
-        self.xfr_fbus = numpy.array([self.bus_map[i] for i in self.xfr_fbus_uid])
-        self.xfr_tbus = numpy.array([self.bus_map[i] for i in self.xfr_tbus_uid])
+        xfr_fbus_uid = numpy.array([data_map[i].fr_bus for i in self.xfr_uid])
+        xfr_tbus_uid = numpy.array([data_map[i].to_bus for i in self.xfr_uid])
+        self.xfr_fbus = numpy.array([self.bus_map[i] for i in xfr_fbus_uid])
+        self.xfr_tbus = numpy.array([self.bus_map[i] for i in xfr_tbus_uid])
         self.xfr_r_sr = numpy.array([data_map[i].r for i in self.xfr_uid])
         self.xfr_x_sr = numpy.array([data_map[i].x for i in self.xfr_uid])
         self.xfr_g_sr = self.xfr_r_sr / (self.xfr_r_sr**2 + self.xfr_x_sr**2)
@@ -315,12 +321,36 @@ class InputData(object):
         self.prz_c_nsc = numpy.array([data_map[i].NSYN_vio_cost for i in self.prz_uid])
         self.prz_c_rru = numpy.array([data_map[i].RAMPING_RESERVE_UP_vio_cost for i in self.prz_uid])
         self.prz_c_rrd = numpy.array([data_map[i].RAMPING_RESERVE_DOWN_vio_cost for i in self.prz_uid])
+        prz_bus_list = [[] for i in self.prz_uid]
+        for i in range(self.num_bus):
+            for j in self.bus_prz_list[i]:
+                prz_bus_list[j].append(i)
+        self.prz_num_bus = [len(i) for i in prz_bus_list]
+        self.prz_bus_list = [numpy.array(i) for i in prz_bus_list]
+        prz_sd_list = [[] for i in self.prz_uid]
+        for i in range(self.num_sd):
+            for j in self.bus_prz_list[self.sd_bus[i]]:
+                prz_sd_list[j].append(i)
+        self.prz_num_sd = [len(i) for i in prz_sd_list]
+        self.prz_sd_list = [numpy.array(i) for i in prz_sd_list]
 
     def set_qrz(self, data):
 
         data_map = {x.uid:x for x in data.network.reactive_zonal_reserve}
         self.qrz_c_qru = numpy.array([data_map[i].REACT_UP_vio_cost for i in self.qrz_uid])
         self.qrz_c_qrd = numpy.array([data_map[i].REACT_DOWN_vio_cost for i in self.qrz_uid])
+        qrz_bus_list = [[] for i in self.qrz_uid]
+        for i in range(self.num_bus):
+            for j in self.bus_qrz_list[i]:
+                qrz_bus_list[j].append(i)
+        self.qrz_num_bus = [len(i) for i in qrz_bus_list]
+        self.qrz_bus_list = [numpy.array(i) for i in qrz_bus_list]
+        qrz_sd_list = [[] for i in self.qrz_uid]
+        for i in range(self.num_sd):
+            for j in self.bus_qrz_list[self.sd_bus[i]]:
+                qrz_sd_list[j].append(i)
+        self.qrz_num_sd = [len(i) for i in qrz_sd_list]
+        self.qrz_sd_list = [numpy.array(i) for i in qrz_sd_list]
 
     def set_t(self, data):
 
@@ -332,14 +362,14 @@ class InputData(object):
 
     def set_k(self, data):
 
-        self.k_out_device_uid = numpy.array([k.components[0] for k in data.reliability.contingency])
-        self.k_out_device = numpy.array([self.all_map[self.k_out_device_uid[i]] for i in range(self.num_k)])
+        k_out_device_uid = numpy.array([k.components[0] for k in data.reliability.contingency])
+        self.k_out_device = numpy.array([self.all_map[k_out_device_uid[i]] for i in range(self.num_k)])
         self.k_out_is_acl = numpy.array([self.all_is_acl[self.k_out_device[i]] for i in range(self.num_k)])
         self.k_out_is_dcl = numpy.array([self.all_is_dcl[self.k_out_device[i]] for i in range(self.num_k)])
         self.k_out_is_xfr = numpy.array([self.all_is_xfr[self.k_out_device[i]] for i in range(self.num_k)])
-        self.k_out_acl = numpy.array([self.acl_map[self.k_out_device_uid[i]] if self.k_out_is_acl[i] else 0 for i in range(self.num_k)])
-        self.k_out_dcl = numpy.array([self.dcl_map[self.k_out_device_uid[i]] if self.k_out_is_dcl[i] else 0 for i in range(self.num_k)])
-        self.k_out_xfr = numpy.array([self.xfr_map[self.k_out_device_uid[i]] if self.k_out_is_xfr[i] else 0 for i in range(self.num_k)])
+        self.k_out_acl = numpy.array([self.acl_map[k_out_device_uid[i]] if self.k_out_is_acl[i] else 0 for i in range(self.num_k)])
+        self.k_out_dcl = numpy.array([self.dcl_map[k_out_device_uid[i]] if self.k_out_is_dcl[i] else 0 for i in range(self.num_k)])
+        self.k_out_xfr = numpy.array([self.xfr_map[k_out_device_uid[i]] if self.k_out_is_xfr[i] else 0 for i in range(self.num_k)])
 
     def set_sd_t(self, data):
 
@@ -372,9 +402,6 @@ class InputData(object):
 
         data_map = {x.uid:x for x in data.time_series_input.simple_dispatchable_device}
         cost_blocks = [data_map[i].cost for i in self.sd_uid]
-        i = 0
-        t = 0
-        print(cost_blocks[i][t])
         for i in range(self.num_sd): # negate the cost value for consumer blocks. keep producer blocks as is
             if self.sd_is_cs[i]:
                 cost_blocks[i] = [[((-1.0) * t_b_c[0], t_b_c[1]) for t_b_c in t_c] for t_c in cost_blocks[i]]
@@ -393,8 +420,8 @@ class InputData(object):
     def set_qrz_t(self, data):
 
         data_map = {x.uid:x for x in data.time_series_input.reactive_zonal_reserve}
-        self.qrz_t_p_qru_min = numpy.array([data_map[i].REACT_UP for i in self.qrz_uid])
-        self.qrz_t_p_qrd_min = numpy.array([data_map[i].REACT_DOWN for i in self.qrz_uid])
+        self.qrz_t_q_qru_min = numpy.array([data_map[i].REACT_UP for i in self.qrz_uid])
+        self.qrz_t_q_qrd_min = numpy.array([data_map[i].REACT_DOWN for i in self.qrz_uid])
 
 class OutputData(object):
 

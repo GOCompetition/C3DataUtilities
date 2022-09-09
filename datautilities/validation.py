@@ -177,13 +177,14 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         solution_data_array.set_from_data_model(problem_data_array, solution_data_model)
         end_time = time.time()
         print('convert solution data to numpy arrays time: {}'.format(end_time - start_time))
-        print('bus_t_v numpy array memory info. shape: {}, size: {}, itemsize: {}, size*itemsize: {}, nbytes: {}'.format(
-            solution_data_array.bus_t_v.shape,
-            solution_data_array.bus_t_v.size,
-            solution_data_array.bus_t_v.itemsize,
-            solution_data_array.bus_t_v.size *
-            solution_data_array.bus_t_v.itemsize,
-            solution_data_array.bus_t_v.nbytes))
+        # todo more systematic memory measurement
+        # print('bus_t_v numpy array memory info. shape: {}, size: {}, itemsize: {}, size*itemsize: {}, nbytes: {}'.format(
+        #     solution_data_array.bus_t_v.shape,
+        #     solution_data_array.bus_t_v.size,
+        #     solution_data_array.bus_t_v.itemsize,
+        #     solution_data_array.bus_t_v.size *
+        #     solution_data_array.bus_t_v.itemsize,
+        #     solution_data_array.bus_t_v.nbytes))
 
         # evaluate solution
         start_time = time.time()
