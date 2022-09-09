@@ -130,9 +130,11 @@ def csr_mat_vec_add_to_vec(a, x, out):
     '''
     csr_mat_vec_add_to_vec(a, x, out)
 
+    compute a@x and add result to out
+
     a - sparse matrix (csr)
     x - vector or dense matrix
-    out - vector or dense matrix of the same shape as x
+    out - vector or dense matrix of conforming shape
     '''
 
     # This should be a more efficient version of:
@@ -157,9 +159,42 @@ def csr_mat_vec_max_to_vec(a, x, out):
     '''
     analogous to csr_mat_vec_add_to_vec
     instead of adding the products to the out vector, we take the maximum of them with the out vector
+
+    csr_mat_vec_max_to_vec(a, x, out)
+
+    computes y with
+    y[i,k] = max([out[i,k]] + [a[i,j] * x[j,k] for j in range(nj)])
+    stores y in out
+
+    a - sparse matrix (csr) - ni-by-nj
+    x - vector or dense matrix - nj-by-nk
+    out - vector or dense matrix of conforming shape - ni-by-nk
+
     '''
 
-    pass
+    shape_a = a.shape
+    shape_x = x.shape
+    shape_out = out.shape
+
+    assert(len(shape_a) == 2)
+    assert(len(shape_x) == 2)
+    assert(len(shape_out) == 2)
+    assert(shape_a[1] == shape_x[0])
+    assert(shape_a[0] == shape_out[0])
+    assert(shape_x[1] == shape_out[1])
+
+    ni = shape_a[0]
+    nj = shape_a[1]
+    nk = shape_x[1]
+
+    temp = numpy.zeros(shape=(nj + 1, nk))
+    a_row = numpy.zeros(shape=(1, nj))
+
+    for i in range(ni):
+        a[i,:].toarray(out=a_row)
+        numpy.multiply(numpy.reshape(a_row, newshape=(nj, 1)), x, out=temp[0:nj,:])
+        temp[nj,:] = out[i,:]
+        numpy.amax(temp, axis=0, out=out[i,:])
 
 def get_connected_components(vertices, od_pairs):
     # vertices should be a list of ints

@@ -754,8 +754,8 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_rgu(self):
 
-        print('sd_t_p_rgu: {}'.format(numpy.sum(self.sd_t_p_rgu)))
-        print('prz_sigma_rgu: {}'.format(numpy.sum(self.problem.prz_sigma_rgu)))
+        print('sd_t_p_rgu sum: {}'.format(numpy.sum(self.sd_t_p_rgu)))
+        print('prz_sigma_rgu max: {}'.format(numpy.amax(self.problem.prz_sigma_rgu)))
 
         # start with 0 - prz_t_float_1 will be used by rgu, scr, and nsc
         # these functions should be called in that order
@@ -772,7 +772,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.prz_sigma_rgu, newshape=(self.problem.num_prz, 1)),
             self.prz_t_float_2, out=self.prz_t_float_2) # scale by sigma factor
-        print('prz_t_p_rgu_req: {}'.format(numpy.sum(self.prz_t_float_2)))
+        print('prz_t_p_rgu_req max: {}'.format(numpy.amax(self.prz_t_float_2)))
         numpy.add(self.prz_t_float_1, self.prz_t_float_2, out=self.prz_t_float_1) # add req
 
         # subtract pr/cs rgu reserve provisions
@@ -792,8 +792,8 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_rgd(self):
 
-        print('sd_t_p_rgd: {}'.format(numpy.sum(self.sd_t_p_rgd)))
-        print('prz_sigma_rgd: {}'.format(numpy.sum(self.problem.prz_sigma_rgd)))
+        print('sd_t_p_rgd sum: {}'.format(numpy.sum(self.sd_t_p_rgd)))
+        print('prz_sigma_rgd max: {}'.format(numpy.amax(self.problem.prz_sigma_rgd)))
 
         # start with 0
         self.prz_t_float[:] = 0.0
@@ -807,7 +807,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.prz_sigma_rgd, newshape=(self.problem.num_prz, 1)),
             self.prz_t_float_2, out=self.prz_t_float_2) # scale by sigma factor
-        print('prz_t_p_rgd_req: {}'.format(numpy.sum(self.prz_t_float_2)))
+        print('prz_t_p_rgd_req max: {}'.format(numpy.amax(self.prz_t_float_2)))
         numpy.add(self.prz_t_float, self.prz_t_float_2, out=self.prz_t_float) # add req
 
         # subtract pr/cs rgd reserve provisions
@@ -827,8 +827,8 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_scr(self):
 
-        print('sd_t_p_scr: {}'.format(numpy.sum(self.sd_t_p_scr)))
-        print('prz_sigma_scr: {}'.format(numpy.sum(self.problem.prz_sigma_scr)))
+        print('sd_t_p_scr sum: {}'.format(numpy.sum(self.sd_t_p_scr)))
+        print('prz_sigma_scr max: {}'.format(numpy.amax(self.problem.prz_sigma_scr)))
 
         # start with prz_t_float_1 values from rgu eval, i.e. requirement less provision of rgu
         # do not change prz_t_float_1
@@ -842,7 +842,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.prz_sigma_scr, newshape=(self.problem.num_prz, 1)),
             self.prz_t_float_2, out=self.prz_t_float_2) # scale by sigma factor
-        print('prz_t_p_scr_req: {}'.format(numpy.sum(self.prz_t_float_2)))
+        print('prz_t_p_scr_req max: {}'.format(numpy.amax(self.prz_t_float_2)))
         numpy.add(self.prz_t_float_1, self.prz_t_float_2, out=self.prz_t_float_1) # add req
 
         # subtract pr/cs scr reserve provisions
@@ -862,8 +862,8 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_nsc(self):
 
-        print('sd_t_p_nsc: {}'.format(numpy.sum(self.sd_t_p_nsc)))
-        print('prz_sigma_nsc: {}'.format(numpy.sum(self.problem.prz_sigma_nsc)))
+        print('sd_t_p_nsc sum: {}'.format(numpy.sum(self.sd_t_p_nsc)))
+        print('prz_sigma_nsc max: {}'.format(numpy.amax(self.problem.prz_sigma_nsc)))
 
         # start with prz_t_float_1 values from scr eval, i.e. requirement less provision of scr and rgu
         # do not change prz_t_float_1
@@ -877,7 +877,7 @@ class SolutionEvaluator(object):
         numpy.multiply(
             numpy.reshape(self.problem.prz_sigma_nsc, newshape=(self.problem.num_prz, 1)),
             self.prz_t_float_2, out=self.prz_t_float_2) # scale by sigma factor
-        print('prz_t_p_nsc_req: {}'.format(numpy.sum(self.prz_t_float_2)))
+        print('prz_t_p_nsc_req max: {}'.format(numpy.amax(self.prz_t_float_2)))
         numpy.add(self.prz_t_float_1, self.prz_t_float_2, out=self.prz_t_float_1) # add req
 
         # subtract pr/cs nsc reserve provisions
@@ -897,8 +897,8 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_rru(self):
 
-        print('sd_t_p_rru: {}'.format(numpy.sum(self.sd_t_p_rru_on) + numpy.sum(self.sd_t_p_rru_off)))
-        print('prz_t_p_rru_min: {}'.format(numpy.sum(self.problem.prz_t_p_rru_min)))
+        print('sd_t_p_rru sum: {}'.format(numpy.sum(self.sd_t_p_rru_on) + numpy.sum(self.sd_t_p_rru_off)))
+        print('prz_t_p_rru_min max: {}'.format(numpy.amax(self.problem.prz_t_p_rru_min)))
 
         # start with rru requirement from data
         self.prz_t_float[:] = self.problem.prz_t_p_rru_min # rhs/req
@@ -921,8 +921,8 @@ class SolutionEvaluator(object):
 
     def eval_prz_t_z_rrd(self):
 
-        print('sd_t_p_rrd: {}'.format(numpy.sum(self.sd_t_p_rrd_on) + numpy.sum(self.sd_t_p_rrd_off)))
-        print('prz_t_p_rrd_min: {}'.format(numpy.sum(self.problem.prz_t_p_rrd_min)))
+        print('sd_t_p_rrd sum: {}'.format(numpy.sum(self.sd_t_p_rrd_on) + numpy.sum(self.sd_t_p_rrd_off)))
+        print('prz_t_p_rrd_min max: {}'.format(numpy.amax(self.problem.prz_t_p_rrd_min)))
 
         # start with rrd requirement from data
         self.prz_t_float[:] = self.problem.prz_t_p_rrd_min # rhs/req
@@ -945,8 +945,8 @@ class SolutionEvaluator(object):
 
     def eval_qrz_t_z_qru(self):
 
-        print('sd_t_p_qru: {}'.format(numpy.sum(self.sd_t_q_qru)))
-        print('qrz_t_q_qru_min: {}'.format(numpy.sum(self.problem.qrz_t_q_qru_min)))
+        print('sd_t_p_qru sum: {}'.format(numpy.sum(self.sd_t_q_qru)))
+        print('qrz_t_q_qru_min max: {}'.format(numpy.amax(self.problem.qrz_t_q_qru_min)))
 
         # start with qru requirement from data
         self.qrz_t_float[:] = self.problem.qrz_t_q_qru_min # rhs/req
@@ -968,8 +968,8 @@ class SolutionEvaluator(object):
 
     def eval_qrz_t_z_qrd(self):
 
-        print('sd_t_p_qrd: {}'.format(numpy.sum(self.sd_t_q_qrd)))
-        print('qrz_t_q_qrd_min: {}'.format(numpy.sum(self.problem.qrz_t_q_qrd_min)))
+        print('sd_t_p_qrd sum: {}'.format(numpy.sum(self.sd_t_q_qrd)))
+        print('qrz_t_q_qrd_min max: {}'.format(numpy.amax(self.problem.qrz_t_q_qrd_min)))
 
         # start with qrd requirement from data
         self.qrz_t_float[:] = self.problem.qrz_t_q_qrd_min # rhs/req
