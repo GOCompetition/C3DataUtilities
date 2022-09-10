@@ -197,9 +197,37 @@ def csr_mat_vec_max_to_vec(a, x, out):
         numpy.amax(temp, axis=0, out=out[i,:])
 
 def get_connected_components(vertices, od_pairs):
-    # vertices should be a list of ints
-    # od_pairs should be a list of pairs of ints
-    # each int in each element of od_pars should be in vertices
+    '''
+
+    components = get_connected_components(vertices, od_pairs)
+
+    vertices
+    should be a list of nonnegative ints
+    nonnegative ints represent vertices
+
+    od_pairs
+    should be a list of pairs of nonnegative ints
+    each int in each element of od_pairs should be in vertices
+    pairs represent edges specified by the origin and destination vertices
+
+    components
+    will be a list of lists of nonnegative ints
+    each element of components is a component
+    each component is a list of vertices that are connected by edges
+    no vertex is listed twice in a single component
+    each vertex is listed in exactly one component
+    for any two vertices listed in two different components, there is no path of edges connecting them
+
+    The following unusual features ARE OK:
+    * empty list of pairs
+    * empty list of vertices (requires an empty list of pairs)
+    * isolated vertices, i.e. not adjacent to any pairs
+    * pairs listing vertices in decreasing order
+    * pairs listing vertices in increasing order
+    * duplicate pairs
+    * pairs that are the same except for the order of vertices
+    * pairs where both vertices are the same, i.e. a self edge
+    '''
 
     num_vertices = len(vertices)
     num_edges = len(od_pairs)
@@ -217,7 +245,32 @@ def get_connected_components(vertices, od_pairs):
     return [sorted(list(c)) for c in g_connected_components]
 
 def get_bridges(od_pairs):
-    # input should be a list of pairs of ints
+    '''
+    bridges = get_bridges(od_pairs)
+
+    od_pairs
+    should be a list of pairs of nonnegative ints
+    nonnegative ints represent vertices
+    pairs represent edges specified by the origin and destination vertices
+
+    bridges
+    will be a list of nonnegative ints
+    each element of bridges is the index of a bridge as an element of od_pairs
+    i.e. [od_pairs[i] for i in bridges] is the set of pairs representing edges that are bridges
+    A bridge is an edge such that when it is removed from the graph, the number of connected components
+    of the graph increases. Specifically, the connected component containing a bridge will be disconnected
+    into two connected components, so the number of connected components increases by 1.
+
+    The following unusual features ARE OK:
+    * empty list of pairs
+    * empty list of vertices (requires an empty list of pairs)
+    * isolated vertices, i.e. not adjacent to any pairs
+    * pairs listing vertices in decreasing order
+    * pairs listing vertices in increasing order
+    * duplicate pairs
+    * pairs that are the same except for the order of vertices
+    * pairs where both vertices are the same, i.e. a self edge
+    '''
     
     num_edges = len(od_pairs)
     if num_edges == 0:

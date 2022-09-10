@@ -96,7 +96,11 @@ class SolutionEvaluator(object):
         # todo
         self.eval_sd_t_p()
 
+        # simple dispatchable device
+        # dispatch costs
         self.eval_sd_t_z_p()
+        # rgu -> scr -> nsc
+        # other reserve computations are mutually independent
         self.eval_sd_t_z_rgu()
         self.eval_sd_t_z_rgd()
         self.eval_sd_t_z_scr()
@@ -108,8 +112,11 @@ class SolutionEvaluator(object):
         self.eval_sd_t_z_qru()
         self.eval_sd_t_z_qrd()
 
+        # bus p/q balance
         self.eval_bus_t_p()
         self.eval_bus_t_q()
+
+        # zonal reserve balance
         self.eval_prz_t_z_rgu()
         self.eval_prz_t_z_rgd()
         self.eval_prz_t_z_scr()
@@ -119,6 +126,12 @@ class SolutionEvaluator(object):
         self.eval_qrz_t_z_qru()
         self.eval_qrz_t_z_qrd()
 
+        # connectedness - each time interval, base case and contingencies
+        self.eval_connectedness()
+
+        # contingency DC power flow solve
+
+        # objective - net market surplus
         self.eval_t_k_z_k()
         self.eval_t_z_base()
         self.eval_t_z_k_worst_case()
@@ -129,6 +142,7 @@ class SolutionEvaluator(object):
         self.eval_z_k_average_case()
         self.eval_z()
 
+        # feasibility determination
         self.eval_infeas()
         
     def set_problem(self, prob):
@@ -167,6 +181,8 @@ class SolutionEvaluator(object):
         '''
         set solution arrays
         '''
+
+        self.t_connected_components_base = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
 
         self.sd_t_u_su = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_u_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
@@ -334,7 +350,9 @@ class SolutionEvaluator(object):
             'viol_xfr_t_u_sd_max',
             #'viol_acl_t_s_max', # penalized
             #'viol_xfr_t_s_max', # penalized
-        ] # todo others
+            'viol_t_connected_base_case',
+            'viol_t_k_connected_ctg',
+        ]
         infeas_keys = [
             k for k in set(keys).intersection(set(summary.keys()))
             if summary[k] is not None
@@ -444,13 +462,15 @@ class SolutionEvaluator(object):
             'sum_prz_t_z_rrd',
             'sum_qrz_t_z_qru',
             'sum_qrz_t_z_qrd',
+            'viol_t_connected_base_case',
+            'viol_t_k_connected_ctg',
             #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
             'z',
             'z_base',
             'z_k_worst_case',
             'z_k_average_case',
             'infeas',
-            ] # todo others
+        ] # todo others
         summary = {k: getattr(self, k, None) for k in keys}
         return summary
 
@@ -533,6 +553,55 @@ class SolutionEvaluator(object):
             self.t_z_k_average_case = numpy.mean(self.t_k_z_k, axis=1)
         else:
             self.t_z_k_average_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
+
+    def eval_connectedness(self):
+        '''
+        connectedness - each time interval, base case and contingencies
+
+        The set of AC branches (AC lines and transformers)
+        that are in service with respect to the solution (u_on = 1) forms a graph.
+        This graph must be connected.
+
+        In each contingency, the set of AC branches (AC lines and transformers( that are in service
+        with respect to the solution (u_on = 1)
+        and with respect to the contingency (not outaged)
+        forms a graph.
+        This graph must be connected.
+
+        To assess connectedness of the graph for each contingency,
+        one does not need to form the contingency graph and get its set of connected components.
+        Instead, form the base case graph, then get the set of bridges of this graph.
+        A bridge is an edge such that when it is removed, the number of connected components increases.
+        Then, for each contingency, the graph for that contingency is connected if and only if
+        the branch going out of service is either not an AC branch or not a bridge.
+
+        '''
+
+        vertices = list(range(self.problem.num_bus))
+        acl_edges = [(self.problem.acl_fbus[i], self.problem.acl_tbus[i]) for i in range(self.problem.num_acl)]
+        xfr_edges = [(self.problem.xfr_fbus[i], self.problem.xfr_tbus[i]) for i in range(self.problem.num_xfr)]
+        edges = acl_edges + xfr_edges
+        for t in range(self.problem.num_t):
+            t_acl_edges = [
+                (self.problem.acl_fbus[i], self.problem.acl_tbus[i])
+                for i in range(self.problem.num_acl)
+                if self.acl_t_u_on[i,t] == 1]
+            t_xfr_edges = [
+                (self.problem.xfr_fbus[i], self.problem.xfr_tbus[i])
+                for i in range(self.problem.num_xfr)
+                if self.xfr_t_u_on[i,t] == 1]
+            t_edges = t_acl_edges + t_xfr_edges
+            t_base_case_connected_components = utils.get_connected_components(vertices, t_edges)
+            self.t_connected_components_base[t] = len(t_base_case_connected_components)
+            #t_bridges = utils.get_bridges(t_edges) # todo: bug? - also, is the base case OK?
+            # todo intersection with contingencies
+        self.viol_t_connected_base_case = utils.get_max(self.t_connected_components_base - 1, idx_lists=[self.problem.t_num])
+        self.viol_t_k_connected_ctg = None # todo
+        # todo useful report
+        # * at least two buses (i1, i2) not connected in the base case
+        # * at least one contingency k and two buses (i1, i2) not connected in contingency k
+        # todo add these to the output
+        print('connectedness. base: {}, ctg: {}'.format(self.viol_t_connected_base_case, self.viol_t_k_connected_ctg))
 
     def eval_sd_t_z_p(self):
         '''

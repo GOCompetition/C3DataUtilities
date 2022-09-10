@@ -1203,6 +1203,10 @@ def ts_sd_q_lb_le_ub(data, config):
         raise ModelError(msg)
 
 def connected(data, config):
+    '''
+    check connectedness under the base case and each contingency
+    '''
+    # todo could use the cleaner interface in utils.get_connected_components and utils.get_bridges
 
     msg = ""
 

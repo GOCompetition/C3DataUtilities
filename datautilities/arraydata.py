@@ -392,22 +392,54 @@ class InputData(object):
     def set_sd_t(self, data):
 
         data_map = {x.uid:x for x in data.time_series_input.simple_dispatchable_device}
-        self.sd_t_u_on_max = numpy.array([data_map[i].on_status_ub for i in self.sd_uid], dtype=int)
-        self.sd_t_u_on_min = numpy.array([data_map[i].on_status_lb for i in self.sd_uid], dtype=int)
-        self.sd_t_p_max = numpy.array([data_map[i].p_ub for i in self.sd_uid], dtype=float)
-        self.sd_t_p_min = numpy.array([data_map[i].p_lb for i in self.sd_uid], dtype=float)
-        self.sd_t_q_max = numpy.array([data_map[i].q_ub for i in self.sd_uid], dtype=float)
-        self.sd_t_q_min = numpy.array([data_map[i].q_lb for i in self.sd_uid], dtype=float)
-        self.sd_t_c_rgu = numpy.array([data_map[i].p_reg_res_up_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_rgd = numpy.array([data_map[i].p_reg_res_down_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_scr = numpy.array([data_map[i].p_syn_res_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_nsc = numpy.array([data_map[i].p_nsyn_res_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_rru_on = numpy.array([data_map[i].p_ramp_res_up_online_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_rrd_on = numpy.array([data_map[i].p_ramp_res_down_online_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_rru_off = numpy.array([data_map[i].p_ramp_res_up_offline_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_rrd_off = numpy.array([data_map[i].p_ramp_res_down_offline_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_qru = numpy.array([data_map[i].q_res_up_cost for i in self.sd_uid], dtype=float)
-        self.sd_t_c_qrd = numpy.array([data_map[i].q_res_down_cost for i in self.sd_uid], dtype=float)
+        self.sd_t_u_on_max = numpy.reshape(
+            numpy.array([data_map[i].on_status_ub for i in self.sd_uid], dtype=int),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_u_on_min = numpy.reshape(
+            numpy.array([data_map[i].on_status_lb for i in self.sd_uid], dtype=int),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_p_max = numpy.reshape(
+            numpy.array([data_map[i].p_ub for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_p_min = numpy.reshape(
+            numpy.array([data_map[i].p_lb for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_q_max = numpy.reshape(
+            numpy.array([data_map[i].q_ub for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_q_min = numpy.reshape(
+            numpy.array([data_map[i].q_lb for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_rgu = numpy.reshape(
+            numpy.array([data_map[i].p_reg_res_up_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_rgd = numpy.reshape(
+            numpy.array([data_map[i].p_reg_res_down_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_scr = numpy.reshape(
+            numpy.array([data_map[i].p_syn_res_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_nsc = numpy.reshape(
+            numpy.array([data_map[i].p_nsyn_res_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_rru_on = numpy.reshape(
+            numpy.array([data_map[i].p_ramp_res_up_online_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_rrd_on = numpy.reshape(
+            numpy.array([data_map[i].p_ramp_res_down_online_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_rru_off = numpy.reshape(
+            numpy.array([data_map[i].p_ramp_res_up_offline_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_rrd_off = numpy.reshape(
+            numpy.array([data_map[i].p_ramp_res_down_offline_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_qru = numpy.reshape(
+            numpy.array([data_map[i].q_res_up_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
+        self.sd_t_c_qrd = numpy.reshape(
+            numpy.array([data_map[i].q_res_down_cost for i in self.sd_uid], dtype=float),
+            newshape=(self.num_sd, self.num_t))
 
     def set_sd_t_cost(self, data):
         '''
@@ -425,21 +457,32 @@ class InputData(object):
                 cost_blocks[i] = [[((-1.0) * t_b_c[0], t_b_c[1]) for t_b_c in t_c] for t_c in cost_blocks[i]]
         for i in range(self.num_sd): # sort blocks in order of increasing cost
             cost_blocks[i] = [sorted(t_c, key=(lambda x: x[0])) for t_c in cost_blocks[i]]
-        self.sd_t_num_block = numpy.array([[len(t_c) for t_c in c] for c in cost_blocks], dtype=int)
+        self.sd_t_num_block = numpy.reshape(
+            numpy.array([[len(t_c) for t_c in c] for c in cost_blocks], dtype=int),
+            newshape=(self.num_sd, self.num_t))
         self.sd_t_block_c_list = [[numpy.array([t_b_c[0] for t_b_c in t_c], dtype=float) for t_c in c] for c in cost_blocks]
-        self.sd_t_block_p_max_list = [[numpy.array([t_b_c[1] for t_b_c in t_c], dtype=float) for t_c in c] for c in cost_blocks]
+        self.sd_t_block_p_max_list = [
+            [numpy.array([t_b_c[1] for t_b_c in t_c], dtype=float) for t_c in c] for c in cost_blocks]
 
     def set_prz_t(self, data):
 
         data_map = {x.uid:x for x in data.time_series_input.active_zonal_reserve}
-        self.prz_t_p_rru_min = numpy.array([data_map[i].RAMPING_RESERVE_UP for i in self.prz_uid], dtype=float)
-        self.prz_t_p_rrd_min = numpy.array([data_map[i].RAMPING_RESERVE_DOWN for i in self.prz_uid], dtype=float)
+        self.prz_t_p_rru_min = numpy.reshape(
+            numpy.array([data_map[i].RAMPING_RESERVE_UP for i in self.prz_uid], dtype=float),
+            newshape=(self.num_qrz, self.num_t))
+        self.prz_t_p_rrd_min = numpy.reshape(
+            numpy.array([data_map[i].RAMPING_RESERVE_DOWN for i in self.prz_uid], dtype=float),
+            newshape=(self.num_prz, self.num_t))
 
     def set_qrz_t(self, data):
 
         data_map = {x.uid:x for x in data.time_series_input.reactive_zonal_reserve}
-        self.qrz_t_q_qru_min = numpy.array([data_map[i].REACT_UP for i in self.qrz_uid], dtype=float)
-        self.qrz_t_q_qrd_min = numpy.array([data_map[i].REACT_DOWN for i in self.qrz_uid], dtype=float)
+        self.qrz_t_q_qru_min = numpy.reshape(
+            numpy.array([data_map[i].REACT_UP for i in self.qrz_uid], dtype=float),
+            newshape=(self.num_qrz, self.num_t))
+        self.qrz_t_q_qrd_min = numpy.reshape(
+            numpy.array([data_map[i].REACT_DOWN for i in self.qrz_uid], dtype=float),
+            newshape=(self.num_qrz, self.num_t))
 
 class OutputData(object):
 
@@ -459,35 +502,69 @@ class OutputData(object):
     def set_bus_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.bus}
-        self.bus_t_v = numpy.array([data_map[i].vm for i in input_data.bus_uid], dtype=float)
-        self.bus_t_theta = numpy.array([data_map[i].va for i in input_data.bus_uid], dtype=float)
+        self.bus_t_v = numpy.reshape(
+            numpy.array([data_map[i].vm for i in input_data.bus_uid], dtype=float),
+            newshape=(input_data.num_bus, input_data.num_t))
+        self.bus_t_theta = numpy.reshape(
+            numpy.array([data_map[i].va for i in input_data.bus_uid], dtype=float),
+            newshape=(input_data.num_bus, input_data.num_t))
 
     def set_sh_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.shunt}
-        self.sh_t_u_st = numpy.array([data_map[i].step for i in input_data.sh_uid], dtype=int)
+        self.sh_t_u_st = numpy.reshape(
+            numpy.array([data_map[i].step for i in input_data.sh_uid], dtype=int),
+            newshape=(input_data.num_sh, input_data.num_t))
 
     def set_sd_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.simple_dispatchable_device}
-        self.sd_t_u_on = numpy.array([data_map[i].on_status for i in input_data.sd_uid], dtype=int)
-        self.sd_t_p_on = numpy.array([data_map[i].p_on for i in input_data.sd_uid], dtype=float)
-        self.sd_t_q = numpy.array([data_map[i].q for i in input_data.sd_uid], dtype=float)
-        self.sd_t_p_rgu = numpy.array([data_map[i].p_reg_res_up for i in input_data.sd_uid], dtype=float)
-        self.sd_t_p_rgd = numpy.array([data_map[i].p_reg_res_down for i in input_data.sd_uid], dtype=float)
-        self.sd_t_p_scr = numpy.array([data_map[i].p_syn_res for i in input_data.sd_uid], dtype=float)
-        self.sd_t_p_nsc = numpy.array([data_map[i].p_nsyn_res for i in input_data.sd_uid], dtype=float)
-        self.sd_t_p_rru_on = numpy.array([data_map[i].p_ramp_res_up_online for i in input_data.sd_uid], dtype=float)
-        self.sd_t_p_rrd_on = numpy.array([data_map[i].p_ramp_res_down_online for i in input_data.sd_uid], dtype=float)
-        self.sd_t_p_rru_off = numpy.array([data_map[i].p_ramp_res_up_offline for i in input_data.sd_uid], dtype=float)
-        self.sd_t_p_rrd_off = numpy.array([data_map[i].p_ramp_res_down_offline for i in input_data.sd_uid], dtype=float)
-        self.sd_t_q_qru = numpy.array([data_map[i].q_res_up for i in input_data.sd_uid], dtype=float)
-        self.sd_t_q_qrd = numpy.array([data_map[i].q_res_down for i in input_data.sd_uid], dtype=float)
+        self.sd_t_u_on = numpy.reshape(
+            numpy.array([data_map[i].on_status for i in input_data.sd_uid], dtype=int),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_on = numpy.reshape(
+            numpy.array([data_map[i].p_on for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_q = numpy.reshape(
+            numpy.array([data_map[i].q for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_rgu = numpy.reshape(
+            numpy.array([data_map[i].p_reg_res_up for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_rgd = numpy.reshape(
+            numpy.array([data_map[i].p_reg_res_down for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_scr = numpy.reshape(
+            numpy.array([data_map[i].p_syn_res for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_nsc = numpy.reshape(
+            numpy.array([data_map[i].p_nsyn_res for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_rru_on = numpy.reshape(
+            numpy.array([data_map[i].p_ramp_res_up_online for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_rrd_on = numpy.reshape(
+            numpy.array([data_map[i].p_ramp_res_down_online for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_rru_off = numpy.reshape(
+            numpy.array([data_map[i].p_ramp_res_up_offline for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_p_rrd_off = numpy.reshape(
+            numpy.array([data_map[i].p_ramp_res_down_offline for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_q_qru = numpy.reshape(
+            numpy.array([data_map[i].q_res_up for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
+        self.sd_t_q_qrd = numpy.reshape(
+            numpy.array([data_map[i].q_res_down for i in input_data.sd_uid], dtype=float),
+            newshape=(input_data.num_sd, input_data.num_t))
 
     def set_acl_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.ac_line}
-        self.acl_t_u_on = numpy.array([data_map[i].on_status for i in input_data.acl_uid], dtype=int) # , dtype=numpy.int8) # could help, but not much
+        self.acl_t_u_on = numpy.reshape(
+            numpy.array([data_map[i].on_status for i in input_data.acl_uid], dtype=int), # , dtype=numpy.int8) # could help, but not much
+            newshape=(input_data.num_acl, input_data.num_t))
 
     def set_dcl_t(self, input_data, output_data_model):
 
@@ -497,14 +574,26 @@ class OutputData(object):
         # also need dtype in the array constructor
         data_map = {x.uid:x for x in output_data_model.time_series_output.dc_line}
         #self.dcl_t_p = numpy.array([data_map[i].pdc_fr for i in input_data.dcl_uid], ndmin=2)
-        self.dcl_t_p = numpy.reshape(numpy.array([data_map[i].pdc_fr for i in input_data.dcl_uid], dtype=float), newshape=(input_data.num_dcl, input_data.num_t))
-        self.dcl_t_q_fr = numpy.reshape(numpy.array([data_map[i].qdc_fr for i in input_data.dcl_uid], dtype=float), newshape=(input_data.num_dcl, input_data.num_t))
-        self.dcl_t_q_to = numpy.reshape(numpy.array([data_map[i].qdc_to for i in input_data.dcl_uid], dtype=float), newshape=(input_data.num_dcl, input_data.num_t))
+        self.dcl_t_p = numpy.reshape(
+            numpy.array([data_map[i].pdc_fr for i in input_data.dcl_uid], dtype=float),
+            newshape=(input_data.num_dcl, input_data.num_t))
+        self.dcl_t_q_fr = numpy.reshape(
+            numpy.array([data_map[i].qdc_fr for i in input_data.dcl_uid], dtype=float),
+            newshape=(input_data.num_dcl, input_data.num_t))
+        self.dcl_t_q_to = numpy.reshape(
+            numpy.array([data_map[i].qdc_to for i in input_data.dcl_uid], dtype=float),
+            newshape=(input_data.num_dcl, input_data.num_t))
 
     def set_xfr_t(self, input_data, output_data_model):
 
         data_map = {x.uid:x for x in output_data_model.time_series_output.two_winding_transformer}
-        self.xfr_t_u_on = numpy.array([data_map[i].on_status for i in input_data.xfr_uid], dtype=int)
-        self.xfr_t_tau = numpy.array([data_map[i].tm for i in input_data.xfr_uid], dtype=float)
-        self.xfr_t_phi = numpy.array([data_map[i].ta for i in input_data.xfr_uid], dtype=float)
+        self.xfr_t_u_on = numpy.reshape(
+            numpy.array([data_map[i].on_status for i in input_data.xfr_uid], dtype=int),
+            newshape=(input_data.num_xfr, input_data.num_t))
+        self.xfr_t_tau = numpy.reshape(
+            numpy.array([data_map[i].tm for i in input_data.xfr_uid], dtype=float),
+            newshape=(input_data.num_xfr, input_data.num_t))
+        self.xfr_t_phi = numpy.reshape(
+            numpy.array([data_map[i].ta for i in input_data.xfr_uid], dtype=float),
+            newshape=(input_data.num_xfr, input_data.num_t))
 
