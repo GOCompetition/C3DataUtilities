@@ -2,9 +2,6 @@
 Evaluation of solutions to the GO Competition Challenge 3 problem.
 '''
 
-# todo
-# a = numpy.reshape(numpy.array([], dtype=int), newshape=(0, 24))
-
 import time
 import numpy, scipy
 from datautilities import arraydata
@@ -99,7 +96,7 @@ class SolutionEvaluator(object):
         # simple dispatchable device
         # dispatch costs
         self.eval_sd_t_z_p()
-        # rgu -> scr -> nsc
+        # order needs to be: rgu -> scr -> nsc
         # other reserve computations are mutually independent
         self.eval_sd_t_z_rgu()
         self.eval_sd_t_z_rgd()
@@ -183,6 +180,7 @@ class SolutionEvaluator(object):
         '''
 
         self.t_connected_components_base = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
+        self.t_ctg_bridges = numpy.zeros(shape=(self.problem.num_t, ), dtype=int)
 
         self.sd_t_u_su = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_u_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
@@ -350,8 +348,8 @@ class SolutionEvaluator(object):
             'viol_xfr_t_u_sd_max',
             #'viol_acl_t_s_max', # penalized
             #'viol_xfr_t_s_max', # penalized
-            'viol_t_connected_base_case',
-            'viol_t_k_connected_ctg',
+            'viol_t_connected_base',
+            'viol_t_connected_ctg',
         ]
         infeas_keys = [
             k for k in set(keys).intersection(set(summary.keys()))
@@ -462,8 +460,10 @@ class SolutionEvaluator(object):
             'sum_prz_t_z_rrd',
             'sum_qrz_t_z_qru',
             'sum_qrz_t_z_qrd',
-            'viol_t_connected_base_case',
-            'viol_t_k_connected_ctg',
+            'viol_t_connected_base',
+            'viol_t_connected_ctg',
+            'info_connected_base',
+            'info_connected_ctg',
             #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
             'z',
             'z_base',
@@ -496,7 +496,6 @@ class SolutionEvaluator(object):
 
     def eval_t_z_base(self):
 
-        #self.t_z_base = numpy.zeros(shape=(self.problem.num_t, ), dtype=float) # todo add everything
         # note "cost" terms have a minus sign, "benefit" terms have a plus sign
         # t_z_base, t_z_ctg, t_z, z, etc. are all net benefits
         self.t_z_base = sum([
@@ -578,30 +577,125 @@ class SolutionEvaluator(object):
         '''
 
         vertices = list(range(self.problem.num_bus))
-        acl_edges = [(self.problem.acl_fbus[i], self.problem.acl_tbus[i]) for i in range(self.problem.num_acl)]
-        xfr_edges = [(self.problem.xfr_fbus[i], self.problem.xfr_tbus[i]) for i in range(self.problem.num_xfr)]
-        edges = acl_edges + xfr_edges
+        # acl_edges = [(self.problem.acl_fbus[i], self.problem.acl_tbus[i]) for i in range(self.problem.num_acl)]
+        # xfr_edges = [(self.problem.xfr_fbus[i], self.problem.xfr_tbus[i]) for i in range(self.problem.num_xfr)]
+        # edges = acl_edges + xfr_edges
+
+        # ctg_edges = [
+        #     (self.problem.k_out_fbus[i], self.problem.k_out_tbus[i])
+        #     for i in range(self.problem.num_k)
+        #     if self.problem.k_out_is_acl[i] or self.problem.k_out_is_xfr[i]]
+        # ctg_edge_ctg_map = {i:[] for i in ctg_edges}
+        # for i in range(self.problem.num_k):
+        #     if self.problem.k_out_is_acl[i] or self.problem.k_out_is_xfr[i]:
+        #         ctg_edge_ctg_map[(self.problem.k_out_fbus[i], self.problem.k_out_tbus[i])].append(i)
+
+        found_base_violation = False
+        base_violation_t = None
+        base_violation_i0 = None
+        base_violation_i1 = None
+        found_ctg_violation = False
+        ctg_violation_t = None
+        ctg_violation_k = None
+        ctg_violation_i0 = None
+        ctg_violation_i1 = None
+
         for t in range(self.problem.num_t):
-            t_acl_edges = [
-                (self.problem.acl_fbus[i], self.problem.acl_tbus[i])
-                for i in range(self.problem.num_acl)
-                if self.acl_t_u_on[i,t] == 1]
-            t_xfr_edges = [
-                (self.problem.xfr_fbus[i], self.problem.xfr_tbus[i])
-                for i in range(self.problem.num_xfr)
-                if self.xfr_t_u_on[i,t] == 1]
+
+            # todo performance
+            # make any of this t-independent?
+            # faster?
+
+            # edges corresponding to in service AC branches
+            t_acl = [i for i in range(self.problem.num_acl) if self.acl_t_u_on[i,t] == 1]
+            t_xfr = [i for i in range(self.problem.num_xfr) if self.xfr_t_u_on[i,t] == 1]
+            t_acl_edges = [(self.problem.acl_fbus[i], self.problem.acl_tbus[i]) for i in t_acl]
+            t_xfr_edges = [(self.problem.xfr_fbus[i], self.problem.xfr_tbus[i]) for i in t_xfr]
             t_edges = t_acl_edges + t_xfr_edges
-            t_base_case_connected_components = utils.get_connected_components(vertices, t_edges)
-            self.t_connected_components_base[t] = len(t_base_case_connected_components)
-            #t_bridges = utils.get_bridges(t_edges) # todo: bug? - also, is the base case OK?
-            # todo intersection with contingencies
-        self.viol_t_connected_base_case = utils.get_max(self.t_connected_components_base - 1, idx_lists=[self.problem.t_num])
-        self.viol_t_k_connected_ctg = None # todo
-        # todo useful report
+
+            # need this to select only the contingency edges from the bridges
+            # bridges not outaged by a contingency are not a violation of post-contingency connectedness
+            t_ctg_acl = [self.problem.k_out_acl[i] for i in range(self.problem.num_k) if self.problem.k_out_is_acl[i]]
+            t_ctg_xfr = [self.problem.k_out_xfr[i] for i in range(self.problem.num_k) if self.problem.k_out_is_xfr[i]]
+            t_ctg_acl = [i for i in t_ctg_acl if self.acl_t_u_on[i,t] == 1]
+            t_ctg_xfr = [i for i in t_ctg_xfr if self.xfr_t_u_on[i,t] == 1]
+            t_ctg_acl_edges = [(self.problem.acl_fbus[i], self.problem.acl_tbus[i]) for i in t_ctg_acl]
+            t_ctg_xfr_edges = [(self.problem.xfr_fbus[i], self.problem.xfr_tbus[i]) for i in t_ctg_xfr]
+            t_ctg_edges_set = set(t_ctg_acl_edges + t_ctg_xfr_edges)
+
+            # need this to find a contingency for a given bridge
+            # only needed for information, not to determine if there is a violation
+            t_ctg_edge_ctg_map = {i:[] for i in t_ctg_edges_set}
+            for i in range(self.problem.num_k):
+                if self.problem.k_out_is_acl[i]:
+                    if self.acl_t_u_on[self.problem.k_out_acl[i], t] == 1:
+                        t_ctg_edge_ctg_map[(self.problem.k_out_fbus[i], self.problem.k_out_tbus[i])].append(i)
+                elif self.problem.k_out_is_xfr[i]:
+                    if self.xfr_t_u_on[self.problem.k_out_xfr[i], t] == 1:
+                        t_ctg_edge_ctg_map[(self.problem.k_out_fbus[i], self.problem.k_out_tbus[i])].append(i)
+
+            # base case - connected components
+            t_base_connected_components = utils.get_connected_components(vertices, t_edges)
+            self.t_connected_components_base[t] = len(t_base_connected_components)
+            if self.t_connected_components_base[t] > 1 and not found_base_violation:
+                found_base_violation = True
+                base_violation_t = t
+                base_violation_i0 = t_base_connected_components[0][0]
+                base_violation_i1 = t_base_connected_components[1][0]
+
+            # contingencies - bridges
+            t_bridges = utils.get_bridges(t_edges) # todo: performance - sorted? - loop/dict?
+            t_bridge_edges = [t_edges[i] for i in t_bridges]
+            t_ctg_bridge_edges = sorted(list(set(t_bridge_edges).intersection(t_ctg_edges_set)))
+            self.t_ctg_bridges[t] = len(t_ctg_bridge_edges)
+            if self.t_ctg_bridges[t] > 0 and not found_ctg_violation:
+                found_ctg_violation = True
+                ctg_violation_t = t
+                ctg_violation_i0 = t_ctg_bridge_edges[0][0]
+                ctg_violation_i1 = t_ctg_bridge_edges[0][1]
+                ctg_violation_k = t_ctg_edge_ctg_map[(ctg_violation_i0, ctg_violation_i1)][0]
+
+        # report violations
+        self.viol_t_connected_base = utils.get_max(self.t_connected_components_base - 1, idx_lists=[self.problem.t_num])
+        self.viol_t_connected_ctg = utils.get_max(self.t_ctg_bridges, idx_lists=[self.problem.t_num])
+
+        # useful information on violations
         # * at least two buses (i1, i2) not connected in the base case
         # * at least one contingency k and two buses (i1, i2) not connected in contingency k
-        # todo add these to the output
-        print('connectedness. base: {}, ctg: {}'.format(self.viol_t_connected_base_case, self.viol_t_k_connected_ctg))
+        self.info_connected_base = {
+            'violation': False,
+            't': None,
+            'i0': None,
+            'i1': None,
+            'i0_idx': None,
+            'i1_idx': None,
+        }
+        self.info_connected_ctg = {
+            'violation': False,
+            't': None,
+            'k': None,
+            'i0': None,
+            'i1': None,
+            'k_idx': None,
+            'i0_idx': None,
+            'i1_idx': None,
+        }
+        if found_base_violation:
+            self.info_connected_base['violation'] = True
+            self.info_connected_base['t'] = base_violation_t
+            self.info_connected_base['i0_idx'] = base_violation_i0
+            self.info_connected_base['i0'] = self.problem.bus_uid[base_violation_i0]
+            self.info_connected_base['i1_idx'] = base_violation_i1
+            self.info_connected_base['i1'] = self.problem.bus_uid[base_violation_i1]
+        if found_ctg_violation:
+            self.info_connected_ctg['violation'] = True
+            self.info_connected_ctg['t'] = ctg_violation_t
+            self.info_connected_ctg['k_idx'] = ctg_violation_k
+            self.info_connected_ctg['k'] = self.problem.k_uid[ctg_violation_k]
+            self.info_connected_ctg['i0_idx'] = ctg_violation_i0
+            self.info_connected_ctg['i0'] = self.problem.bus_uid[ctg_violation_i0]
+            self.info_connected_ctg['i1_idx'] = ctg_violation_i1
+            self.info_connected_ctg['i1'] = self.problem.bus_uid[ctg_violation_i1]
 
     def eval_sd_t_z_p(self):
         '''
@@ -1415,20 +1509,6 @@ class SolutionEvaluator(object):
         numpy.maximum(
             self.dcl_t_q_to, numpy.reshape(self.problem.dcl_q_to_min, newshape=(self.problem.num_dcl, 1)),
             out=self.dcl_t_q_to)
-
-    def eval_dcl_t_s_fr_max(self):
-        '''
-        evaluate violation of dcl s_fr max
-        compute penalty
-        '''
-        # todo - missing from data
-
-    def eval_dcl_t_s_to_max(self):
-        '''
-        evaluate violation of dcl s_to max
-        compute penalty
-        '''
-        # todo - missing from data
 
     def eval_xfr_t_tau_max(self):
         '''

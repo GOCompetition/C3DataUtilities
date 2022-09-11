@@ -388,6 +388,20 @@ class InputData(object):
             [self.dcl_map[k_out_device_uid[i]] if self.k_out_is_dcl[i] else 0 for i in range(self.num_k)], dtype=int)
         self.k_out_xfr = numpy.array(
             [self.xfr_map[k_out_device_uid[i]] if self.k_out_is_xfr[i] else 0 for i in range(self.num_k)], dtype=int)
+        self.k_out_fbus_is_acl = numpy.array(
+            [self.acl_fbus[self.k_out_acl[i]] if self.k_out_is_acl[i] else 0 for i in range(self.num_k)], dtype=int)
+        self.k_out_tbus_is_acl = numpy.array(
+            [self.acl_tbus[self.k_out_acl[i]] if self.k_out_is_acl[i] else 0 for i in range(self.num_k)], dtype=int)
+        self.k_out_fbus_is_dcl = numpy.array(
+            [self.dcl_fbus[self.k_out_dcl[i]] if self.k_out_is_dcl[i] else 0 for i in range(self.num_k)], dtype=int)
+        self.k_out_tbus_is_dcl = numpy.array(
+            [self.dcl_tbus[self.k_out_dcl[i]] if self.k_out_is_dcl[i] else 0 for i in range(self.num_k)], dtype=int)
+        self.k_out_fbus_is_xfr = numpy.array(
+            [self.xfr_fbus[self.k_out_xfr[i]] if self.k_out_is_xfr[i] else 0 for i in range(self.num_k)], dtype=int)
+        self.k_out_tbus_is_xfr = numpy.array(
+            [self.xfr_tbus[self.k_out_xfr[i]] if self.k_out_is_xfr[i] else 0 for i in range(self.num_k)], dtype=int)
+        self.k_out_fbus = self.k_out_fbus_is_acl + self.k_out_fbus_is_dcl + self.k_out_fbus_is_xfr
+        self.k_out_tbus = self.k_out_tbus_is_acl + self.k_out_tbus_is_dcl + self.k_out_tbus_is_xfr
 
     def set_sd_t(self, data):
 
