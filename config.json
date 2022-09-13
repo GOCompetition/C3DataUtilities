@@ -10,6 +10,8 @@
     "xfr_switch_dn_allowed": true,
     "time_eq_tol": 0.000001,
     "minimum_time_unit": 0.01,
+    "hard_constr_tol": 0.00000001,
+    "do_proj": false,
     "interval_duration_schedules": [
         [
             0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,

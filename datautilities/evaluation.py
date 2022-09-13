@@ -26,6 +26,7 @@ class SolutionEvaluator(object):
         self.eval_sd_t_u_on_min()
         self.eval_sd_t_d_up_dn()
         self.eval_sd_t_u_su_sd()
+        self.eval_sd_t_u_on_su_sd()
         self.eval_sd_t_d_up_min()
         self.eval_sd_t_d_dn_min()
         self.eval_sd_t_z_on()
@@ -37,8 +38,8 @@ class SolutionEvaluator(object):
         # bus voltage
         self.eval_bus_t_v_max()
         self.eval_bus_t_v_min()
-        self.proj_bus_t_v_max()
-        self.proj_bus_t_v_min()
+        #self.proj_bus_t_v_max()
+        #self.proj_bus_t_v_min()
 
         # shunts
         # no proj needed because integer
@@ -49,26 +50,26 @@ class SolutionEvaluator(object):
         # DC line bounds
         self.eval_dcl_t_p_max()
         self.eval_dcl_t_p_min()
-        self.proj_dcl_t_p_max()
-        self.proj_dcl_t_p_min()
+        #self.proj_dcl_t_p_max()
+        #self.proj_dcl_t_p_min()
         self.eval_dcl_t_q_fr_max()
         self.eval_dcl_t_q_fr_min()
-        self.proj_dcl_t_q_fr_max()
-        self.proj_dcl_t_q_fr_min()
+        #self.proj_dcl_t_q_fr_max()
+        #self.proj_dcl_t_q_fr_min()
         self.eval_dcl_t_q_to_max()
         self.eval_dcl_t_q_to_min()
-        self.proj_dcl_t_q_to_max()
-        self.proj_dcl_t_q_to_min()
+        #self.proj_dcl_t_q_to_max()
+        #self.proj_dcl_t_q_to_min()
 
         # transformer controls
         self.eval_xfr_t_tau_max()
         self.eval_xfr_t_tau_min()
-        self.proj_xfr_t_tau_max() # comment out these projections to highlight the power balance violation
-        self.proj_xfr_t_tau_min()
+        #self.proj_xfr_t_tau_max() # comment out these projections to highlight the power balance violation
+        #self.proj_xfr_t_tau_min()
         self.eval_xfr_t_phi_max()
         self.eval_xfr_t_phi_min()
-        self.proj_xfr_t_phi_max()
-        self.proj_xfr_t_phi_min()
+        #self.proj_xfr_t_phi_max()
+        #self.proj_xfr_t_phi_min() # what if we make the projection a configurable parameter?
 
         # AC branch switching
         self.eval_acl_t_u_su()
@@ -106,11 +107,11 @@ class SolutionEvaluator(object):
         # have to project p_on down onto [u_on*p_min, u_on*p_max] to make sense of reserves
         # could account for ramping, max/min energy, and p-q constraints in projection
         # on computing p_max_final and p_min_final, if p_min_final > p_max_final + tol, declare infeas
-        self.proj_sd_t_p_on()
+        #self.proj_sd_t_p_on()
         # then recompute p from p_on, p_su, p_sd based on projected p_on
-        self.eval_sd_t_p()
+        #self.eval_sd_t_p()
         # then project q
-        self.proj_sd_t_q()
+        #self.proj_sd_t_q()
 
         # simple dispatchable device reserves - todo
         # eval/proj nonneg
@@ -213,6 +214,7 @@ class SolutionEvaluator(object):
 
         self.sd_t_u_su = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_u_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
+        self.sd_t_u_on_su_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_z = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
         self.sd_t_p = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
         self.sd_t_d_up_start = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
@@ -499,6 +501,8 @@ class SolutionEvaluator(object):
             'viol_sd_t_p_on_min',
             'viol_sd_t_p_ramp_dn_max',
             'viol_sd_t_p_ramp_up_max',
+            'viol_sd_max_energy_constr',
+            'viol_sd_min_energy_constr',
             #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
             'z',
             'z_base',
@@ -912,14 +916,14 @@ class SolutionEvaluator(object):
         '''
         '''
 
-        #todo - for now set to 0
+        #todo - for now set to 0 - add su curve
         self.sd_t_p_su = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
 
     def eval_sd_t_p_sd(self):
         '''
         '''
 
-        #todo - for now set to 0
+        #todo - for now set to 0 - add sd curve
         self.sd_t_p_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
 
     def eval_sd_t_p_on_max(self):
@@ -994,19 +998,85 @@ class SolutionEvaluator(object):
         numpy.maximum(0.0, self.sd_t_float_1, out=self.sd_t_float_1)
         self.viol_sd_t_p_ramp_dn_max = utils.get_max(self.sd_t_float_1, idx_lists=[self.problem.sd_uid, self.problem.t_num])
 
+    # todo this looks inefficient, but so far it is not a problem
     def eval_sd_max_energy(self):
         '''
         '''
 
-        # todo
-        pass
+        max_viol = 0
+        max_i = 0
+        max_j = 0
+        for i in range(self.problem.num_sd):
+            for j in range(self.problem.sd_num_max_energy_constr[i]):
+                a_start = self.problem.sd_max_energy_constr_a_start_list[i][j]
+                a_end = self.problem.sd_max_energy_constr_a_end_list[i][j]
+                numpy.less(a_start + self.config['time_eq_tol'], self.problem.t_a_mid, out=self.t_int_1) # todo - check if this is right
+                numpy.less_equal(self.problem.t_a_mid, a_end + self.config['time_eq_tol'], out=self.t_int_2)
+                numpy.multiply(self.t_int_1, self.t_int_2, out=self.t_int)
+                #print('t_a_start: {}'.format(self.problem.t_a_start))
+                #print('t_a_end: {}'.format(self.problem.t_a_end))
+                #print('t_int_1: {}'.format(self.t_int_1))
+                #print('t_int_2: {}'.format(self.t_int_2))
+                #print('t_int: {}'.format(self.t_int))
+                numpy.multiply(self.t_int, self.problem.t_d, out=self.t_float)
+                numpy.multiply(self.t_float, self.sd_t_p[i, :], out=self.t_float)
+                #print('t_d: {}'.format(self.problem.t_d))
+                #print('sd_t_u_p: {}'.format(self.sd_t_p[i, :]))
+                #print('t_float: {}'.format(self.t_float))
+                energy = numpy.sum(self.t_float)
+                viol = max(0, energy - self.problem.sd_max_energy_constr_max_energy_list[i][j])
+                #print('i: {}, j: {}, sd: {}, t: {}, a_start: {}, a_end: {}, max_energy: {}, energy: {}, viol: {}'.format(
+                #    i, j, self.problem.sd_uid[i], self.problem.t_num[j], a_start, a_end, self.problem.sd_max_energy_constr_max_energy_list[i][j], energy, viol))
+                if viol > max_viol:
+                    max_viol = viol
+                    max_i = i
+                    max_j = j
+        self.viol_sd_max_energy_constr = {
+            'val': max_viol,
+            'abs': abs(max_viol),
+            'idx': (self.problem.sd_uid[max_i], self.problem.t_num[max_j]),
+            'idx_lin': None,
+            'idx_int': (max_i, max_j)}
 
+    # todo this looks inefficient, but so far it is not a problem
     def eval_sd_min_energy(self):
         '''
         '''
 
-        # todo
-        pass
+        max_viol = 0
+        max_i = 0
+        max_j = 0
+        for i in range(self.problem.num_sd):
+            for j in range(self.problem.sd_num_min_energy_constr[i]):
+                a_start = self.problem.sd_min_energy_constr_a_start_list[i][j]
+                a_end = self.problem.sd_min_energy_constr_a_end_list[i][j]
+                numpy.less(a_start + self.config['time_eq_tol'], self.problem.t_a_mid, out=self.t_int_1) # todo - check if this is right
+                numpy.less_equal(self.problem.t_a_mid, a_end + self.config['time_eq_tol'], out=self.t_int_2)
+                numpy.multiply(self.t_int_1, self.t_int_2, out=self.t_int)
+                #print('t_a_start: {}'.format(self.problem.t_a_start))
+                #print('t_a_end: {}'.format(self.problem.t_a_end))
+                #print('t_int_1: {}'.format(self.t_int_1))
+                #print('t_int_2: {}'.format(self.t_int_2))
+                #print('t_int: {}'.format(self.t_int))
+                numpy.multiply(self.t_int, self.problem.t_d, out=self.t_float)
+                numpy.multiply(self.t_float, self.sd_t_p[i, :], out=self.t_float)
+                #print('t_d: {}'.format(self.problem.t_d))
+                #print('sd_t_u_p: {}'.format(self.sd_t_p[i, :]))
+                #print('t_float: {}'.format(self.t_float))
+                energy = numpy.sum(self.t_float)
+                viol = max(0, self.problem.sd_min_energy_constr_min_energy_list[i][j] - energy)
+                #print('i: {}, j: {}, sd: {}, t: {}, a_start: {}, a_end: {}, min_energy: {}, energy: {}, viol: {}'.format(
+                #    i, j, self.problem.sd_uid[i], self.problem.t_num[j], a_start, a_end, self.problem.sd_min_energy_constr_min_energy_list[i][j], energy, viol))
+                if viol > max_viol:
+                    max_viol = viol
+                    max_i = i
+                    max_j = j
+        self.viol_sd_min_energy_constr = {
+            'val': max_viol,
+            'abs': abs(max_viol),
+            'idx': (self.problem.sd_uid[max_i], self.problem.t_num[max_j]),
+            'idx_lin': None,
+            'idx_int': (max_i, max_j)}
 
     def eval_sd_t_q_max(self):
         '''
@@ -1381,6 +1451,10 @@ class SolutionEvaluator(object):
         self.sum_sd_t_su = numpy.sum(self.sd_t_u_su)
         self.sum_sd_t_sd = numpy.sum(self.sd_t_u_sd)
 
+    def eval_sd_t_u_on_su_sd(self):
+
+        self.sd_t_u_on_su_sd[:] = self.sd_t_u_on # todo - add su/sd curves
+
     def eval_sd_t_d_up_min(self):
         '''
         evaluate min uptime constraints on sd_t_u_sd
@@ -1435,7 +1509,7 @@ class SolutionEvaluator(object):
         self.sum_sd_t_z_sd = numpy.sum(self.sd_t_float)
         self.t_sum_sd_t_z_sd = numpy.sum(self.sd_t_float, axis=0)
 
-    # this looks inefficient, but so far it is not a problem
+    # todo this looks inefficient, but so far it is not a problem
     def eval_sd_max_startup(self):
 
         max_viol = 0
