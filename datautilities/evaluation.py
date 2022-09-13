@@ -88,10 +88,35 @@ class SolutionEvaluator(object):
 
         # simple dispatchable device
         # p_on, p_su, p_sd, q
-        # bounds, constraints, and projections
-        # temporarily, set p = p_on
-        # todo
+        # bounds and constraints - no projection yet, no reserves
+        self.eval_sd_t_p_su()
+        self.eval_sd_t_p_sd()
+        self.eval_sd_t_p_on_max()
+        self.eval_sd_t_p_on_min()
         self.eval_sd_t_p()
+        self.eval_sd_t_p_ramp_up_dn()
+        self.eval_sd_max_energy()
+        self.eval_sd_min_energy()
+        self.eval_sd_t_q_max()
+        self.eval_sd_t_q_min()
+        self.eval_sd_t_q_p_max()
+        self.eval_sd_t_q_p_min()
+        self.eval_sd_t_q_p_eq()
+
+        # have to project p_on down onto [u_on*p_min, u_on*p_max] to make sense of reserves
+        # could account for ramping, max/min energy, and p-q constraints in projection
+        # on computing p_max_final and p_min_final, if p_min_final > p_max_final + tol, declare infeas
+        self.proj_sd_t_p_on()
+        # then recompute p from p_on, p_su, p_sd based on projected p_on
+        self.eval_sd_t_p()
+        # then project q
+        self.proj_sd_t_q()
+
+        # simple dispatchable device reserves - todo
+        # eval/proj nonneg
+        # eval/proj absolute max
+        # eval/proj relative max - pr
+        # eval/proj relative max - cs
 
         # simple dispatchable device
         # dispatch costs
@@ -108,6 +133,10 @@ class SolutionEvaluator(object):
         self.eval_sd_t_z_rrd_off()
         self.eval_sd_t_z_qru()
         self.eval_sd_t_z_qrd()
+
+        # simple dispatchable device
+        # max/min energy soft constraint violation costs
+        # todo - maybe
 
         # bus p/q balance
         self.eval_bus_t_p()
@@ -185,6 +214,7 @@ class SolutionEvaluator(object):
         self.sd_t_u_su = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_u_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_z = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
+        self.sd_t_p = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
         self.sd_t_d_up_start = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
         self.sd_t_d_dn_start = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
 
@@ -234,6 +264,7 @@ class SolutionEvaluator(object):
         self.sd_t_int = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=int)
         self.sd_t_float = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
         self.sd_t_float_1 = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
+        self.sd_t_float_2 = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
 
         self.bus_t_float = numpy.zeros(shape=(self.problem.num_bus, self.problem.num_t), dtype=float)
 
@@ -464,6 +495,10 @@ class SolutionEvaluator(object):
             'viol_t_connected_ctg',
             'info_connected_base',
             'info_connected_ctg',
+            'viol_sd_t_p_on_max',
+            'viol_sd_t_p_on_min',
+            'viol_sd_t_p_ramp_dn_max',
+            'viol_sd_t_p_ramp_up_max',
             #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
             'z',
             'z_base',
@@ -859,17 +894,154 @@ class SolutionEvaluator(object):
         self.sum_sd_t_z_qrd = numpy.sum(self.sd_t_float)
         self.t_sum_sd_t_z_qrd = numpy.sum(self.sd_t_float, axis=0)
 
+    def proj_sd_t_p_on(self):
+        '''
+        '''
+
+        #todo
+        pass
+
+    def proj_sd_t_q(self):
+        '''
+        '''
+
+        #todo
+        pass
+
+    def eval_sd_t_p_su(self):
+        '''
+        '''
+
+        #todo - for now set to 0
+        self.sd_t_p_su = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
+
+    def eval_sd_t_p_sd(self):
+        '''
+        '''
+
+        #todo - for now set to 0
+        self.sd_t_p_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
+
+    def eval_sd_t_p_on_max(self):
+        '''
+        '''
+
+        numpy.multiply(self.problem.sd_t_p_max, self.sd_t_u_on, out=self.sd_t_float)
+        numpy.subtract(self.sd_t_p_on, self.sd_t_float, out=self.sd_t_float)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float)
+        self.viol_sd_t_p_on_max = utils.get_max(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+
+    def eval_sd_t_p_on_min(self):
+        '''
+        '''
+
+        numpy.multiply(self.problem.sd_t_p_min, self.sd_t_u_on, out=self.sd_t_float)
+        numpy.subtract(self.sd_t_float, self.sd_t_p_on, out=self.sd_t_float)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float)
+        self.viol_sd_t_p_on_min = utils.get_max(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+
     def eval_sd_t_p(self):
         '''
         '''
 
         # simple dispatchable device
-        # p_on, p_su, p_sd, q
-        # bounds, constraints, and projections
-        # todo
+        # p = p_on + p_su + p_sd, q
 
-        # temporarily, set p = p_on
-        self.sd_t_p = numpy.add(self.sd_t_p_on, 0.0)
+        numpy.add(self.sd_t_p_su, self.sd_t_p_sd, out=self.sd_t_p)
+        numpy.add(self.sd_t_p_on, self.sd_t_p, out=self.sd_t_p)
+
+    def eval_sd_t_p_ramp_up_dn(self):
+        '''
+        '''
+
+        # actual ramping (up, signed)
+        self.sd_t_float[:] = numpy.diff(
+            self.sd_t_p, axis=1, prepend=numpy.reshape(self.problem.sd_p_0, newshape=(self.problem.num_sd, 1)))
+
+        # ramp up maximum
+        numpy.subtract(self.sd_t_u_on, self.sd_t_u_su, out=self.sd_t_int)
+        numpy.multiply(
+            numpy.reshape(self.problem.sd_p_ramp_up_max, newshape=(self.problem.num_sd, 1)),
+            self.sd_t_int, out=self.sd_t_float_1)
+        numpy.subtract(1, self.sd_t_int, out=self.sd_t_int)
+        numpy.multiply(
+            numpy.reshape(self.problem.sd_p_startup_ramp_up_max, newshape=(self.problem.num_sd, 1)),
+            self.sd_t_int, out=self.sd_t_float_2)
+        numpy.add(self.sd_t_float_1, self.sd_t_float_2, out=self.sd_t_float_1)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float_1, out=self.sd_t_float_1)
+
+        # ramping over maximum
+        numpy.subtract(self.sd_t_float, self.sd_t_float_1, out=self.sd_t_float_1)
+        numpy.maximum(0.0, self.sd_t_float_1, out=self.sd_t_float_1)
+        self.viol_sd_t_p_ramp_up_max = utils.get_max(self.sd_t_float_1, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+
+        # ramp down maximum
+        numpy.multiply(
+            numpy.reshape(self.problem.sd_p_ramp_dn_max, newshape=(self.problem.num_sd, 1)),
+            self.sd_t_u_on, out=self.sd_t_float_1)
+        numpy.subtract(1, self.sd_t_u_on, out=self.sd_t_int)
+        numpy.multiply(
+            numpy.reshape(self.problem.sd_p_shutdown_ramp_dn_max, newshape=(self.problem.num_sd, 1)),
+            self.sd_t_int, out=self.sd_t_float_2)
+        numpy.add(self.sd_t_float_1, self.sd_t_float_2, out=self.sd_t_float_1)
+        numpy.multiply(
+            numpy.reshape(self.problem.t_d, newshape=(1, self.problem.num_t)), self.sd_t_float_1, out=self.sd_t_float_1)
+
+        # ramping down over maximum
+        numpy.negative(self.sd_t_float, out=self.sd_t_float)
+        numpy.subtract(self.sd_t_float, self.sd_t_float_1, out=self.sd_t_float_1)
+        numpy.maximum(0.0, self.sd_t_float_1, out=self.sd_t_float_1)
+        self.viol_sd_t_p_ramp_dn_max = utils.get_max(self.sd_t_float_1, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+
+    def eval_sd_max_energy(self):
+        '''
+        '''
+
+        # todo
+        pass
+
+    def eval_sd_min_energy(self):
+        '''
+        '''
+
+        # todo
+        pass
+
+    def eval_sd_t_q_max(self):
+        '''
+        '''
+
+        # todo
+        pass
+
+    def eval_sd_t_q_min(self):
+        '''
+        '''
+
+        # todo
+        pass
+
+    def eval_sd_t_q_p_max(self):
+        '''
+        '''
+
+        # todo
+        pass
+
+    def eval_sd_t_q_p_min(self):
+        '''
+        '''
+
+        # todo
+        pass
+
+    def eval_sd_t_q_p_eq(self):
+        '''
+        '''
+
+        # todo
+        pass
 
     def eval_bus_t_p(self):
 
