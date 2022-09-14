@@ -233,12 +233,19 @@ class InputData(object):
         self.sd_q_0 = numpy.array([data_map[i].initial_status.q for i in self.sd_uid], dtype=float)
         self.sd_d_dn_0 = numpy.array([data_map[i].initial_status.accu_down_time for i in self.sd_uid], dtype=float)
         self.sd_d_up_0 = numpy.array([data_map[i].initial_status.accu_up_time for i in self.sd_uid], dtype=float)
-        #
+        
         # p-q indicators:
-        # self.sd_is_pqe q_linear_cap
-        # self.sd_is_pqmax q_bound_cap
-        # self.sd_is_pqmin
-        #
+        self.sd_is_pqe = numpy.array([data_map[i].q_linear_cap for i in self.sd_uid], dtype=int)
+        self.sd_is_pqa = numpy.array([data_map[i].q_bound_cap for i in self.sd_uid], dtype=int)
+        self.sd_is_pqi = numpy.array([data_map[i].q_bound_cap for i in self.sd_uid], dtype=int)
+        self.sd_is_pqae = self.sd_is_pqa + self.sd_is_pqe
+        self.sd_is_pqie = self.sd_is_pqi + self.sd_is_pqe
+        self.num_pqe = numpy.sum(self.sd_is_pqe)
+        self.num_pqa = numpy.sum(self.sd_is_pqa)
+        self.num_pqi = numpy.sum(self.sd_is_pqi)
+        self.num_pqae = numpy.sum(self.sd_is_pqae)
+        self.num_pqie = numpy.sum(self.sd_is_pqie)
+
         # reserves:
         self.sd_p_rgu_max = numpy.array([data_map[i].p_reg_res_up_ub for i in self.sd_uid], dtype=float)
         self.sd_p_rgd_max = numpy.array([data_map[i].p_reg_res_down_ub for i in self.sd_uid], dtype=float)
@@ -248,14 +255,24 @@ class InputData(object):
         self.sd_p_rrd_on_max = numpy.array([data_map[i].p_ramp_res_down_online_ub for i in self.sd_uid], dtype=float)
         self.sd_p_rru_off_max = numpy.array([data_map[i].p_ramp_res_up_offline_ub for i in self.sd_uid], dtype=float)
         self.sd_p_rrd_off_max = numpy.array([data_map[i].p_ramp_res_down_offline_ub for i in self.sd_uid], dtype=float)
-        #
-        # optionals:
-        # self.sd_q_p0 = numpy.array([data_map[i].q_0 optional    )
-        # beta: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
-        # q_0_ub: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
-        # q_0_lb: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
-        # beta_ub: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
-        # beta_lb: Optional[confloat(gt=-float('inf'), lt=float('inf'), strict=False)] = Field(
+        
+        # p-q optionals:
+        self.sd_q_p0_pqe = numpy.array(
+            [data_map[i].q_0 if data_map[i].q_linear_cap else 0.0 for i in self.sd_uid], dtype=float)
+        self.sd_q_p0_pqa = numpy.array(
+            [data_map[i].q_0_ub if data_map[i].q_bound_cap else 0.0 for i in self.sd_uid], dtype=float)
+        self.sd_q_p0_pqi = numpy.array(
+            [data_map[i].q_0_lb if data_map[i].q_bound_cap else 0.0 for i in self.sd_uid], dtype=float)
+        self.sd_beta_pqe = numpy.array(
+            [data_map[i].beta if data_map[i].q_linear_cap else 0.0 for i in self.sd_uid], dtype=float)
+        self.sd_beta_pqa = numpy.array(
+            [data_map[i].beta_ub if data_map[i].q_bound_cap else 0.0 for i in self.sd_uid], dtype=float)
+        self.sd_beta_pqi = numpy.array(
+            [data_map[i].beta_lb if data_map[i].q_bound_cap else 0.0 for i in self.sd_uid], dtype=float)
+        self.sd_q_p0_pqae = self.sd_q_p0_pqe + self.sd_q_p0_pqa
+        self.sd_q_p0_pqie = self.sd_q_p0_pqe + self.sd_q_p0_pqi
+        self.sd_beta_pqae = self.sd_beta_pqe + self.sd_beta_pqa
+        self.sd_beta_pqie = self.sd_beta_pqe + self.sd_beta_pqi
         
     def set_acl(self, data):
 
