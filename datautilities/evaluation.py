@@ -128,11 +128,16 @@ class SolutionEvaluator(object):
         self.eval_sd_t_p_rrd_off_max()
         # todo relative q reserve limits,
         # including q max/min, bounds and p/q constraints
-        # self.eval_sd_t_q_max()
-        # self.eval_sd_t_q_min()
-        # self.eval_sd_t_q_p_max()
-        # self.eval_sd_t_q_p_min()
-        # self.eval_sd_t_q_p_eq()
+        self.eval_pr_t_q_max()
+        self.eval_pr_t_q_min()
+        self.eval_pr_t_q_p_max()
+        self.eval_pr_t_q_p_min()
+        #self.eval_pr_t_q_p_eq()
+        self.eval_cs_t_q_max()
+        self.eval_cs_t_q_min()
+        self.eval_cs_t_q_p_max()
+        self.eval_cs_t_q_p_min()
+        #self.eval_cs_t_q_p_eq()
 
         # have to project p_on down onto [u_on*p_min, u_on*p_max] to make sense of reserves
         # could account for ramping, max/min energy, and p-q constraints in projection
@@ -430,6 +435,10 @@ class SolutionEvaluator(object):
             'viol_cs_t_p_on_min',
             'viol_pr_t_p_off_min',
             'viol_cs_t_p_off_min',
+            'viol_pr_t_q_max',
+            'viol_pr_t_q_min',
+            'viol_cs_t_q_max',
+            'viol_cs_t_q_min',
             'viol_sd_t_p_ramp_dn_max',
             'viol_sd_t_p_ramp_up_max',
             'viol_sd_max_energy_constr',
@@ -575,6 +584,10 @@ class SolutionEvaluator(object):
             'viol_cs_t_p_on_min',
             'viol_pr_t_p_off_min',
             'viol_cs_t_p_off_min',
+            'viol_pr_t_q_max',
+            'viol_pr_t_q_min',
+            'viol_cs_t_q_max',
+            'viol_cs_t_q_min',
             'viol_sd_t_p_ramp_dn_max',
             'viol_sd_t_p_ramp_up_max',
             'viol_sd_max_energy_constr',
@@ -1302,6 +1315,82 @@ class SolutionEvaluator(object):
         numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_cs)
         self.cs_t_float[:] = self.sd_t_float[self.problem.cs_sd, :]
         self.viol_cs_t_p_off_min = utils.get_max(self.cs_t_float, idx_lists=[self.problem.cs_uid, self.problem.t_num])
+
+    def eval_pr_t_q_max(self):
+        '''
+        pr q + q_qru - q_max * u_on_su_sd <= 0
+        '''
+
+        sd_t_is_pr = numpy.reshape(self.problem.sd_is_pr == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.multiply(self.problem.sd_t_q_max, self.sd_t_u_on_su_sd, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.subtract(self.sd_t_q, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_q_qru, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_pr)
+        self.pr_t_float[:] = self.sd_t_float[self.problem.pr_sd, :]
+        self.viol_pr_t_q_max = utils.get_max(self.pr_t_float, idx_lists=[self.problem.pr_uid, self.problem.t_num])
+        
+    def eval_pr_t_q_min(self):
+        '''
+        pr q_min * u_on_su_sd - q + q_qrd <= 0
+        '''
+
+        sd_t_is_pr = numpy.reshape(self.problem.sd_is_pr == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.multiply(self.problem.sd_t_q_min, self.sd_t_u_on_su_sd, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.subtract(self.sd_t_float, self.sd_t_q, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_q_qrd, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_pr)
+        self.pr_t_float[:] = self.sd_t_float[self.problem.pr_sd, :]
+        self.viol_pr_t_q_min = utils.get_max(self.pr_t_float, idx_lists=[self.problem.pr_uid, self.problem.t_num])
+        
+    def eval_pr_t_q_p_max(self):
+        '''
+        '''
+        # todo - maybe split out eq case?
+        
+    def eval_pr_t_q_p_min(self):
+        '''
+        '''
+        # todo - maybe split out eq case?
+        
+    def eval_cs_t_q_max(self):
+        '''
+        cs q + q_qrd - q_max * u_on_su_sd <= 0
+        '''
+
+        sd_t_is_cs = numpy.reshape(self.problem.sd_is_cs == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.multiply(self.problem.sd_t_q_max, self.sd_t_u_on_su_sd, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.subtract(self.sd_t_q, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_q_qrd, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_cs)
+        self.cs_t_float[:] = self.sd_t_float[self.problem.cs_sd, :]
+        self.viol_cs_t_q_max = utils.get_max(self.cs_t_float, idx_lists=[self.problem.cs_uid, self.problem.t_num])
+        
+    def eval_cs_t_q_min(self):
+        '''
+        cs q_min * u_on_su_sd - q + q_qru <= 0
+        '''
+
+        sd_t_is_cs = numpy.reshape(self.problem.sd_is_cs == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.multiply(self.problem.sd_t_q_min, self.sd_t_u_on_su_sd, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.subtract(self.sd_t_float, self.sd_t_q, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_q_qru, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_cs)
+        self.cs_t_float[:] = self.sd_t_float[self.problem.cs_sd, :]
+        self.viol_cs_t_q_min = utils.get_max(self.cs_t_float, idx_lists=[self.problem.cs_uid, self.problem.t_num])
+        
+    def eval_cs_t_q_p_max(self):
+        '''
+        '''
+        # todo - maybe split out eq case?
+        
+    def eval_cs_t_q_p_min(self):
+        '''
+        '''
+        # todo - maybe split out eq case?
 
     def eval_sd_t_p(self):
         '''
