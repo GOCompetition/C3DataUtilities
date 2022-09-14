@@ -20,13 +20,14 @@ class SolutionEvaluator(object):
 
     def run(self):
 
+        # todo add projections
+
         # simple dispatchable device
         # on/off state
         self.eval_sd_t_u_on_max()
         self.eval_sd_t_u_on_min()
         self.eval_sd_t_d_up_dn()
         self.eval_sd_t_u_su_sd()
-        self.eval_sd_t_u_on_su_sd()
         self.eval_sd_t_d_up_min()
         self.eval_sd_t_d_dn_min()
         self.eval_sd_t_z_on()
@@ -90,19 +91,37 @@ class SolutionEvaluator(object):
         # simple dispatchable device
         # p_on, p_su, p_sd, q
         # bounds and constraints - no projection yet, no reserves
-        self.eval_sd_t_p_su()
-        self.eval_sd_t_p_sd()
-        self.eval_sd_t_p_on_max()
-        self.eval_sd_t_p_on_min()
+        self.eval_sd_t_su_sd_trajectories()
+        self.eval_pr_t_p_on_max()
+        self.eval_cs_t_p_on_max()
+        self.eval_pr_t_p_on_min()
+        self.eval_cs_t_p_on_min()
+        self.eval_pr_t_p_off_max()
+        self.eval_cs_t_p_off_max()
+        self.eval_pr_t_p_off_min()
+        self.eval_cs_t_p_off_min()
+        #self.eval_sd_t_p_on_min() # replace with relative reserve limits
         self.eval_sd_t_p()
         self.eval_sd_t_p_ramp_up_dn()
         self.eval_sd_max_energy()
         self.eval_sd_min_energy()
-        self.eval_sd_t_q_max()
-        self.eval_sd_t_q_min()
-        self.eval_sd_t_q_p_max()
-        self.eval_sd_t_q_p_min()
-        self.eval_sd_t_q_p_eq()
+        self.eval_sd_t_p_rgu_nonneg()
+        self.eval_sd_t_p_rgd_nonneg()
+        self.eval_sd_t_p_scr_nonneg()
+        self.eval_sd_t_p_nsc_nonneg()
+        self.eval_sd_t_p_rru_on_nonneg()
+        self.eval_sd_t_p_rru_off_nonneg()
+        self.eval_sd_t_p_rrd_on_nonneg()
+        self.eval_sd_t_p_rrd_off_nonneg()
+        self.eval_sd_t_q_qru_nonneg()
+        self.eval_sd_t_q_qrd_nonneg()
+        # todo absolute and relative reserve limits,
+        # including pmax and qmax
+        # self.eval_sd_t_q_max()
+        # self.eval_sd_t_q_min()
+        # self.eval_sd_t_q_p_max()
+        # self.eval_sd_t_q_p_min()
+        # self.eval_sd_t_q_p_eq()
 
         # have to project p_on down onto [u_on*p_min, u_on*p_max] to make sense of reserves
         # could account for ramping, max/min energy, and p-q constraints in projection
@@ -268,6 +287,9 @@ class SolutionEvaluator(object):
         self.sd_t_float_1 = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
         self.sd_t_float_2 = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
 
+        self.pr_t_float = numpy.zeros(shape=(self.problem.num_pr, self.problem.num_t), dtype=float)
+        self.cs_t_float = numpy.zeros(shape=(self.problem.num_cs, self.problem.num_t), dtype=float)
+
         self.bus_t_float = numpy.zeros(shape=(self.problem.num_bus, self.problem.num_t), dtype=float)
 
         self.sh_t_int = numpy.zeros(shape=(self.problem.num_sh, self.problem.num_t), dtype=int)
@@ -395,12 +417,28 @@ class SolutionEvaluator(object):
             #'viol_qrz_t_q_qrd_balance', # penalized
             'viol_t_connected_base',
             'viol_t_connected_ctg',
-            'viol_sd_t_p_on_max',
-            'viol_sd_t_p_on_min',
+            'viol_pr_t_p_on_max',
+            'viol_cs_t_p_on_max',
+            'viol_pr_t_p_off_max',
+            'viol_cs_t_p_off_max',
+            'viol_pr_t_p_on_min',
+            'viol_cs_t_p_on_min',
+            'viol_pr_t_p_off_min', # todo reorganize eqs for this in formulation
+            'viol_cs_t_p_off_min',
             'viol_sd_t_p_ramp_dn_max',
             'viol_sd_t_p_ramp_up_max',
             'viol_sd_max_energy_constr',
             'viol_sd_min_energy_constr',
+            'viol_sd_t_p_rgu_nonneg',
+            'viol_sd_t_p_rgd_nonneg',
+            'viol_sd_t_p_scr_nonneg',
+            'viol_sd_t_p_nsc_nonneg',
+            'viol_sd_t_p_rru_on_nonneg',
+            'viol_sd_t_p_rru_off_nonneg',
+            'viol_sd_t_p_rrd_on_nonneg',
+            'viol_sd_t_p_rrd_off_nonneg',
+            'viol_sd_t_q_qru_nonneg',
+            'viol_sd_t_q_qrd_nonneg',
         ]
         infeas_keys = [
             k for k in set(keys).intersection(set(summary.keys()))
@@ -516,12 +554,28 @@ class SolutionEvaluator(object):
             'viol_t_connected_ctg',
             'info_connected_base',
             'info_connected_ctg',
-            'viol_sd_t_p_on_max',
-            'viol_sd_t_p_on_min',
+            'viol_pr_t_p_on_max',
+            'viol_cs_t_p_on_max',
+            'viol_pr_t_p_off_max',
+            'viol_cs_t_p_off_max',
+            'viol_pr_t_p_on_min',
+            'viol_cs_t_p_on_min',
+            'viol_pr_t_p_off_min',
+            'viol_cs_t_p_off_min',
             'viol_sd_t_p_ramp_dn_max',
             'viol_sd_t_p_ramp_up_max',
             'viol_sd_max_energy_constr',
             'viol_sd_min_energy_constr',
+            'viol_sd_t_p_rgu_nonneg',
+            'viol_sd_t_p_rgd_nonneg',
+            'viol_sd_t_p_scr_nonneg',
+            'viol_sd_t_p_nsc_nonneg',
+            'viol_sd_t_p_rru_on_nonneg',
+            'viol_sd_t_p_rru_off_nonneg',
+            'viol_sd_t_p_rrd_on_nonneg',
+            'viol_sd_t_p_rrd_off_nonneg',
+            'viol_sd_t_q_qru_nonneg',
+            'viol_sd_t_q_qrd_nonneg',
             #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
             'z',
             'z_base',
@@ -931,37 +985,246 @@ class SolutionEvaluator(object):
         #todo
         pass
 
-    def eval_sd_t_p_su(self):
+    def eval_sd_t_su_sd_trajectories(self):
         '''
+        set u_su_sd_on, p_su, p_sd
+        loop over u_su nonzeros and u_sd nonzeros
         '''
 
-        #todo - for now set to 0 - add su curve
+        #todo - for now set to 0 - add su/sd curve
+        self.sd_t_u_on_su_sd[:] = self.sd_t_u_on
         self.sd_t_p_su = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
-
-    def eval_sd_t_p_sd(self):
-        '''
-        '''
-
-        #todo - for now set to 0 - add sd curve
         self.sd_t_p_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
 
-    def eval_sd_t_p_on_max(self):
+    def eval_sd_t_p_rgu_nonneg(self):
         '''
         '''
 
-        numpy.multiply(self.problem.sd_t_p_max, self.sd_t_u_on, out=self.sd_t_float)
-        numpy.subtract(self.sd_t_p_on, self.sd_t_float, out=self.sd_t_float)
-        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float)
-        self.viol_sd_t_p_on_max = utils.get_max(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        numpy.minimum(0.0, self.sd_t_p_rgu, out=self.sd_t_float)
+        self.viol_sd_t_p_rgu_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_p_rgu_nonneg['val'] = (-1.0) * self.viol_sd_t_p_rgu_nonneg['val']
 
-    def eval_sd_t_p_on_min(self):
+    def eval_sd_t_p_rgd_nonneg(self):
         '''
         '''
 
-        numpy.multiply(self.problem.sd_t_p_min, self.sd_t_u_on, out=self.sd_t_float)
-        numpy.subtract(self.sd_t_float, self.sd_t_p_on, out=self.sd_t_float)
-        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float)
-        self.viol_sd_t_p_on_min = utils.get_max(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        numpy.minimum(0.0, self.sd_t_p_rgd, out=self.sd_t_float)
+        self.viol_sd_t_p_rgd_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_p_rgd_nonneg['val'] = (-1.0) * self.viol_sd_t_p_rgd_nonneg['val']
+
+    def eval_sd_t_p_scr_nonneg(self):
+        '''
+        '''
+
+        numpy.minimum(0.0, self.sd_t_p_scr, out=self.sd_t_float)
+        self.viol_sd_t_p_scr_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_p_scr_nonneg['val'] = (-1.0) * self.viol_sd_t_p_scr_nonneg['val']
+
+    def eval_sd_t_p_nsc_nonneg(self):
+        '''
+        '''
+
+        numpy.minimum(0.0, self.sd_t_p_nsc, out=self.sd_t_float)
+        self.viol_sd_t_p_nsc_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_p_nsc_nonneg['val'] = (-1.0) * self.viol_sd_t_p_nsc_nonneg['val']
+
+    def eval_sd_t_p_rru_on_nonneg(self):
+        '''
+        '''
+
+        numpy.minimum(0.0, self.sd_t_p_rru_on, out=self.sd_t_float)
+        self.viol_sd_t_p_rru_on_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_p_rru_on_nonneg['val'] = (-1.0) * self.viol_sd_t_p_rru_on_nonneg['val']
+
+    def eval_sd_t_p_rru_off_nonneg(self):
+        '''
+        '''
+
+        numpy.minimum(0.0, self.sd_t_p_rru_off, out=self.sd_t_float)
+        self.viol_sd_t_p_rru_off_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_p_rru_off_nonneg['val'] = (-1.0) * self.viol_sd_t_p_rru_off_nonneg['val']
+
+    def eval_sd_t_p_rrd_on_nonneg(self):
+        '''
+        '''
+
+        numpy.minimum(0.0, self.sd_t_p_rrd_on, out=self.sd_t_float)
+        self.viol_sd_t_p_rrd_on_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_p_rrd_on_nonneg['val'] = (-1.0) * self.viol_sd_t_p_rrd_on_nonneg['val']
+
+    def eval_sd_t_p_rrd_off_nonneg(self):
+        '''
+        '''
+
+        numpy.minimum(0.0, self.sd_t_p_rrd_off, out=self.sd_t_float)
+        self.viol_sd_t_p_rrd_off_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_p_rrd_off_nonneg['val'] = (-1.0) * self.viol_sd_t_p_rrd_off_nonneg['val']
+
+    def eval_sd_t_q_qru_nonneg(self):
+        '''
+        '''
+
+        numpy.minimum(0.0, self.sd_t_q_qru, out=self.sd_t_float)
+        self.viol_sd_t_q_qru_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_q_qru_nonneg['val'] = (-1.0) * self.viol_sd_t_q_qru_nonneg['val']
+
+    def eval_sd_t_q_qrd_nonneg(self):
+        '''
+        '''
+
+        numpy.minimum(0.0, self.sd_t_q_qrd, out=self.sd_t_float)
+        self.viol_sd_t_q_qrd_nonneg = utils.get_min(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+        self.viol_sd_t_q_qrd_nonneg['val'] = (-1.0) * self.viol_sd_t_q_qrd_nonneg['val']
+
+    # def eval_sd_t_p_on_max(self):
+    #     '''
+    #     '''
+    #     # todo split into pr cs and add reserves
+
+    #     numpy.multiply(self.problem.sd_t_p_max, self.sd_t_u_on, out=self.sd_t_float)
+    #     numpy.subtract(self.sd_t_p_on, self.sd_t_float, out=self.sd_t_float)
+    #     numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float)
+    #     self.viol_sd_t_p_on_max = utils.get_max(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+
+    # def eval_sd_t_p_on_min(self):
+    #     '''
+    #     '''
+    #     # todo split into pr cs and add reserves
+
+    #     numpy.multiply(self.problem.sd_t_p_min, self.sd_t_u_on, out=self.sd_t_float)
+    #     numpy.subtract(self.sd_t_float, self.sd_t_p_on, out=self.sd_t_float)
+    #     numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float)
+    #     self.viol_sd_t_p_on_min = utils.get_max(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
+
+    def eval_pr_t_p_on_max(self):
+        '''
+        pr p_on + p_rgu + p_scr + p_rru_on - p_max * u_on <= 0
+        '''
+
+        sd_t_is_pr = numpy.reshape(self.problem.sd_is_pr == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.multiply(self.problem.sd_t_p_max, self.sd_t_u_on, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.subtract(self.sd_t_p_on, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_p_rgu, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_p_scr, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_p_rru_on, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_pr)
+        self.pr_t_float[:] = self.sd_t_float[self.problem.pr_sd, :]
+        self.viol_pr_t_p_on_max = utils.get_max(self.pr_t_float, idx_lists=[self.problem.pr_uid, self.problem.t_num])
+
+    def eval_cs_t_p_on_max(self):
+        '''
+        cs p_on + p_rgd + p_rrd_on - p_max * u_on <= 0
+        '''
+
+        sd_t_is_cs = numpy.reshape(self.problem.sd_is_cs == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.multiply(self.problem.sd_t_p_max, self.sd_t_u_on, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.subtract(self.sd_t_p_on, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_p_rgd, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_p_rrd_on, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_cs)
+        self.cs_t_float[:] = self.sd_t_float[self.problem.cs_sd, :]
+        self.viol_cs_t_p_on_max = utils.get_max(self.cs_t_float, idx_lists=[self.problem.cs_uid, self.problem.t_num])
+
+    def eval_pr_t_p_off_max(self):
+        '''
+        pr p_su + p_sd + p_nsc + p_rru_off - p_max * (1 - u_on) <= 0
+        '''
+
+        sd_t_is_pr = numpy.reshape(self.problem.sd_is_pr == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.subtract(1, self.sd_t_u_on, out=self.sd_t_int, where=sd_t_is_pr)
+        numpy.multiply(self.problem.sd_t_p_max, self.sd_t_int, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.subtract(self.sd_t_p_su, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_p_sd, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_p_nsc, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_p_rru_off, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_pr)
+        self.pr_t_float[:] = self.sd_t_float[self.problem.pr_sd, :]
+        self.viol_pr_t_p_off_max = utils.get_max(self.pr_t_float, idx_lists=[self.problem.pr_uid, self.problem.t_num])
+
+    def eval_cs_t_p_off_max(self):
+        '''
+        cs p_su + p_sd + p_rrd_off - p_max * (1 - u_on) <= 0
+        '''
+
+        sd_t_is_cs = numpy.reshape(self.problem.sd_is_cs == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.subtract(1, self.sd_t_u_on, out=self.sd_t_int, where=sd_t_is_cs)
+        numpy.multiply(self.problem.sd_t_p_max, self.sd_t_int, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.subtract(self.sd_t_p_su, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_p_sd, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_p_rrd_off, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_cs)
+        self.cs_t_float[:] = self.sd_t_float[self.problem.cs_sd, :]
+        self.viol_cs_t_p_off_max = utils.get_max(self.cs_t_float, idx_lists=[self.problem.cs_uid, self.problem.t_num])
+
+    def eval_pr_t_p_on_min(self):
+        '''
+        pr p_min * u_on - p_on + p_rgd + p_rrd_on <= 0
+        '''
+        
+        sd_t_is_pr = numpy.reshape(self.problem.sd_is_pr == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.multiply(self.problem.sd_t_p_min, self.sd_t_u_on, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.subtract(self.sd_t_float, self.sd_t_p_on, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_p_rgd, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.add(self.sd_t_p_rrd_on, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_pr)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_pr)
+        self.pr_t_float[:] = self.sd_t_float[self.problem.pr_sd, :]
+        self.viol_pr_t_p_on_min = utils.get_max(self.pr_t_float, idx_lists=[self.problem.pr_uid, self.problem.t_num])
+
+    def eval_cs_t_p_on_min(self):
+        '''
+        cs p_min * u_on - p_on + p_rgu + p_scr + p_rru_on <= 0
+        '''
+
+        sd_t_is_cs = numpy.reshape(self.problem.sd_is_cs == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.multiply(self.problem.sd_t_p_min, self.sd_t_u_on, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.subtract(self.sd_t_float, self.sd_t_p_on, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_p_rgu, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_p_scr, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.add(self.sd_t_p_rru_on, self.sd_t_float, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_cs)
+        self.cs_t_float[:] = self.sd_t_float[self.problem.cs_sd, :]
+        self.viol_cs_t_p_on_min = utils.get_max(self.cs_t_float, idx_lists=[self.problem.cs_uid, self.problem.t_num])
+
+    def eval_pr_t_p_off_min(self):
+        '''
+        pr rrd_off <= 0
+        '''
+
+        # todo - move eq 96 from formulation into relative pr bounds section
+        sd_t_is_pr = numpy.reshape(self.problem.sd_is_pr == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.maximum(self.sd_t_p_rrd_off, 0.0, out=self.sd_t_float, where=sd_t_is_pr)
+        self.pr_t_float[:] = self.sd_t_float[self.problem.pr_sd, :]
+        self.viol_pr_t_p_off_min = utils.get_max(self.pr_t_float, idx_lists=[self.problem.pr_uid, self.problem.t_num])
+
+    def eval_cs_t_p_off_min(self):
+        '''
+        cs nsc + rru_off <= 0
+        '''
+        
+        # todo - move and combine eqs 97, 98 in formation into relative cs bounds section
+        sd_t_is_cs = numpy.reshape(self.problem.sd_is_cs == 1, newshape=(self.problem.num_sd, 1))
+        self.sd_t_float[:] = 0.0
+        numpy.add(self.sd_t_p_nsc, self.sd_t_p_rru_off, out=self.sd_t_float, where=sd_t_is_cs)
+        numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float, where=sd_t_is_cs)
+        self.cs_t_float[:] = self.sd_t_float[self.problem.cs_sd, :]
+        self.viol_cs_t_p_off_min = utils.get_max(self.cs_t_float, idx_lists=[self.problem.cs_uid, self.problem.t_num])
+
+    # def eval_sd_t_p_on_min(self):
+    #     '''
+    #     '''
+    #     # todo split into pr cs and add reserves
+
+    #     numpy.multiply(self.problem.sd_t_p_min, self.sd_t_u_on, out=self.sd_t_float)
+    #     numpy.subtract(self.sd_t_float, self.sd_t_p_on, out=self.sd_t_float)
+    #     numpy.maximum(self.sd_t_float, 0.0, out=self.sd_t_float)
+    #     self.viol_sd_t_p_on_min = utils.get_max(self.sd_t_float, idx_lists=[self.problem.sd_uid, self.problem.t_num])
 
     def eval_sd_t_p(self):
         '''
@@ -1101,13 +1364,14 @@ class SolutionEvaluator(object):
         '''
         '''
 
-        # todo
+        # todo split into pr cs and add reserves
         pass
 
     def eval_sd_t_q_min(self):
         '''
         '''
 
+        # todo split into pr cs and add reserves
         # todo
         pass
 
@@ -1115,6 +1379,7 @@ class SolutionEvaluator(object):
         '''
         '''
 
+        # todo split into pr cs and add reserves
         # todo
         pass
 
@@ -1122,6 +1387,7 @@ class SolutionEvaluator(object):
         '''
         '''
 
+        # todo split into pr cs and add reserves
         # todo
         pass
 
@@ -1129,6 +1395,7 @@ class SolutionEvaluator(object):
         '''
         '''
 
+        # todo split into pr cs and add reserves
         # todo
         pass
 
@@ -1469,10 +1736,6 @@ class SolutionEvaluator(object):
         numpy.maximum(self.sd_t_int, 0, out=self.sd_t_u_sd)
         self.sum_sd_t_su = numpy.sum(self.sd_t_u_su)
         self.sum_sd_t_sd = numpy.sum(self.sd_t_u_sd)
-
-    def eval_sd_t_u_on_su_sd(self):
-
-        self.sd_t_u_on_su_sd[:] = self.sd_t_u_on # todo - add su/sd curves
 
     def eval_sd_t_d_up_min(self):
         '''

@@ -42,8 +42,8 @@ class InputData(object):
         self.num_xfr = len(data.network.two_winding_transformer)
         self.num_sh = len(data.network.shunt)
         self.num_sd = len(data.network.simple_dispatchable_device)
-        self.num_pd = len([i for i in data.network.simple_dispatchable_device if i.device_type == 'producer'])
-        self.num_cd = len([i for i in data.network.simple_dispatchable_device if i.device_type == 'consumer'])
+        self.num_pr = len([i for i in data.network.simple_dispatchable_device if i.device_type == 'producer'])
+        self.num_cs = len([i for i in data.network.simple_dispatchable_device if i.device_type == 'consumer'])
         self.num_prz = len(data.network.active_zonal_reserve)
         self.num_qrz = len(data.network.reactive_zonal_reserve)
         self.num_t = len(data.time_series_input.general.interval_duration)
@@ -58,6 +58,10 @@ class InputData(object):
         self.xfr_uid = numpy.array([i.uid for i in data.network.two_winding_transformer], dtype=str)
         self.sh_uid = numpy.array([i.uid for i in data.network.shunt], dtype=str)
         self.sd_uid = numpy.array([i.uid for i in data.network.simple_dispatchable_device], dtype=str)
+        self.pr_uid = numpy.array(
+            [i.uid for i in data.network.simple_dispatchable_device if i.device_type == 'producer'], dtype=str)
+        self.cs_uid = numpy.array(
+            [i.uid for i in data.network.simple_dispatchable_device if i.device_type == 'consumer'], dtype=str)
         self.prz_uid = numpy.array([i.uid for i in data.network.active_zonal_reserve], dtype=str)
         self.qrz_uid = numpy.array([i.uid for i in data.network.reactive_zonal_reserve], dtype=str)
         self.k_uid = numpy.array([i.uid for i in data.reliability.contingency], dtype=str)
@@ -171,6 +175,10 @@ class InputData(object):
         self.sd_bus = numpy.array([self.bus_map[i] for i in sd_bus_uid], dtype=int)
         self.sd_is_pr = numpy.array([1 if data_map[i].device_type == 'producer' else 0 for i in self.sd_uid], dtype=int)
         self.sd_is_cs = numpy.array([1 if data_map[i].device_type == 'consumer' else 0 for i in self.sd_uid], dtype=int)
+        self.pr_sd = numpy.array(
+            [i for i in range(self.num_sd) if data_map[self.sd_uid[i]].device_type == 'producer'], dtype=int)
+        self.cs_sd = numpy.array(
+            [i for i in range(self.num_sd) if data_map[self.sd_uid[i]].device_type == 'consumer'], dtype=int)
         self.sd_c_su = numpy.array([data_map[i].startup_cost for i in self.sd_uid], dtype=float)
         self.sd_c_sd = numpy.array([data_map[i].shutdown_cost for i in self.sd_uid], dtype=float)
         self.sd_c_on = numpy.array([data_map[i].on_cost for i in self.sd_uid], dtype=float)
