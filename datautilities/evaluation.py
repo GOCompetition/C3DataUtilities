@@ -361,33 +361,52 @@ class SolutionEvaluator(object):
             'viol_sd_t_d_up_min',
             'viol_sd_t_d_dn_min',
             'viol_sd_max_startup_constr',
-            #'viol_bus_t_v_max', # projected
-            #'viol_bus_t_v_min', # projected
+            'viol_bus_t_v_max', # projected
+            'viol_bus_t_v_min', # projected
             'viol_sh_t_u_st_max',
             'viol_sh_t_u_st_min',
-            #'viol_dcl_t_p_max', # projected
-            #'viol_dcl_t_p_min', # projected
-            #'viol_dcl_t_q_fr_max', # projected
-            #'viol_dcl_t_q_fr_min', # projected
-            #'viol_dcl_t_q_to_max', # projected
-            #'viol_dcl_t_q_to_min', # projected
-            #'viol_xfr_t_tau_max', # projected
-            #'viol_xfr_t_tau_min', # projected
-            #'viol_xfr_t_phi_max', # projected
-            #'viol_xfr_t_phi_min', # projected
+            'viol_dcl_t_p_max', # projected
+            'viol_dcl_t_p_min', # projected
+            'viol_dcl_t_q_fr_max', # projected
+            'viol_dcl_t_q_fr_min', # projected
+            'viol_dcl_t_q_to_max', # projected
+            'viol_dcl_t_q_to_min', # projected
+            'viol_xfr_t_tau_max', # projected
+            'viol_xfr_t_tau_min', # projected
+            'viol_xfr_t_phi_max', # projected
+            'viol_xfr_t_phi_min', # projected
             'viol_acl_t_u_su_max',
             'viol_acl_t_u_sd_max',
             'viol_xfr_t_u_su_max',
             'viol_xfr_t_u_sd_max',
             #'viol_acl_t_s_max', # penalized
             #'viol_xfr_t_s_max', # penalized
+            #'viol_bus_t_p_balance_max', # penalized
+            #'viol_bus_t_p_balance_min', # penalized
+            #'viol_bus_t_q_balance_max', # penalized
+            #'viol_bus_t_q_balance_min', # penalized
+            #'viol_prz_t_p_rgu_balance', # penalized
+            #'viol_prz_t_p_rgd_balance', # penalized
+            #'viol_prz_t_p_scr_balance', # penalized
+            #'viol_prz_t_p_nsc_balance', # penalized
+            #'viol_prz_t_p_rru_balance', # penalized
+            #'viol_prz_t_p_rrd_balance', # penalized
+            #'viol_qrz_t_q_qru_balance', # penalized
+            #'viol_qrz_t_q_qrd_balance', # penalized
             'viol_t_connected_base',
             'viol_t_connected_ctg',
+            'viol_sd_t_p_on_max',
+            'viol_sd_t_p_on_min',
+            'viol_sd_t_p_ramp_dn_max',
+            'viol_sd_t_p_ramp_up_max',
+            'viol_sd_max_energy_constr',
+            'viol_sd_min_energy_constr',
         ]
         infeas_keys = [
             k for k in set(keys).intersection(set(summary.keys()))
             if summary[k] is not None
-            and summary[k]['val'] > 0]
+            and summary[k]['val'] is not None
+            and summary[k]['val'] > self.config['hard_constr_tol']]
         self.infeas_summary = {k:summary[k] for k in infeas_keys}
         self.infeas = int(len(self.infeas_summary) > 0)
 
@@ -1647,6 +1666,7 @@ class SolutionEvaluator(object):
             self.dcl_t_p, numpy.reshape(self.problem.dcl_p_max, newshape=(self.problem.num_dcl, 1)), out=self.dcl_t_float)
         numpy.maximum(self.dcl_t_float, 0, out=self.dcl_t_float)
         self.viol_dcl_t_p_max = utils.get_max(self.dcl_t_float, idx_lists=[self.problem.dcl_uid, self.problem.t_num])
+        # print(self.problem.dcl_uid)
 
     def eval_dcl_t_p_min(self):
         '''
