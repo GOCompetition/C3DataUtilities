@@ -240,14 +240,14 @@ class InputData(object):
         # self.sd_is_pqmin
         #
         # reserves:
-        # p_reg_res_up_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
-        # p_reg_res_down_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
-        # p_syn_res_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
-        # p_nsyn_res_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
-        # p_ramp_res_up_online_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
-        # p_ramp_res_down_online_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
-        # p_ramp_res_up_offline_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
-        # p_ramp_res_down_offline_ub: confloat(gt=-float('inf'), lt=float('inf'), strict=False) = Field(
+        self.sd_p_rgu_max = numpy.array([data_map[i].p_reg_res_up_ub for i in self.sd_uid], dtype=float)
+        self.sd_p_rgd_max = numpy.array([data_map[i].p_reg_res_down_ub for i in self.sd_uid], dtype=float)
+        self.sd_p_scr_max = numpy.array([data_map[i].p_syn_res_ub for i in self.sd_uid], dtype=float)
+        self.sd_p_nsc_max = numpy.array([data_map[i].p_nsyn_res_ub for i in self.sd_uid], dtype=float)
+        self.sd_p_rru_on_max = numpy.array([data_map[i].p_ramp_res_up_online_ub for i in self.sd_uid], dtype=float)
+        self.sd_p_rrd_on_max = numpy.array([data_map[i].p_ramp_res_down_online_ub for i in self.sd_uid], dtype=float)
+        self.sd_p_rru_off_max = numpy.array([data_map[i].p_ramp_res_up_offline_ub for i in self.sd_uid], dtype=float)
+        self.sd_p_rrd_off_max = numpy.array([data_map[i].p_ramp_res_down_offline_ub for i in self.sd_uid], dtype=float)
         #
         # optionals:
         # self.sd_q_p0 = numpy.array([data_map[i].q_0 optional    )
