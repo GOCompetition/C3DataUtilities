@@ -436,6 +436,13 @@ def eval_convex_cost_function(num_block, p_max, c, p):
     assumes
     '''
 
+    # todo - what if p exceeds sum(p_max)? - nothing terrible happens, we just do not apply a cost to the excess
+    # need to add something to the checker to prevent this
+    # just check that sd_t_p_max <= sum_b sd_t_b_p_max
+    # but what about su/sd trajectories?
+    # also should require that the trajectories do not go past sd_t_pmax
+    # safer to require that pmin[t] - pmax[t-1] <= d[t]*min(ru, suru) and pmin[t] - pmax[t+1] <= d[t+1]*min(rd, sdrd)
+
     p_remaining = float(p)
     z_so_far = 0.0
     for i in range(num_block):

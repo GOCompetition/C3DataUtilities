@@ -351,6 +351,18 @@ def model_checks(data, config):
         ts_sd_on_status_lb_le_ub,
         ts_sd_p_lb_le_ub,
         ts_sd_q_lb_le_ub,
+        t_d_discrete,
+        sd_d_up_0_discrete,
+        sd_d_dn_0_discrete,
+        sd_d_up_min_discrete,
+        sd_d_dn_min_discrete,
+        sd_sus_d_dn_max_discrete,
+        sd_w_a_en_max_start_discrete,
+        sd_w_a_en_max_end_discrete,
+        sd_w_a_en_min_start_discrete,
+        sd_w_a_en_min_end_discrete,
+        sd_w_a_su_max_start_discrete,
+        sd_w_a_su_max_end_discrete,
         ]
     errors = []
     # try:
@@ -1200,6 +1212,180 @@ def ts_sd_q_lb_le_ub(data, config):
     idx_err = [(i, uid[i], j, lb[i][j], ub[i][j]) for i in range(num_sd) for j in range(num_t) if lb[i][j] > ub[i][j]]
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device q_lb <= q_ub. failures (device index, device uid, interval index, q_lb, q_ub): {}".format(idx_err)
+        raise ModelError(msg)
+
+def t_d_discrete(data, config):
+    '''
+    '''
+
+    t = data.time_series_input.general.interval_duration
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    num_t = len(t)
+    idx_err = [(i, t[i]) for i in range(num_t) if abs(0.5 * t[i] / tu - round(0.5 * t[i] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails time_series_input general interval_duration 0.5 * d / TU within TOL of an integer. TU: {}, TOL: {}, failures (t num, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_d_up_0_discrete(data, config):
+    '''
+    '''
+
+    uid = [i.uid for i in data.network.simple_dispatchable_device]
+    t = [i.initial_status.accu_up_time for i in data.network.simple_dispatchable_device]
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    num_sd = len(uid)
+    idx_err = [(uid[i], t[i]) for i in range(num_sd) if abs(t[i] / tu - round(t[i] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device initial_status accu_up_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_d_dn_0_discrete(data, config):
+    '''
+    '''
+
+    uid = [i.uid for i in data.network.simple_dispatchable_device]
+    t = [i.initial_status.accu_down_time for i in data.network.simple_dispatchable_device]
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    num_sd = len(uid)
+    idx_err = [(uid[i], t[i]) for i in range(num_sd) if abs(t[i] / tu - round(t[i] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device initial_status accu_down_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_d_up_min_discrete(data, config):
+    '''
+    '''
+
+    uid = [i.uid for i in data.network.simple_dispatchable_device]
+    t = [i.in_service_time_lb for i in data.network.simple_dispatchable_device]
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    num_sd = len(uid)
+    idx_err = [(uid[i], t[i]) for i in range(num_sd) if abs(t[i] / tu - round(t[i] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device in_service_time_lb d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_d_dn_min_discrete(data, config):
+    '''
+    '''
+
+    uid = [i.uid for i in data.network.simple_dispatchable_device]
+    t = [i.down_time_lb for i in data.network.simple_dispatchable_device]
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    num_sd = len(uid)
+    idx_err = [(uid[i], t[i]) for i in range(num_sd) if abs(t[i] / tu - round(t[i] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device down_time_lb d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_sus_d_dn_max_discrete(data, config):
+    '''
+    '''
+
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    idx_err = [
+        (i.uid, j, i.startup_states[j][1])
+        for i in data.network.simple_dispatchable_device
+        for j in range(len(i.startup_states))
+        if abs(i.startup_states[j][1] / tu - round(i.startup_states[j][1] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device startup_states max_down_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, state num, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_w_a_en_max_start_discrete(data, config):
+    '''
+    '''
+
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    idx_err = [
+        (i.uid, j, i.energy_req_ub[j][0])
+        for i in data.network.simple_dispatchable_device
+        for j in range(len(i.energy_req_ub))
+        if abs(i.energy_req_ub[j][0] / tu - round(i.energy_req_ub[j][0] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device energy_req_ub start_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, constr num, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_w_a_en_max_end_discrete(data, config):
+    '''
+    '''
+
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    idx_err = [
+        (i.uid, j, i.energy_req_ub[j][1])
+        for i in data.network.simple_dispatchable_device
+        for j in range(len(i.energy_req_ub))
+        if abs(i.energy_req_ub[j][1] / tu - round(i.energy_req_ub[j][1] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device energy_req_ub end_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, constr num, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_w_a_en_min_start_discrete(data, config):
+    '''
+    '''
+
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    idx_err = [
+        (i.uid, j, i.energy_req_lb[j][0])
+        for i in data.network.simple_dispatchable_device
+        for j in range(len(i.energy_req_lb))
+        if abs(i.energy_req_lb[j][0] / tu - round(i.energy_req_lb[j][0] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device energy_req_lb start_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, constr num, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_w_a_en_min_end_discrete(data, config):
+    '''
+    '''
+
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    idx_err = [
+        (i.uid, j, i.energy_req_lb[j][1])
+        for i in data.network.simple_dispatchable_device
+        for j in range(len(i.energy_req_lb))
+        if abs(i.energy_req_lb[j][1] / tu - round(i.energy_req_lb[j][1] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device energy_req_lb end_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, constr num, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_w_a_su_max_start_discrete(data, config):
+    '''
+    '''
+
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    idx_err = [
+        (i.uid, j, i.startups_ub[j][0])
+        for i in data.network.simple_dispatchable_device
+        for j in range(len(i.startups_ub))
+        if abs(i.startups_ub[j][0] / tu - round(i.startups_ub[j][0] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device startups_ub start_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, constr num, d): {}".format(tu, te, idx_err)
+        raise ModelError(msg)
+
+def sd_w_a_su_max_end_discrete(data, config):
+    '''
+    '''
+
+    tu = config['minimum_time_unit']
+    te = config['float_int_tol']
+    idx_err = [
+        (i.uid, j, i.startups_ub[j][1])
+        for i in data.network.simple_dispatchable_device
+        for j in range(len(i.startups_ub))
+        if abs(i.startups_ub[j][1] / tu - round(i.startups_ub[j][1] / tu)) > te]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device startups_ub end_time d / TU within TOL of an integer. TU: {}, TOL: failures (sd uid, constr num, d): {}".format(tu, te, idx_err)
         raise ModelError(msg)
 
 def connected(data, config):
