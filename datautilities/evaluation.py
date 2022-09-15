@@ -9,6 +9,7 @@ from datautilities import utils
 
 class SolutionEvaluator(object):
 
+    @utils.timeit
     def __init__(self, problem, solution, config={}):
         
         self.config = config
@@ -18,6 +19,7 @@ class SolutionEvaluator(object):
         self.set_work_zero()
         self.set_matrices()
 
+    @utils.timeit
     def run(self):
 
         # todo performance - which functions are expensive here and elsewhere - how bad does it get for larger data
@@ -196,12 +198,14 @@ class SolutionEvaluator(object):
 
         # feasibility determination
         self.eval_infeas()
-        
+
+    @utils.timeit
     def set_problem(self, prob):
 
         # todo - might be more convenient to flatten the problem attributes into SolutionEvaluator
         self.problem = prob
 
+    @utils.timeit
     def set_solution(self, sol):
 
         # note these are views not copies of the solution arrays
@@ -229,6 +233,7 @@ class SolutionEvaluator(object):
         self.xfr_t_tau = sol.xfr_t_tau
         self.xfr_t_phi = sol.xfr_t_phi
 
+    @utils.timeit
     def set_solution_zero(self):
         '''
         set solution arrays
@@ -258,6 +263,7 @@ class SolutionEvaluator(object):
         self.xfr_t_q_fr = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
         self.xfr_t_q_to = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
 
+    @utils.timeit
     def set_work_zero(self):
         '''
         set working arrays
@@ -320,6 +326,7 @@ class SolutionEvaluator(object):
         self.qrz_t_float_1 = numpy.zeros(shape=(self.problem.num_qrz, self.problem.num_t), dtype=float)
         self.qrz_t_float_2 = numpy.zeros(shape=(self.problem.num_qrz, self.problem.num_t), dtype=float)
 
+    @utils.timeit
     def set_matrices(self):
 
         self.bus_sd_inj_mat = scipy.sparse.csr_matrix(
@@ -703,6 +710,7 @@ class SolutionEvaluator(object):
         else:
             self.t_z_k_average_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
 
+    @utils.timeit
     def eval_connectedness(self):
         '''
         connectedness - each time interval, base case and contingencies
@@ -847,6 +855,7 @@ class SolutionEvaluator(object):
             self.info_connected_ctg['i1_idx'] = ctg_violation_i1
             self.info_connected_ctg['i1'] = self.problem.bus_uid[ctg_violation_i1]
 
+    @utils.timeit
     def eval_sd_t_z_p(self):
         '''
         evaluate simple dispatchable device energy cost/value
@@ -1009,6 +1018,7 @@ class SolutionEvaluator(object):
         self.sum_sd_t_z_qrd = numpy.sum(self.sd_t_float)
         self.t_sum_sd_t_z_qrd = numpy.sum(self.sd_t_float, axis=0)
 
+    @utils.timeit
     def eval_sd_t_su_sd_trajectories(self):
         '''
         set u_on_su_sd, p_su, p_sd
@@ -1574,6 +1584,7 @@ class SolutionEvaluator(object):
         self.viol_sd_t_p_ramp_dn_max = utils.get_max(self.sd_t_float_1, idx_lists=[self.problem.sd_uid, self.problem.t_num])
 
     # todo this looks inefficient, but so far it is not a problem
+    @utils.timeit
     def eval_sd_max_energy(self):
         '''
         '''
@@ -1614,6 +1625,7 @@ class SolutionEvaluator(object):
             'idx_int': (max_i, max_j)}
 
     # todo this looks inefficient, but so far it is not a problem
+    @utils.timeit
     def eval_sd_min_energy(self):
         '''
         '''
@@ -1653,6 +1665,7 @@ class SolutionEvaluator(object):
             'idx_lin': None,
             'idx_int': (max_i, max_j)}
 
+    @utils.timeit
     def eval_bus_t_p(self):
 
         self.bus_t_float[:] = 0.0
@@ -1677,6 +1690,7 @@ class SolutionEvaluator(object):
         self.sum_bus_t_z_p = self.problem.c_p * numpy.sum(self.bus_t_float)
         self.t_sum_bus_t_z_p = self.problem.c_p * numpy.sum(self.bus_t_float, axis=0)
 
+    @utils.timeit
     def eval_bus_t_q(self):
 
         self.bus_t_float[:] = 0.0
@@ -1949,6 +1963,7 @@ class SolutionEvaluator(object):
         numpy.maximum(self.sd_t_int, 0, out=self.sd_t_int)
         self.viol_sd_t_u_on_min = utils.get_max(self.sd_t_int, idx_lists=[self.problem.sd_uid, self.problem.t_num])
 
+    @utils.timeit
     def eval_sd_t_d_up_dn(self):
         '''
         evaluate uptime and downtime at the start of each interval
@@ -2046,6 +2061,7 @@ class SolutionEvaluator(object):
         self.t_sum_sd_t_z_sd = numpy.sum(self.sd_t_float, axis=0)
 
     # todo this looks inefficient, but so far it is not a problem
+    @utils.timeit
     def eval_sd_max_startup(self):
 
         max_viol = 0
@@ -2084,6 +2100,7 @@ class SolutionEvaluator(object):
             'idx_lin': None,
             'idx_int': (max_i, max_j)}
 
+    @utils.timeit
     def eval_sd_t_z_sus(self):
         
         for i in range(self.problem.num_sd):
@@ -2443,6 +2460,7 @@ class SolutionEvaluator(object):
         self.sum_xfr_t_z_sd = numpy.sum(self.xfr_t_float)
         self.t_sum_xfr_t_z_sd = numpy.sum(self.xfr_t_float, axis=0)
 
+    @utils.timeit
     def eval_acl_t_p_q_fr_to(self):
         '''
         evaluate acl p/q fr/to
@@ -2578,6 +2596,7 @@ class SolutionEvaluator(object):
             print('debug:')
             print(debug)
 
+    @utils.timeit
     def eval_xfr_t_p_q_fr_to(self):
         '''
         evaluate xfr p/q fr/to

@@ -196,6 +196,7 @@ def csr_mat_vec_max_to_vec(a, x, out):
         temp[nj,:] = out[i,:]
         numpy.amax(temp, axis=0, out=out[i,:])
 
+@timeit
 def get_connected_components(vertices, od_pairs):
     '''
 
@@ -253,6 +254,7 @@ def get_connected_components(vertices, od_pairs):
     g_connected_components = networkx.connected_components(g)
     return [sorted(list(c)) for c in g_connected_components]
 
+@timeit
 def get_bridges(od_pairs):
     '''
     bridges = get_bridges(od_pairs)
