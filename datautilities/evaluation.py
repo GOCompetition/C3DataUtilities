@@ -1011,14 +1011,69 @@ class SolutionEvaluator(object):
 
     def eval_sd_t_su_sd_trajectories(self):
         '''
-        set u_su_sd_on, p_su, p_sd
+        set u_on_su_sd, p_su, p_sd
         loop over u_su nonzeros and u_sd nonzeros
         '''
 
         #todo - for now set to 0 - add su/sd curve
+        # todo performance - eliminate a loop with numpy operations
+        # todo definitely check for bugs
+        # todo need to ensure p > 0 is not ambiguous,
+        # i.e. abs(p) > epsilon for some reasonably large epsilon, e.g. 1e-6,
+        # or else just require q = 0 when in su/sd trajectory - i.e. u_on==0 but p_su > 0 or p_sd > 0
         self.sd_t_u_on_su_sd[:] = self.sd_t_u_on
         self.sd_t_p_su = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
         self.sd_t_p_sd = numpy.zeros(shape=(self.problem.num_sd, self.problem.num_t), dtype=float)
+
+        # su
+        indices = numpy.nonzero(self.sd_t_u_su)
+        num_indices = indices[0].size
+        for i in range(num_indices):
+            sd = indices[0][i]
+            t_1 = indices[1][i]
+            if t_1 == 0:
+                continue
+            p_1 = self.problem.sd_t_p_min[sd, t_1]
+            pr = self.problem.sd_p_startup_ramp_up_max[sd]
+            t = int(t_1) - 1
+            done = False
+            while not done:
+                t -= 1
+                p = p_1 - pr * (self.problem.t_a_end[t_1] - self.problem.t_a_end[t])
+                if p > 0.0:
+                    self.sd_t_u_on_su_sd[sd, t] = 1
+                    self.sd_t_p_su[sd, t] = p
+                else:
+                    done = True
+                if t == 0:
+                    done = True
+                if not done:
+                    t -= 1
+
+        # sd
+        indices = numpy.nonzero(self.sd_t_u_sd)
+        num_indices = indices[0].size
+        for i in range(num_indices):
+            sd = indices[0][i]
+            t_1 = indices[1][i]
+            if t_1 == 0:
+                p_1 = self.problem.sd_p_0[sd]
+            else:
+                p_1 = self.problem.sd_t_p_min[sd, t_1 - 1]
+            pr = self.problem.sd_p_shutdown_ramp_dn_max[sd]
+            t = int(t_1)
+            done = False
+            while not done:
+                p = p_1 - pr * (self.problem.t_a_end[t] - self.problem.t_a_start[t_1])
+                if p > 0.0:
+                    self.sd_t_u_on_su_sd[sd, t] = 1
+                    self.sd_t_p_sd[sd, t] = p
+                else:
+                    done = True
+                if t == self.problem.num_t - 1:
+                    done = True
+                if not done:
+                    t += 1
 
     def eval_sd_t_p_rgu_nonneg(self):
         '''
