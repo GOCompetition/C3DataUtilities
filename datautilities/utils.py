@@ -2,7 +2,7 @@
 Functions needed in various places in datautilities
 '''
 
-import os, sys, subprocess, traceback, pathlib, time
+import os, sys, subprocess, traceback, pathlib, time, psutil
 import numpy, networkx
 from scipy.sparse import sparsetools
 
@@ -17,6 +17,21 @@ def timeit(function):
         print('function: {}, time: {}'.format(function.__name__, end_time - start_time))
         return result
     return timed
+
+def get_memory_info():
+    '''
+    in bytes
+    '''
+
+    process = psutil.Process(os.getpid())
+    info = process.memory_info()
+    rss = info.rss
+    rss_human = psutil._common.bytes2human(rss)
+    percent = process.memory_percent()
+    return {
+        'rss bytes': rss,
+        'rss human': rss_human,
+        'percent': percent}
 
 def get_C3DataUtilities_dir():
     

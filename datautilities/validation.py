@@ -44,6 +44,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     # read problem data file without validation (faster)
     start_time = time.time()
     problem_data_dict = read_json(problem_file)
+    print('after reading problem without validation, memory info: {}'.format(utils.get_memory_info()))
     end_time = time.time()
     print('read problem data file without validation time: {}'.format(end_time - start_time))
 
@@ -81,6 +82,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
+    print('after reading problem with validation, memory info: {}'.format(utils.get_memory_info()))
     end_time = time.time()
     print('load time: {}'.format(end_time - start_time))
 
@@ -94,6 +96,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
+    print('after problem model checks, memory info: {}'.format(utils.get_memory_info()))
     end_time = time.time()
     print('model_checks time: {}'.format(end_time - start_time))
 
@@ -107,6 +110,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
+    print('after checking problem connectedness, memory info: {}'.format(utils.get_memory_info()))
     end_time = time.time()
     print('connected time: {}'.format(end_time - start_time))
 
@@ -125,6 +129,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         # read solution data file without validation (faster)
         start_time = time.time()
         solution_data_dict = read_json(solution_file)
+        print('after read solution without validation, memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
         print('read solution data file without validation time: {}'.format(end_time - start_time))
 
@@ -139,6 +144,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
+        print('after read solution with validation, memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
         print('solution load time: {}'.format(end_time - start_time))
         
@@ -152,6 +158,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
+        print('after solution_model_checks(), memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
         print('solution model_checks time: {}'.format(end_time - start_time))
 
@@ -168,6 +175,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         start_time = time.time()
         problem_data_array = arraydata.InputData()
         problem_data_array.set_from_data_model(data_model)
+        print('after problem_data_array.set_from_data_model(), memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
         print('convert problem data to numpy arrays time: {}'.format(end_time - start_time))
 
@@ -175,6 +183,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         start_time = time.time()
         solution_data_array = arraydata.OutputData()
         solution_data_array.set_from_data_model(problem_data_array, solution_data_model)
+        print('after solution_data_arrau.set_from_data_model(), memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
         print('convert solution data to numpy arrays time: {}'.format(end_time - start_time))
         # todo more systematic memory measurement
@@ -192,6 +201,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         #solution_evaluator.problem = problem_data_array
         #solution_evaluator.solution = solution_data_array
         solution_evaluator.run()
+        print('after solution_evaluator.run(), memory info: {}'.format(utils.get_memory_info()))
         evaluation_summary = solution_evaluator.get_summary()
         infeas_summary = solution_evaluator.get_infeas_summary()
         obj = solution_evaluator.get_obj()
@@ -223,6 +233,8 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         #                 print('  {}: {}'.format(k, v))
         #             else:
         #                 print('    {}: {}'.format(k, v))            
+
+    print('end of check_data(), memory info: {}'.format(utils.get_memory_info()))
 
 def get_summary(data):
 

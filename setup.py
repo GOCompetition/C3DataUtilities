@@ -20,6 +20,7 @@ setup(
         # "pandas",
         # "pydantic",
         # "networkx",
+        # "psutil",
 
         # "datamodel",
         # "Bid-DS-data-model",

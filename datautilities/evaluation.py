@@ -3,7 +3,7 @@ Evaluation of solutions to the GO Competition Challenge 3 problem.
 '''
 
 import time
-import numpy, scipy
+import numpy, scipy, scipy.sparse, scipy.sparse.linalg
 from datautilities import arraydata
 from datautilities import utils
 
@@ -184,6 +184,7 @@ class SolutionEvaluator(object):
         self.eval_connectedness()
 
         # contingency DC power flow solve
+        self.eval_post_contingency_model()
 
         # objective - net market surplus
         self.eval_t_k_z_k()
@@ -303,6 +304,7 @@ class SolutionEvaluator(object):
         self.cs_t_float = numpy.zeros(shape=(self.problem.num_cs, self.problem.num_t), dtype=float)
 
         self.bus_t_float = numpy.zeros(shape=(self.problem.num_bus, self.problem.num_t), dtype=float)
+        self.bus_t_float_1 = numpy.zeros(shape=(self.problem.num_bus, self.problem.num_t), dtype=float)
 
         self.sh_t_int = numpy.zeros(shape=(self.problem.num_sh, self.problem.num_t), dtype=int)
         self.sh_t_float = numpy.zeros(shape=(self.problem.num_sh, self.problem.num_t), dtype=float)
@@ -854,6 +856,22 @@ class SolutionEvaluator(object):
             self.info_connected_ctg['i0'] = self.problem.bus_uid[ctg_violation_i0]
             self.info_connected_ctg['i1_idx'] = ctg_violation_i1
             self.info_connected_ctg['i1'] = self.problem.bus_uid[ctg_violation_i1]
+
+        print('end of eval_connectedness(), memory info: {}'.format(utils.get_memory_info()))
+
+    @utils.timeit
+    def eval_post_contingency_model(self):
+        '''
+        '''
+
+        try:
+            from datautilities import ctgmodel
+        except Exception as e:
+            print("Failed to import module ctgmodel. The module may not exist. Or it may have an error. Bypassing evaluation of post-contingency AC branch limits.")
+            print(e)
+            return
+        else:
+            ctgmodel.eval_post_contingency_model(self)
 
     @utils.timeit
     def eval_sd_t_z_p(self):
