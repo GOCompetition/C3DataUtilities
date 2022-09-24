@@ -1066,7 +1066,6 @@ class SolutionEvaluator(object):
             t = int(t_1) - 1
             done = False
             while not done:
-                t -= 1 # remove this - it is a duplicate, so we are decrementing by 2 each time through the loop and thus missing the termination criterion t == 0
                 # debugging
                 # if t == -43:
                 #     print('i: {}, sd: {}, sd_uid: {}, t_1: {}, p_1: {}, pr: {}, t: {}'.format(i, sd, self.problem.sd_uid[sd], t_1, p_1, pr, t))
