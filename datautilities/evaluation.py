@@ -1076,12 +1076,17 @@ class SolutionEvaluator(object):
                 if p > 0.0:
                     self.sd_t_u_on_su_sd[sd, t] = 1
                     self.sd_t_p_su[sd, t] = p
+                    # debugging
+                    # print('i: {}, sd: {}, sd_uid: {}, t_1: {}, p_1: {}, pr: {}, t: {}, p: {}'.format(i, sd, self.problem.sd_uid[sd], t_1, p_1, pr, t, p))
                 else:
                     done = True
                 if t == 0:
                     done = True
                 if not done:
                     t -= 1
+                # debugging
+                # else:
+                #     print('i: {}, sd: {}, sd_uid: {}, t_1: {}, p_1: {}, pr: {}, t: {}, p: {}'.format(i, sd, self.problem.sd_uid[sd], t_1, p_1, pr, t, p))
 
         # sd
         indices = numpy.nonzero(self.sd_t_u_sd)
