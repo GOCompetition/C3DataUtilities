@@ -17,6 +17,9 @@ import os, sys, traceback, argparse, subprocess, pathlib, shutil
 import pandas
 from datautilities import utils
 
+problem_host_default = None
+solution_host_default = None
+output_host_default = None
 out_dir_default = 'checker_output'
 out_csv = 'results.csv'
 stdout_file = 'stdout.txt'
@@ -41,9 +44,21 @@ if __name__ == '__main__':
     out_dir = pathlib.Path(out_dir).resolve()
     parser.add_argument("-o", "--out_dir", default=str(out_dir), help="Output directory")
 
+    problem_host = problem_host_default
+    parser.add_argument("-p", "--problem_host", default=problem_host, help="Problem host")
+
+    solution_host = solution_host_default
+    parser.add_argument("-s", "--solution_host", default=solution_host, help="Solution host")
+
+    output_host = output_host_default
+    parser.add_argument("-h", "--output_host", default=output_host, help="Output host")
+
     args = parser.parse_args()
     probs_sols = args.list
     out_dir = str(pathlib.Path(args.out_dir).resolve())
+
+    if(problem_host is not None or solution_host is not None or output_host is not None):
+        password = '' # todo get password
 
     checks = pandas.read_csv(probs_sols, names=['problem', 'solution'])
     num_checks = checks.shape[0]

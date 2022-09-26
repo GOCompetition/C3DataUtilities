@@ -14,13 +14,6 @@ Currently relies on https://github.com/Smart-DS/Bid-DS-data-model. You can obtai
 git clone https://github.com/Smart-DS/Bid-DS-data-model.git
 ```
 
-Currently uses the validators branch (https://github.com/Smart-DS/Bid-DS-data-model/tree/validators). This contains the most complete set of input data checking but will later be merged into main. To use the validators branch, do:
-
-```
-cd Bid-DS-data-model
-git checkout validators
-```
-
 Follow installation directions in the Bid-DS-data-model repository, primarily:
 
 ```
