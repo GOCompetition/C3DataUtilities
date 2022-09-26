@@ -14,7 +14,7 @@ Currently relies on https://github.com/Smart-DS/GO-3-data-model.git. You can obt
 git clone https://github.com/Smart-DS/GO-3-data-model.git
 ```
 
-Follow installation directions in the Bid-DS-data-model repository, primarily:
+Follow installation directions in the GO-3-data-model repository, primarily:
 
 ```
 cd GO-3-data-model
