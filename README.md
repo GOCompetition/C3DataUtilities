@@ -8,16 +8,16 @@
 
 # Installation
 
-Currently relies on https://github.com/Smart-DS/Bid-DS-data-model. You can obtain this by:
+Currently relies on https://github.com/Smart-DS/GO-3-data-model.git. You can obtain this by:
 
 ```
-git clone https://github.com/Smart-DS/Bid-DS-data-model.git
+git clone https://github.com/Smart-DS/GO-3-data-model.git
 ```
 
-Follow installation directions in the Bid-DS-data-model repository, primarily:
+Follow installation directions in the GO-3-data-model repository, primarily:
 
 ```
-cd Bid-DS-data-model
+cd GO-3-data-model
 pip install -e .
 ```
 
