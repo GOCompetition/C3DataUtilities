@@ -478,6 +478,7 @@ class SolutionEvaluator(object):
             and summary[k]['val'] > self.config['hard_constr_tol']]
         self.infeas_summary = {k:summary[k] for k in infeas_keys}
         self.infeas = int(len(self.infeas_summary) > 0)
+        self.feas = int(len(self.infeas_summary) == 0)
 
     def get_infeas_summary(self):
         '''
@@ -485,6 +486,15 @@ class SolutionEvaluator(object):
         '''
 
         return self.infeas_summary
+
+    def get_feas(self):
+        '''
+        return an indicator of feasibility
+        1 if feasible
+        0 else
+        '''
+
+        return self.feas
 
     def get_infeas(self):
         '''
@@ -628,6 +638,7 @@ class SolutionEvaluator(object):
             'z_base',
             'z_k_worst_case',
             'z_k_average_case',
+            'feas',
             'infeas',
         ]
         summary = {k: getattr(self, k, None) for k in keys}

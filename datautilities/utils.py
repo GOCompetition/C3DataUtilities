@@ -2,7 +2,7 @@
 Functions needed in various places in datautilities
 '''
 
-import os, sys, subprocess, traceback, pathlib, time, psutil
+import os, sys, subprocess, traceback, pathlib, time, psutil, json
 import numpy, networkx
 from scipy.sparse import sparsetools
 
@@ -32,6 +32,22 @@ def get_memory_info():
         'rss bytes': rss,
         'rss human': rss_human,
         'percent': percent}
+
+# from
+#   https://stackoverflow.com/questions/50916422/python-typeerror-object-of-type-int64-is-not-json-serializable
+# call as:
+#   json.dumps(data, cls=NpEncoder)
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, numpy.bool_):
+            return bool(obj)
+        if isinstance(obj, numpy.integer):
+            return int(obj)
+        if isinstance(obj, numpy.floating):
+            return float(obj)
+        if isinstance(obj, numpy.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
 
 def get_C3DataUtilities_dir():
     

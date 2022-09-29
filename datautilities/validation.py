@@ -32,14 +32,18 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     for fn in [summary_file, problem_errors_file, ignored_errors_file, solution_errors_file]:
         with open(fn, 'w') as f:
             pass
-    # - todo solution summary file? for now just use the problem summary file. that may be the right way anyway
-    solution_summary_file = summary_file
+
+    # summary - write this to the summary file when exiting
+    summary = {
+        'problem_data_file': problem_file,
+        'solution_data_file': solution_file,
+        'problem': {},
+        'solution': {},
+        'evaluation': {}}
 
     # data files
-    with open(summary_file, 'a') as f:
-        f.write('problem data file: {}\n'.format(problem_file))
-    with open(summary_file, 'a') as f:
-        f.write('solution data file: {}\n'.format(solution_file))
+    print('problem data file: {}\n'.format(problem_file))
+    print('solution data file: {}\n'.format(solution_file))
 
     # read problem data file without validation (faster)
     start_time = time.time()
@@ -51,16 +55,13 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     # git info
     try:
         git_info = utils.get_git_info_all()
-        with open(summary_file, 'a') as f:
-            f.write('git info: {}\n'.format(git_info))
+        print('git info: {}\n'.format(git_info))
     except GitError:
-        with open(summary_file, 'a') as f:
-            f.write('git info error ignored\n')
+        print('git info error ignored\n')
         with open(ignored_errors_file, 'a') as f:
             f.write(traceback.format_exc())
     except Exception:
-        with open(summary_file, 'a') as f:
-            f.write('git info error ignored\n')
+        print('git info error ignored\n')
         with open(ignored_errors_file, 'a') as f:
             f.write(traceback.format_exc())
 
@@ -77,8 +78,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     try:
         data_model = InputDataFile.load(problem_file)
     except ValidationError as e:
-        with open(summary_file, 'a') as f:
-            f.write('data read error - pydantic validation\n')
+        print('data read error - pydantic validation\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
@@ -91,8 +91,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     try:
         model_checks(data_model, config)
     except ModelError as e:
-        with open(summary_file, 'a') as f:
-            f.write('model error - independent checks\n')
+        print('model error - independent checks\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
@@ -105,8 +104,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     try:
         connected(data_model, config)
     except ModelError as e:
-        with open(summary_file, 'a') as f:
-            f.write('model error - connectedness\n')
+        print('model error - connectedness\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
         raise e
@@ -115,14 +113,10 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     print('connected time: {}'.format(end_time - start_time))
 
     # summary
-    summary = get_summary(data_model)
-    with open(summary_file, 'a') as f:
-        pp = pprint.PrettyPrinter()
-        pp.pprint(summary)
-        #f.write('data summary: {}'.format(pp.pprint(summary)))
-        f.write('data summary:\n')
-        f.write(pp.pformat(summary))
-        f.write('\n')
+    problem_summary = get_summary(data_model)
+    pp = pprint.PrettyPrinter()
+    pp.pprint(problem_summary)
+    summary['problem'] = problem_summary
 
     if solution_file is not None:
 
@@ -139,8 +133,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         try:
             solution_data_model = OutputDataFile.load(solution_file)
         except ValidationError as e:
-            with open(summary_file, 'a') as f:
-                f.write('solution read error - pydantic validation')
+            print('solution read error - pydantic validation')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
@@ -153,8 +146,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         try:
             solution_model_checks(data_model, solution_data_model, config)
         except ModelError as e:
-            with open(summary_file, 'a') as f:
-                f.write('solution model error - independent checks\n')
+            print('solution model error - independent checks\n')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
@@ -164,12 +156,9 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
 
         # summary
         solution_summary = get_solution_summary(data_model, solution_data_model)
-        with open(solution_summary_file, 'a') as f:
-            pp = pprint.PrettyPrinter()
-            pp.pprint(solution_summary)
-            f.write('solution data summary:\n')
-            f.write(pp.pformat(solution_summary))
-            f.write('\n')
+        pp = pprint.PrettyPrinter()
+        pp.pprint(solution_summary)
+        summary['solution'] = solution_summary
 
         # convert problem data to numpy arrays
         start_time = time.time()
@@ -205,22 +194,15 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         evaluation_summary = solution_evaluator.get_summary()
         infeas_summary = solution_evaluator.get_infeas_summary()
         obj = solution_evaluator.get_obj()
-        infeas = solution_evaluator.get_infeas()
-        with open(solution_summary_file, 'a') as f:
-            pp = pprint.PrettyPrinter()
-            print('evaluation summary:')
-            pp.pprint(evaluation_summary)
-            print('infeasibility summary:')
-            pp.pprint(infeas_summary)            
-            print('infeas: {}'.format(infeas))
-            print('obj: {}'.format(obj))
-            f.write('solution evaluation summary:\n')
-            f.write(pp.pformat(evaluation_summary))
-            f.write('infeasibility summary:\n')
-            f.write(pp.pformat(infeas_summary))
-            f.write('infeas: {}'.format(infeas))
-            f.write('obj: {}'.format(obj))
-            f.write('\n')
+        feas = solution_evaluator.get_feas()
+        pp = pprint.PrettyPrinter()
+        print('evaluation summary:')
+        pp.pprint(evaluation_summary)
+        print('infeasibility summary:')
+        pp.pprint(infeas_summary)            
+        print('feas: {}'.format(feas))
+        print('obj: {}'.format(obj))
+        summary['evaluation'] = evaluation_summary
         end_time = time.time()
         print('evaluate solution time: {}'.format(end_time - start_time))
 
@@ -234,6 +216,11 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         #             else:
         #                 print('    {}: {}'.format(k, v))            
 
+    # write summary to json summary file
+    # todo - capture any error messages in json summary file too
+    with open(summary_file, 'w') as f:
+        json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+
     print('end of check_data(), memory info: {}'.format(utils.get_memory_info()))
 
 def get_summary(data):
@@ -242,8 +229,8 @@ def get_summary(data):
 
     network = data.network
     
-    summary['general'] = network.general
-    summary['violation costs'] = network.violation_cost
+    summary['general'] = network.general.dict()
+    summary['violation costs'] = network.violation_cost.dict()
     
     bus = network.bus
     acl = network.ac_line

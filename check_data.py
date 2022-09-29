@@ -9,7 +9,7 @@ python check_data.py [-p, --problem] <problem_file_name>
 python check_data.py [-p, --problem] <problem_file_name> [-s, --solution] <solution_file_name>
 * check a problem file
 * check a solution file
-* write summary.txt, data_errors.txt, ignored_errors.txt, solution_errors.txt
+* write summary.json, data_errors.txt, ignored_errors.txt, solution_errors.txt
 * solution check does not check feasibility of the solution or compute objective
 * it is mainly about formatting
 '''
@@ -18,7 +18,7 @@ import argparse, pathlib
 from datautilities import validation, utils
 
 config_file = 'config.json'
-summary_file = 'summary.txt'
+summary_file = 'summary.json'
 data_errors_file = 'data_errors.txt'
 ignored_errors_file = 'ignored_errors.txt'
 solution_errors_file = 'solution_errors.txt'
@@ -44,7 +44,7 @@ if __name__ == '__main__':
         "-c", "--configuration",
         default=str(pathlib.Path(utils.get_C3DataUtilities_dir(), config_file)),
         help="Configuration file")
-    parser.add_argument("-m", "--summary", default=summary_file, help="Summary output file", )
+    parser.add_argument("-m", "--summary", default=summary_file, help="Summary output file - JSON format", )
     parser.add_argument("-d", "--data_errors", default=data_errors_file, help="Data errors output file")
     parser.add_argument("-i", "--ignored_errors", default=ignored_errors_file, help="Ignored errors output file")
     parser.add_argument("-u", "--solution_errors", default=solution_errors_file, help="Solution errors output file")
