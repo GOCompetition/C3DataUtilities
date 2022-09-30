@@ -8,20 +8,7 @@
 
 # Installation
 
-Currently relies on https://github.com/Smart-DS/GO-3-data-model.git. You can obtain this by:
-
-```
-git clone https://github.com/Smart-DS/GO-3-data-model.git
-```
-
-Follow installation directions in the GO-3-data-model repository, primarily:
-
-```
-cd GO-3-data-model
-pip install -e .
-```
-
-Next clone this repository:
+Clone this repository:
 
 ```
 git clone https://github.com/GOCompetition/C3DataUtilities.git
@@ -33,6 +20,11 @@ Then install with pip:
 cd C3DataUtilities
 pip install -e .
 ```
+
+The pip command uses setup.py, which ensures other needed Python packages are installed.
+C3DataUtilities uses GO-3-data-model, which is another package that was developed for the GO Competition
+and can be obtained from PyPI (https://pypi.org/project/GO-3-data-model/) or GitHub (https://github.com/Smart-DS/GO-3-data-model).
+The C3DataUtilities pip command obtains GO-3-data-model from PyPI.
 
 # Checking problem data formatting and properties
 
