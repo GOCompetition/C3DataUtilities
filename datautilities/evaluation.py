@@ -1658,10 +1658,11 @@ class SolutionEvaluator(object):
                     max_j = j
         self.viol_sd_max_energy_constr = {
             'val': max_viol,
-            'abs': abs(max_viol),
-            'idx': (self.problem.sd_uid[max_i], self.problem.t_num[max_j]),
-            'idx_lin': None,
-            'idx_int': (max_i, max_j)}
+            #'abs': abs(max_viol),
+            'idx': {0:self.problem.sd_uid[max_i], 1:self.problem.t_num[max_j]},
+            #'idx_lin': None,
+            #'idx_int': (max_i, max_j),
+        }
 
     # todo this looks inefficient, but so far it is not a problem
     @utils.timeit
@@ -1699,10 +1700,11 @@ class SolutionEvaluator(object):
                     max_j = j
         self.viol_sd_min_energy_constr = {
             'val': max_viol,
-            'abs': abs(max_viol),
-            'idx': (self.problem.sd_uid[max_i], self.problem.t_num[max_j]),
-            'idx_lin': None,
-            'idx_int': (max_i, max_j)}
+            #'abs': abs(max_viol),
+            'idx': {0:self.problem.sd_uid[max_i], 1:self.problem.t_num[max_j]},
+            #'idx_lin': None,
+            #'idx_int': (max_i, max_j),
+        }
 
     @utils.timeit
     def eval_bus_t_p(self):
@@ -2134,10 +2136,11 @@ class SolutionEvaluator(object):
                     max_j = j
         self.viol_sd_max_startup_constr = {
             'val': max_viol,
-            'abs': abs(max_viol),
-            'idx': (self.problem.sd_uid[max_i], self.problem.t_num[max_j]),
-            'idx_lin': None,
-            'idx_int': (max_i, max_j)}
+            #'abs': abs(max_viol),
+            'idx': {0:self.problem.sd_uid[max_i], 1:self.problem.t_num[max_j]},
+            #'idx_lin': None,
+            #'idx_int': (max_i, max_j),
+        }
 
     @utils.timeit
     def eval_sd_t_z_sus(self):
