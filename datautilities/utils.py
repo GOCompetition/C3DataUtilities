@@ -126,7 +126,8 @@ def get_max_abs(arr, idx_lists=None):
     min_out = get_min(arr, idx_lists=idx_lists)
     if max_out['val'] is None or min_out['val'] is None:
         out = max_out
-    elif max_out['abs'] > min_out['abs']:
+    #elif max_out['abs'] > min_out['abs']:
+    elif abs(max_out['val']) > abs(min_out['val']):
         out = max_out
     else:
         out = min_out
@@ -136,9 +137,9 @@ def get_max_min(arr, use_max=True, idx_lists=None):
     
     out = {
         'val': None,
-        'abs': None,
-        'idx_lin': None,
-        'idx_int': None,
+        #'abs': None,
+        #'idx_lin': None,
+        #'idx_int': None,
         'idx': None,
     }
     if arr.size > 0:
@@ -146,14 +147,15 @@ def get_max_min(arr, use_max=True, idx_lists=None):
             arg = numpy.argmax(arr)
         else:
             arg = numpy.argmin(arr)
-        out['idx_lin'] = arg
+        #out['idx_lin'] = arg
         arg_tuple = numpy.unravel_index(arg, shape=arr.shape)
         val = arr[arg_tuple]
         out['val'] = val
-        out['abs'] = abs(val)
-        out['idx_int'] = arg_tuple
+        #out['abs'] = abs(val)
+        #out['idx_int'] = arg_tuple
         if idx_lists is not None:
-            idx = tuple([idx_lists[i][arg_tuple[i]] for i in range(len(idx_lists))])
+            #idx = tuple([idx_lists[i][arg_tuple[i]] for i in range(len(idx_lists))])
+            idx = {i:idx_lists[i][arg_tuple[i]] for i in range(len(idx_lists))}
             out['idx'] = idx
     return out
 

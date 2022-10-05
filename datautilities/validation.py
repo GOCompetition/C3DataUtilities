@@ -37,6 +37,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     summary = {
         'problem_data_file': problem_file,
         'solution_data_file': solution_file,
+        'git_info': {},
         'problem': {},
         'solution': {},
         'evaluation': {}}
@@ -44,13 +45,6 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     # data files
     print('problem data file: {}\n'.format(problem_file))
     print('solution data file: {}\n'.format(solution_file))
-
-    # read problem data file without validation (faster)
-    start_time = time.time()
-    problem_data_dict = read_json(problem_file)
-    print('after reading problem without validation, memory info: {}'.format(utils.get_memory_info()))
-    end_time = time.time()
-    print('read problem data file without validation time: {}'.format(end_time - start_time))
 
     # git info
     try:
@@ -64,6 +58,24 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         print('git info error ignored\n')
         with open(ignored_errors_file, 'a') as f:
             f.write(traceback.format_exc())
+    else:
+        summary['git_info'] = git_info
+
+    # read problem data file without validation (faster)
+    start_time = time.time()
+    try:
+        problem_data_dict = read_json(problem_file)
+    except Exception as e:
+        summary['problem']['pass'] = 0
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+        print('data read error - read without validation\n')
+        with open(problem_errors_file, 'a') as f:
+            f.write(traceback.format_exc())
+        raise e
+    print('after reading problem without validation, memory info: {}'.format(utils.get_memory_info()))
+    end_time = time.time()
+    print('read problem data file without validation time: {}'.format(end_time - start_time))
 
     # read data
     # this is the main part of the run time of the problem data checker
@@ -78,6 +90,9 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     try:
         data_model = InputDataFile.load(problem_file)
     except ValidationError as e:
+        summary['problem']['pass'] = 0
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
         print('data read error - pydantic validation\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
@@ -91,6 +106,9 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     try:
         model_checks(data_model, config)
     except ModelError as e:
+        summary['problem']['pass'] = 0
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
         print('model error - independent checks\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
@@ -104,6 +122,9 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     try:
         connected(data_model, config)
     except ModelError as e:
+        summary['problem']['pass'] = 0
+        with open(summary_file, 'w') as f:
+            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
         print('model error - connectedness\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
@@ -117,12 +138,22 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
     pp = pprint.PrettyPrinter()
     pp.pprint(problem_summary)
     summary['problem'] = problem_summary
+    summary['problem']['pass'] = 1
 
     if solution_file is not None:
 
         # read solution data file without validation (faster)
         start_time = time.time()
-        solution_data_dict = read_json(solution_file)
+        try:
+            solution_data_dict = read_json(solution_file)
+        except Error as e:
+            summary['solution']['pass'] = 0
+            with open(summary_file, 'w') as f:
+                json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+            print('solution read error - read without validation')
+            with open(solution_errors_file, 'a') as f:
+                f.write(traceback.format_exc())
+            raise e
         print('after read solution without validation, memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
         print('read solution data file without validation time: {}'.format(end_time - start_time))
@@ -133,6 +164,9 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         try:
             solution_data_model = OutputDataFile.load(solution_file)
         except ValidationError as e:
+            summary['solution']['pass'] = 0
+            with open(summary_file, 'w') as f:
+                json.dump(summary, f, indent=4, cls=utils.NpEncoder)
             print('solution read error - pydantic validation')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -146,6 +180,9 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         try:
             solution_model_checks(data_model, solution_data_model, config)
         except ModelError as e:
+            summary['solution']['pass'] = 0
+            with open(summary_file, 'w') as f:
+                json.dump(summary, f, indent=4, cls=utils.NpEncoder)
             print('solution model error - independent checks\n')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -159,6 +196,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         pp = pprint.PrettyPrinter()
         pp.pprint(solution_summary)
         summary['solution'] = solution_summary
+        summary['solution']['pass'] = 1
 
         # convert problem data to numpy arrays
         start_time = time.time()
@@ -172,7 +210,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         start_time = time.time()
         solution_data_array = arraydata.OutputData()
         solution_data_array.set_from_data_model(problem_data_array, solution_data_model)
-        print('after solution_data_arrau.set_from_data_model(), memory info: {}'.format(utils.get_memory_info()))
+        print('after solution_data_array.set_from_data_model(), memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
         print('convert solution data to numpy arrays time: {}'.format(end_time - start_time))
         # todo more systematic memory measurement
