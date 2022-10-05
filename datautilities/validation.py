@@ -23,13 +23,13 @@ def read_json(file_name):
     #print(config['timestamp_pattern_str'])
     return data
 
-def check_data(problem_file, solution_file, config_file, summary_file, problem_errors_file, ignored_errors_file, solution_errors_file):
+def check_data(problem_file, solution_file, config_file, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
     # read config
     config = read_json(config_file)
 
     # open files
-    for fn in [summary_file, problem_errors_file, ignored_errors_file, solution_errors_file]:
+    for fn in [summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file]:
         with open(fn, 'w') as f:
             pass
 
@@ -67,8 +67,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         problem_data_dict = read_json(problem_file)
     except Exception as e:
         summary['problem']['pass'] = 0
-        with open(summary_file, 'w') as f:
-            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+        write_summary(summary, summary_csv_file, summary_json_file)
         print('data read error - read without validation\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
@@ -91,8 +90,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         data_model = InputDataFile.load(problem_file)
     except ValidationError as e:
         summary['problem']['pass'] = 0
-        with open(summary_file, 'w') as f:
-            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+        write_summary(summary, summary_csv_file, summary_json_file)
         print('data read error - pydantic validation\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
@@ -107,8 +105,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         model_checks(data_model, config)
     except ModelError as e:
         summary['problem']['pass'] = 0
-        with open(summary_file, 'w') as f:
-            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+        write_summary(summary, summary_csv_file, summary_json_file)
         print('model error - independent checks\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
@@ -123,8 +120,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         connected(data_model, config)
     except ModelError as e:
         summary['problem']['pass'] = 0
-        with open(summary_file, 'w') as f:
-            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+        write_summary(summary, summary_csv_file, summary_json_file)
         print('model error - connectedness\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
@@ -148,8 +144,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             solution_data_dict = read_json(solution_file)
         except Error as e:
             summary['solution']['pass'] = 0
-            with open(summary_file, 'w') as f:
-                json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+            write_summary(summary, summary_csv_file, summary_json_file)
             print('solution read error - read without validation')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -165,8 +160,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             solution_data_model = OutputDataFile.load(solution_file)
         except ValidationError as e:
             summary['solution']['pass'] = 0
-            with open(summary_file, 'w') as f:
-                json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+            write_summary(summary, summary_csv_file, summary_json_file)
             print('solution read error - pydantic validation')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -181,8 +175,7 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
             solution_model_checks(data_model, solution_data_model, config)
         except ModelError as e:
             summary['solution']['pass'] = 0
-            with open(summary_file, 'w') as f:
-                json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+            write_summary(summary, summary_csv_file, summary_json_file)
             print('solution model error - independent checks\n')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -254,12 +247,19 @@ def check_data(problem_file, solution_file, config_file, summary_file, problem_e
         #             else:
         #                 print('    {}: {}'.format(k, v))            
 
-    # write summary to json summary file
+    write_summary(summary, summary_csv_file, summary_json_file)
     # todo - capture any error messages in json summary file too
-    with open(summary_file, 'w') as f:
-        json.dump(summary, f, indent=4, cls=utils.NpEncoder)
 
     print('end of check_data(), memory info: {}'.format(utils.get_memory_info()))
+
+def write_summary(summary, summary_csv_file=None, summary_json_file=None):
+
+    if summary_csv_file is not None:
+        summary_table = pandas.json_normalize(summary)
+        summary_table.to_csv(summary_csv_file, index=False)
+    if summary_json_file is not None:
+        with open(summary_json_file, 'w') as f:
+            json.dump(summary, f, indent=4, cls=utils.NpEncoder)
 
 def get_summary(data):
 
