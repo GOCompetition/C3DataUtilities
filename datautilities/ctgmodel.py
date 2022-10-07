@@ -1,0 +1,552 @@
+'''
+Uses ideas from the following, and sources cited therein:
+
+Holzer, Jesse; Chen, Yonghong; wu, zhongyu; Pan, Feng; Veeramany, Arun, "Fast Simultaneous Feasibility Test for Security Constrained Unit Commitment". Submitted to IEEE Trans. Pow. Sys. (2022). TechRxiv. Preprint. https://doi.org/10.36227/techrxiv.20280384.v1
+
+J. Holzer, J. Cottam, J. Li, C. Xie, G. Kestor, J. Zucker, F. Pan, "Fast Evaluation of Security Constraints with Multiple Line Outage Contingencies", in prep.
+
+J. Holzer, Y. Chen, F. Pan, E. Rothberg, A. Veeramany. "Fast Evaluation of Security Constraints in a Security Constrained Unit Commitment Algorithm", in FERC Technical Conference on Increasing Market and Planning Efficiency Through Improved Software, 2019. https://www.ferc.gov/sites/default/files/2020-09/W1-A-4-Holzer.pdf. [Online; accessed 7-March-2022].
+
+Feng Pan, Yonghong Chen, Yongpei Guan, Jesse Holzer, Jim Ostrowski, Edward Rothberg, Arun Veeramany, Jie Wan, Yanan Yu, HIPPO: High-Performance Power-grid Optimization, ARPA-E HIPPO report, January 2021.
+
+Y. Chen, F. Pan, J. Holzer, E. Rothberg, Y. Ma, and A. Veeramany, "A High PerformanceComputing Based Market Economics Driven Neighborhood Search and Polishing Algorithm for Security Constrained Unit Commitment", in IEEE Transactions on Power Systems, vol. 36, no. 1, pp. 292-302, Jan. 2021.
+
+Y. Chen, F. Pan, J. Holzer, A. Veeramany, and Z. Wu, "On Improving Efficiency of Electricity Market Clearing Software with A Concurrent High Performance Computer Based Security Constrained Unit Commitment Solver", in IEEE PES General Meeting, 2021.
+
+O. Alsac, B. Stott, and W. F. Tinney, "Sparsity-Oriented Compensation Methods for Modified Network Solutions", in IEEE Transactions on Power Apparatus and Systems, vol. PAS-102, no. 5, pp. 1050-1060, May 1983.
+
+W. W. Hager. "Updating the Inverse of a Matrix", in SIAM Review, 31(2):221–239, 1989.
+'''
+
+import time, numpy, scipy, scipy.sparse, scipy.sparse.linalg
+from datautilities import utils
+
+#@utils.timeit
+def eval_post_contingency_model(sol_eval):
+    '''
+    '''
+
+    method_1(sol_eval)
+    #method_2(sol_eval)
+
+@utils.timeit
+def method_1(sol_eval):
+    '''
+    loop over t
+    * create and factor negative admittance matrix A_t[t]
+    * evaluate base case flows p_t[t]
+    * compute rank-1 adjustments w_tk[t,k], v_tk[t,k], for contingencies k
+    * 
+    '''
+
+    # problem dimensions
+    num_bus = sol_eval.problem.num_bus
+    num_acl = sol_eval.problem.num_acl
+    num_xfr = sol_eval.problem.num_xfr
+    num_dcl = sol_eval.problem.num_dcl
+    num_br = num_acl + num_xfr
+    num_k = sol_eval.problem.num_k
+    num_t = sol_eval.problem.num_t
+    print('problem dimensions. bus: {}, acl: {}, xfr: {}, dcl: {}, k: {}, t: {}'.format(
+        num_bus, num_acl, num_xfr, num_dcl, num_k, num_t))
+
+    # choose a reference bus
+    ref_bus = 0
+    nonref_bus = numpy.array(list(range(ref_bus)) + list(range(ref_bus + 1, sol_eval.problem.num_bus)), dtype=int)
+
+    # branch matrices
+    nonref_bus_acl_inc = sol_eval.bus_acl_to_inj_mat - sol_eval.bus_acl_fr_inj_mat # inj_mat has -1.0, so (to - fr)
+    nonref_bus_acl_inc = nonref_bus_acl_inc[nonref_bus, :]
+    nonref_bus_xfr_inc = sol_eval.bus_xfr_to_inj_mat - sol_eval.bus_xfr_fr_inj_mat
+    nonref_bus_xfr_inc = nonref_bus_xfr_inc[nonref_bus, :]
+    nonref_bus_br_inc = scipy.sparse.hstack((nonref_bus_acl_inc, nonref_bus_xfr_inc))
+    acl_b = numpy.array(sol_eval.problem.acl_b_sr, dtype=float)
+    xfr_b = numpy.array(sol_eval.problem.xfr_b_sr, dtype=float)
+    br_b = numpy.concatenate((acl_b, xfr_b))
+    acl_s_max = numpy.array(sol_eval.problem.acl_s_max_ctg, dtype=float)
+    xfr_s_max = numpy.array(sol_eval.problem.xfr_s_max_ctg, dtype=float)
+    br_s_max = numpy.concatenate((acl_s_max, xfr_s_max))
+
+    # static matrix A = -B = - M*Bsr*Mt on non-reference buses, generally symmetric nonsingular
+    # usually positive definite but may be indefinite if some branches have X_sr < 0
+    # if positive definite, using a Cholesky factorization instead of LU can improve run time
+    start_time = time.time()
+    a_mat = nonref_bus_br_inc.transpose().multiply(numpy.reshape(br_b, newshape=(num_br, 1)))
+    a_mat = nonref_bus_br_inc.dot(a_mat)
+    a_mat = a_mat.multiply(-1.0)
+    end_time = time.time()
+    print('construct static bus admittance matrix. time: {}'.format(end_time - start_time))
+
+    # factor
+    start_time = time.time()
+    a_factors = scipy.sparse.linalg.splu(a_mat)
+    end_time = time.time()
+    print('factor static bus admittance matrix. time: {}'.format(end_time - start_time))
+
+    # get AC branches going out of service in at least one contingency
+    #acl_delta_k = numpy.array([
+    acl_delta_k = numpy.array(sorted(list(set([
+        sol_eval.problem.k_out_acl[k] for k in range(num_k) if sol_eval.problem.k_out_is_acl[k]]))), dtype=int)
+    xfr_delta_k = numpy.array(sorted(list(set([
+        sol_eval.problem.k_out_xfr[k] for k in range(num_k) if sol_eval.problem.k_out_is_xfr[k]]))), dtype=int)
+    dcl_delta_k = numpy.array(sorted(list(set([
+        sol_eval.problem.k_out_dcl[k] for k in range(num_k) if sol_eval.problem.k_out_is_dcl[k]]))), dtype=int)
+    br_delta_k = numpy.concatenate((acl_delta_k, num_acl + xfr_delta_k))
+    num_br_delta_k = br_delta_k.size
+    num_acl_delta_k = acl_delta_k.size
+    num_xfr_delta_k = xfr_delta_k.size
+    num_dcl_delta_k = dcl_delta_k.size
+    acl_delta_k_map = {acl_delta_k[i]:i for i in range(num_acl_delta_k)}
+    dcl_delta_k_map = {dcl_delta_k[i]:i for i in range(num_dcl_delta_k)}
+    xfr_delta_k_map = {xfr_delta_k[i]:i for i in range(num_xfr_delta_k)}
+    k_out_is_acl_list = numpy.nonzero(sol_eval.problem.k_out_is_acl)[0]
+    k_out_is_acl_acl_list = sol_eval.problem.k_out_acl[k_out_is_acl_list]
+    k_out_is_acl_acl_delta_k_list = numpy.array([acl_delta_k_map[i] for i in k_out_is_acl_acl_list], dtype=int)
+    k_out_is_dcl_list = numpy.nonzero(sol_eval.problem.k_out_is_dcl)[0]
+    k_out_is_dcl_dcl_list = sol_eval.problem.k_out_dcl[k_out_is_dcl_list]
+    k_out_is_dcl_dcl_delta_k_list = numpy.array([dcl_delta_k_map[i] for i in k_out_is_dcl_dcl_list], dtype=int)
+    k_out_is_xfr_list = numpy.nonzero(sol_eval.problem.k_out_is_xfr)[0]
+    k_out_is_xfr_xfr_list = sol_eval.problem.k_out_xfr[k_out_is_xfr_list]
+    k_out_is_xfr_xfr_delta_k_list = numpy.array([xfr_delta_k_map[i] for i in k_out_is_xfr_xfr_list], dtype=int)
+    br_acl_delta_k_out_idx_lists = (acl_delta_k, numpy.arange(num_acl_delta_k, dtype=int))
+    br_xfr_delta_k_out_idx_lists = (num_acl + xfr_delta_k, numpy.arange(num_xfr_delta_k, dtype=int))
+    print('contingency delta branches. acl: {}, xfr: {}, dcl: {}'.format(
+        num_acl_delta_k, num_xfr_delta_k, num_dcl_delta_k))
+
+    # collect bus-t injections from producers, consumers, and shunts:
+    # p_inj = p_pr - p_cs - p_sh
+    start_time = time.time()
+    sol_eval.bus_t_float[:] = 0.0
+    utils.csr_mat_vec_add_to_vec(sol_eval.bus_sd_inj_mat, sol_eval.sd_t_p, out=sol_eval.bus_t_float)
+    utils.csr_mat_vec_add_to_vec(sol_eval.bus_sh_inj_mat, sol_eval.sh_t_p, out=sol_eval.bus_t_float)
+    # subtract the distributed slack
+    t_p_sl = numpy.sum(sol_eval.bus_t_float, axis=0)
+    numpy.subtract(
+        sol_eval.bus_t_float, (1.0 / num_bus) * numpy.reshape(t_p_sl, newshape=(1, num_t)), out=sol_eval.bus_t_float)
+    # subtract pre-contingency power absorption due to DC line flow
+    utils.csr_mat_vec_add_to_vec(sol_eval.bus_dcl_fr_inj_mat, sol_eval.dcl_t_p, out=sol_eval.bus_t_float)
+    numpy.negative(sol_eval.dcl_t_p, out=sol_eval.dcl_t_float)
+    utils.csr_mat_vec_add_to_vec(sol_eval.bus_dcl_to_inj_mat, sol_eval.dcl_t_float, out=sol_eval.bus_t_float)
+    # subtract pre-contingency power absorption due to transformer phase difference
+    numpy.multiply(numpy.reshape(xfr_b, newshape=(num_xfr, 1)), sol_eval.xfr_t_phi, out=sol_eval.xfr_t_float)
+    numpy.multiply(sol_eval.xfr_t_u_on, sol_eval.xfr_t_float, out=sol_eval.xfr_t_float)
+    utils.csr_mat_vec_add_to_vec(sol_eval.bus_xfr_fr_inj_mat, sol_eval.xfr_t_float, out=sol_eval.bus_t_float)
+    numpy.negative(sol_eval.xfr_t_float, out=sol_eval.xfr_t_float)
+    utils.csr_mat_vec_add_to_vec(sol_eval.bus_xfr_to_inj_mat, sol_eval.xfr_t_float, out=sol_eval.bus_t_float)
+    # todo - check sign on terms, especially transformer
+    end_time = time.time()
+    print('construct bus,t-indexed right hand side. time: {}'.format(end_time - start_time))
+
+    # solve for bus-t theta in the base case
+    start_time = time.time()
+    sol_eval.bus_t_float_1[:] = 0.0
+    sol_eval.bus_t_float_1[nonref_bus, :] = a_factors.solve(sol_eval.bus_t_float[nonref_bus, :])
+    end_time = time.time()
+    print('solve for base case bus,t-indexed theta. time: {}'.format(end_time - start_time))
+
+    #br_t_u = numpy.concatenate((sol_eval.acl_t_u_on, sol_eval.xfr_t_u_on), axis=0)
+    #br_t_phi
+    acl_phi = numpy.zeros(shape=(num_acl, ), dtype=float)
+    m_acl_k = nonref_bus_br_inc[:, acl_delta_k].toarray()
+    m_xfr_k = nonref_bus_br_inc[:, xfr_delta_k].toarray()
+    #mw_k = numpy.zeros(shape=(num_bus - 1, num_br_delta_k), dtype=float)
+    w_acl_k = numpy.zeros(shape=(num_bus - 1, num_acl_delta_k), dtype=float)
+    w_xfr_k = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float)
+
+    bus_rhs = numpy.zeros(shape=(num_bus - 1, ), dtype=float) # main term of RHS
+    bus_theta = numpy.zeros(shape=(num_bus - 1, ), dtype=float) # main term
+    bus_acl_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_acl_delta_k), dtype=float)
+    bus_dcl_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_dcl_delta_k), dtype=float)
+    bus_xfr_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float)
+
+    br_float = numpy.zeros(shape=(num_br, ), dtype=float)
+    br_acl_delta_k_float = numpy.zeros(shape=(num_br, num_acl_delta_k), dtype=float)
+    br_dcl_delta_k_float = numpy.zeros(shape=(num_br, num_dcl_delta_k), dtype=float)
+    br_xfr_delta_k_float = numpy.zeros(shape=(num_br, num_xfr_delta_k), dtype=float)
+
+    acl_delta_k_float = numpy.zeros(shape=(num_acl_delta_k, ), dtype=float)
+    dcl_delta_k_float = numpy.zeros(shape=(num_dcl_delta_k, ), dtype=float)
+    xfr_delta_k_float = numpy.zeros(shape=(num_xfr_delta_k, ), dtype=float)
+
+    # keep track of run time of certain phases of the loop over t
+    get_time_varying_branch_characteristics_time = 0.0
+    construct_a_t_time = 0.0
+    factor_a_t_time = 0.0
+    compute_w_time = 0.0
+    compute_v_time = 0.0 # includes v_inv
+    compute_bus_theta_time = 0.0
+    compute_bus_acl_delta_k_theta_time = 0.0
+    compute_br_acl_delta_k_p_time = 0.0
+    compute_br_acl_delta_k_s_over_time = 0.0
+    zero_out_acl_delta_k_time = 0.0
+    get_max_br_acl_delta_k_s_over_time = 0.0
+    compute_br_acl_delta_k_z_time = 0.0
+    collect_penalties_into_obj_array_time = 0.0
+
+    # largest violations
+    viol = utils.make_empty_viol(val=0.0, num_indices=3)
+    max_viol_acl_acl_delta_k = utils.make_empty_viol(val=0.0, num_indices=3)
+    max_viol_xfr_acl_delta_k = utils.make_empty_viol(val=0.0, num_indices=3)
+    max_viol_acl_dcl_delta_k = utils.make_empty_viol(val=0.0, num_indices=3)
+    max_viol_xfr_dcl_delta_k = utils.make_empty_viol(val=0.0, num_indices=3)
+    max_viol_acl_xfr_delta_k = utils.make_empty_viol(val=0.0, num_indices=3)
+    max_viol_xfr_xfr_delta_k = utils.make_empty_viol(val=0.0, num_indices=3)
+
+    t_computation_time = {}
+
+    for t in range(num_t):
+
+        # todo skip certain computations if there was no change from the previous t, i.e. ac br u_su/sd == 0
+
+        # todo low rank update with respect to t, as in HIPPO/MISO paper
+
+        t_start_time = time.time()
+
+        # get some time-varying characteristics of branches from the base case solution
+        start_time = time.time()
+        xfr_phi = sol_eval.xfr_t_phi[:, t]
+        br_phi = numpy.concatenate((acl_phi, xfr_phi))
+        acl_u = sol_eval.acl_t_u_on[:, t]
+        xfr_u = sol_eval.xfr_t_u_on[:, t]
+        br_u = numpy.concatenate((acl_u, xfr_u))
+        br_b_t = br_u * br_b
+        acl_q_fr = sol_eval.acl_t_q_fr[:, t]
+        xfr_q_fr = sol_eval.xfr_t_q_fr[:, t]
+        br_q_fr = numpy.concatenate((acl_q_fr, xfr_q_fr))
+        acl_q_to = sol_eval.acl_t_q_to[:, t]
+        xfr_q_to = sol_eval.xfr_t_q_to[:, t]
+        br_q_to = numpy.concatenate((acl_q_to, xfr_q_to))
+        br_q = numpy.maximum(numpy.absolute(br_q_fr), numpy.absolute(br_q_to)) # no need to track which side is violated
+        end_time = time.time()
+        get_time_varying_branch_characteristics_time += (end_time - start_time)
+
+        # form A_t
+        start_time = time.time()
+        a_mat_t = nonref_bus_br_inc.transpose().multiply(numpy.reshape(br_b_t, newshape=(num_br, 1)))
+        a_mat_t = nonref_bus_br_inc.dot(a_mat_t)
+        a_mat_t = a_mat_t.multiply(-1.0)
+        end_time = time.time()
+        construct_a_t_time += (end_time - start_time)
+
+        # factor A_t
+        start_time = time.time()
+        a_factors_t = scipy.sparse.linalg.splu(a_mat_t)
+        end_time = time.time()
+        factor_a_t_time += (end_time - start_time)
+
+        # solve with A_t for W_tk - this is expensive ~80 s
+        # two ideas can improve this:
+        # skipping updates if ac br u_su/sd == 0
+        # applying low rank update technique to network changes with respect to t
+        start_time = time.time()
+        w_acl_k[:] = a_factors_t.solve(m_acl_k)
+        w_xfr_k[:] = a_factors_t.solve(m_xfr_k)
+        #w_k = a_factors_t.solve(m_k) # no in-place, creating w_k for each t (instead of w[:] = ..) is better
+        #for k in range(sol_eval.problem.num_k):
+        #    w[:, k] = bus_b_mat_factors.solve(m[:, k])
+        end_time = time.time()
+        compute_w_time += (end_time - start_time)
+
+        # todo skip the post-contingency evaluation if the connectedness constraints are violated
+        
+        # compute V_tk and inverses
+        start_time = time.time()
+        v_acl_k = (1.0 / acl_b[acl_delta_k]) + numpy.einsum('ij,ij->j', m_acl_k, w_acl_k)
+        # v_acl_k should be nonzero so the following division should work
+        # for contingencies k where the line going out of service is not already out of service in the base case,
+        # we have the assumption that the network remains connected post-contingency,
+        # so the post-contingency negative admittance matrix is nonsingular,
+        # so the rank-1 update formula holds and the inner factor is nonzero.
+        # for contingencies k where the line going out of service is already out of service in the base case,
+        # the rank-1 update to the network amounts to putting the line in with its susceptance multiplied by -1.
+        # we assume that the pre-contingency network is connected, and adding a line cannot disconnect it,
+        # so the post-contingency network is connected.
+        # the theoretical result that the negative admittance matrix on the non-reference buses resulting from a
+        # connected network is nonsingular does not require that the branch reactances be positive
+        # (or that they be negative).
+        # if this step ever fails, we have some work to do.
+        # todo catch this and ensure that it is not treated as a competitor error
+        # and that it raises an issue for debugging.
+        v_acl_k_inv = 1.0 / v_acl_k
+        v_acl_k = v_acl_k * acl_u[acl_delta_k] # zero out v_acl_k from base case - this is not necessary
+        # zero out v_acl_k_inv for any branches that are out of service due to pre-contingency state
+        # this will zero out the delta contribution to the solved theta,
+        # so the solved theta is that of the base case, as it should be
+        v_acl_k_inv = v_acl_k_inv * acl_u[acl_delta_k]
+        v_xfr_k = (1.0 / xfr_b[xfr_delta_k]) + numpy.einsum('ij,ij->j', m_xfr_k, w_xfr_k)
+        v_xfr_k_inv = 1.0 / v_xfr_k
+        v_xfr_k = v_xfr_k * xfr_u[xfr_delta_k]
+        v_xfr_k_inv = v_xfr_k_inv * xfr_u[xfr_delta_k]
+        end_time = time.time()
+        compute_v_time += (end_time - start_time)
+
+        # set RHS terms
+        bus_rhs[:] = sol_eval.bus_t_float[nonref_bus, t]
+
+        # compute terms in theta expression
+
+        # solve for base case bus theta in the base case
+        # There are no contingencies outaging no branches
+        # every contingency outages exactly one branch
+        # some branches might be outaged by more than one contingency - why though?
+        start_time = time.time()
+        bus_theta[:] = a_factors_t.solve(bus_rhs)
+        end_time = time.time()
+        compute_bus_theta_time += (end_time - start_time)
+
+        # compute bus theta under ACL outages
+        # main theta perturbation term for AC lines
+        # this is somewhat expensive ~7 s
+        # might be able to apply the idea on eliminating AC line computations that cannot possibly lead to violation
+        start_time = time.time()
+        w_acl_k_rhs = numpy.dot(w_acl_k.transpose(), bus_rhs)
+        w_acl_k_rhs = v_acl_k_inv * w_acl_k_rhs
+        bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
+        numpy.subtract(numpy.reshape(bus_theta, newshape=(num_bus - 1, 1)), bus_acl_delta_k_float, out=bus_acl_delta_k_float) # this is non-ref theta
+        end_time = time.time()
+        compute_bus_acl_delta_k_theta_time += (end_time - start_time)
+        
+        # todo before adding, eliminate entries that do not need to be added because they cannot exceed the limit
+        # that could reduce the compute time (and memory use)
+
+        # compute AC branch flows under ACL outages
+        # this is somewhat expensive ~9 s
+        # might be able to apply the idea on eliminating AC line computations that cannot possibly lead to violation
+        # apply M, phi, B to get AC branch flows
+        start_time = time.time()
+        #numpy.multiply(nonref_bus_br_inc.transpose(), bus_acl_delta_k_float, out=br_acl_delta_k_float)
+        br_acl_delta_k_float[:] = nonref_bus_br_inc.transpose().dot(bus_acl_delta_k_float)
+        numpy.subtract(br_acl_delta_k_float, numpy.reshape(br_phi, newshape=(num_br, 1)), out=br_acl_delta_k_float)
+        numpy.multiply(
+            numpy.reshape((-1.0) * br_b_t, newshape=(num_br, 1)), br_acl_delta_k_float, out=br_acl_delta_k_float)
+        end_time = time.time()
+        compute_br_acl_delta_k_p_time += (end_time - start_time)
+
+        # compute AC branch flow violations under ACL outages
+        # this is very expensive ~83 s
+        # definitely need the idea on
+        # eliminating AC branch computations that cannot possibly lead to violation
+        # as in HIPPO SFT
+        start_time = time.time()
+        numpy.power(br_acl_delta_k_float, 2, out=br_acl_delta_k_float)
+        numpy.add(
+            br_acl_delta_k_float, numpy.reshape(numpy.power(br_q, 2), newshape=(num_br, 1)),
+            out=br_acl_delta_k_float)
+        numpy.power(br_acl_delta_k_float, 0.5, out=br_acl_delta_k_float)
+        numpy.subtract(
+            br_acl_delta_k_float, numpy.reshape(br_s_max, newshape=(num_br, 1)), out=br_acl_delta_k_float)
+        numpy.maximum(0.0, br_acl_delta_k_float, out=br_acl_delta_k_float)
+        end_time = time.time()
+        compute_br_acl_delta_k_s_over_time += (end_time - start_time)
+
+        # zero out flows for branch-contingency pairs where the branch is out of service
+        # may need to use this multiple times so time it - it should be trivial
+        start_time = time.time()
+        br_acl_delta_k_float[br_acl_delta_k_out_idx_lists] = 0.0
+        end_time = time.time()
+        zero_out_acl_delta_k_time += (end_time - start_time)
+
+        # get worst violations under ACL outages
+        start_time = time.time()
+        viol = utils.get_max(
+            br_acl_delta_k_float[0:num_acl, :],
+            idx_lists=[sol_eval.problem.acl_uid, sol_eval.problem.acl_uid[acl_delta_k]])
+        if viol['val'] > max_viol_acl_acl_delta_k['val']:
+            viol['idx'][2] = t
+            max_viol_acl_acl_delta_k = viol
+        viol = utils.get_max(
+            br_acl_delta_k_float[0:num_xfr, :],
+            idx_lists=[sol_eval.problem.xfr_uid, sol_eval.problem.acl_uid[acl_delta_k]])
+        if viol['val'] > max_viol_xfr_acl_delta_k['val']:
+            viol['idx'][2] = t
+            max_viol_xfr_acl_delta_k = viol
+        end_time = time.time()
+        get_max_br_acl_delta_k_s_over_time += (end_time - start_time)
+
+        # compute AC branch flow penalties under ACL outages
+        start_time = time.time()
+        numpy.sum(br_acl_delta_k_float, axis=0, out=acl_delta_k_float)
+        numpy.multiply(sol_eval.problem.c_s, acl_delta_k_float, out=acl_delta_k_float)
+        end_time = time.time()
+        compute_br_acl_delta_k_z_time += (end_time - start_time)
+
+        # todo compute dcl rhs
+        # todo compute xfr rhs and xfr perturbation
+        
+        # acl_delta_k_float, dcl_delta_k_float, and xfr_delta_k_float
+        # have the total penalties for this t under ACL, DCL, and XFR outages
+        # need to collect these into total penalty for this t under each contingency
+        # goes into sol_eval.t_k_z (with minus sign)
+        start_time = time.time()
+        sol_eval.t_k_z[t, k_out_is_acl_list] = (-1.0) * acl_delta_k_float[k_out_is_acl_acl_delta_k_list]
+        sol_eval.t_k_z[t, k_out_is_dcl_list] = (-1.0) * dcl_delta_k_float[k_out_is_dcl_dcl_delta_k_list]
+        sol_eval.t_k_z[t, k_out_is_xfr_list] = (-1.0) * xfr_delta_k_float[k_out_is_xfr_xfr_delta_k_list]
+        end_time = time.time()
+        collect_penalties_into_obj_array_time += (end_time - start_time)
+
+        t_end_time = time.time()
+        t_computation_time[t] = t_end_time - t_start_time
+        print('t: {}, time: {}, memory_info: {}'.format(t, t_computation_time[t], utils.get_memory_info()))
+
+    # todo
+    # reduce as in HIPPO SFT
+    # LHS : monitored branches (well, they are all monitored so this will not help)
+    # RHS : injection buses (generators, loads, shunts) and deal with distributed slack
+    # really this is only of value in case of repeated evaluation, as in a solver callback, not in solution eval
+
+    # todo
+    # GPU deployment of linear algebra, as in DMC-SCY0 paper
+
+    # report worst violations
+    sol_eval.viol_acl_acl_t_s_max_ctg = max_viol_acl_acl_delta_k
+    sol_eval.viol_xfr_acl_t_s_max_ctg = max_viol_xfr_acl_delta_k
+    sol_eval.viol_acl_dcl_t_s_max_ctg = max_viol_acl_dcl_delta_k
+    sol_eval.viol_xfr_dcl_t_s_max_ctg = max_viol_xfr_dcl_delta_k
+    sol_eval.viol_acl_xfr_t_s_max_ctg = max_viol_acl_xfr_delta_k
+    sol_eval.viol_xfr_xfr_t_s_max_ctg = max_viol_xfr_xfr_delta_k
+        
+    print('construct_a_t_time: {}'.format(construct_a_t_time))
+    print('factor_a_t_time: {}'.format(factor_a_t_time))
+    print('compute_w_time: {}'.format(compute_w_time))
+    print('compute_v_time: {}'.format(compute_v_time))
+    print('compute_bus_theta_time: {}'.format(compute_bus_theta_time))
+    print('compute_bus_acl_delta_k_theta_time: {}'.format(compute_bus_acl_delta_k_theta_time))
+    print('compute_br_acl_delta_k_p_time: {}'.format(compute_br_acl_delta_k_p_time))
+    print('compute_br_acl_delta_k_s_over_time: {}'.format(compute_br_acl_delta_k_s_over_time))
+    print('zero_out_acl_delta_k_time: {}'.format(zero_out_acl_delta_k_time))
+    print('get_max_br_acl_delta_k_s_over_time: {}'.format(get_max_br_acl_delta_k_s_over_time))
+    print('compute_br_acl_delta_k_z_time: {}'.format(compute_br_acl_delta_k_z_time))
+    print('collect_penalties_into_obj_array_time: {}'.format(collect_penalties_into_obj_array_time))
+    print('end of contingency model method 1, memory info: {}'.format(utils.get_memory_info()))
+
+@utils.timeit
+def method_2(sol_eval):
+    '''
+    use SMW delta method on time as well as contingencies, as in HIPPO/MISO paper
+    '''
+    
+    # get active branches, i.e. AC branches that are connected in at least one interval
+    numpy.sum(sol_eval.acl_t_u_on, axis=1, out=sol_eval.acl_int)
+    active_acl = numpy.flatnonzero(sol_eval.acl_int)
+    numpy.sum(sol_eval.xfr_t_u_on, axis=1, out=sol_eval.xfr_int)
+    active_xfr = numpy.flatnonzero(sol_eval.xfr_int)
+    active_br = numpy.concatenate((active_acl, sol_eval.problem.num_acl + active_xfr))
+    num_active_br = active_br.size
+    
+    # get time-delta branches, i.e. active branches that are disconnected in at least one interval
+    numpy.subtract(sol_eval.problem.num_t, sol_eval.acl_int, out=sol_eval.acl_int)
+    active_acl_delta_t = numpy.intersect1d(active_acl, numpy.flatnonzero(sol_eval.acl_int), assume_unique=True)
+    numpy.subtract(sol_eval.problem.num_t, sol_eval.xfr_int, out=sol_eval.xfr_int)
+    active_xfr_delta_t = numpy.intersect1d(active_xfr, numpy.flatnonzero(sol_eval.xfr_int), assume_unique=True)
+    active_br_delta_t = numpy.concatenate((active_acl_delta_t, sol_eval.problem.num_acl + active_xfr_delta_t))
+    
+    # get contingency-delta branches, i.e. active branches that are disconnected in at least one contingency
+    active_acl_delta_k = numpy.array(sorted(list(set([
+        sol_eval.problem.k_out_acl[k]
+        for k in range(sol_eval.problem.num_k)
+        if sol_eval.problem.k_out_is_acl[k]]))), dtype=int)
+    active_acl_delta_k = numpy.intersect1d(active_acl, active_acl_delta_k, assume_unique=True)
+    active_xfr_delta_k = numpy.array(sorted(list(set([
+        sol_eval.problem.k_out_xfr[k]
+        for k in range(sol_eval.problem.num_k)
+        if sol_eval.problem.k_out_is_xfr[k]]))), dtype=int)
+    active_xfr_delta_k = numpy.intersect1d(active_xfr, active_xfr_delta_k, assume_unique=True)
+    active_br_delta_k = numpy.concatenate((active_acl_delta_k, sol_eval.problem.num_acl + active_xfr_delta_k))
+
+    # get delta branches, i.e. active branches that are disconnected in at least one interval or in at least one contingency
+    active_acl_delta = numpy.unique(numpy.concatenate((active_acl_delta_t, active_acl_delta_k)))
+    active_xfr_delta = numpy.unique(numpy.concatenate((active_xfr_delta_t, active_xfr_delta_k)))
+    active_br_delta = numpy.concatenate((active_acl_delta, sol_eval.problem.num_acl + active_xfr_delta))
+    num_active_br_delta = active_br_delta.size
+
+    # locate delta branches in active branches - may need other items like this
+    active_br_map = {active_br[i]:i for i in range(num_active_br)}
+    active_br_delta_in_active_br = numpy.array([active_br_map[i] for i in active_br_delta], dtype=int)
+    
+    # get delta-t branches for each t in the set of all branches, in active branches, and in delta branches
+    t_active_acl_delta_t = [[] for t in range(sol_eval.problem.num_t)]
+    numpy.sum(sol_eval.acl_t_u_on, axis=1, out=sol_eval.acl_int)
+    numpy.greater(sol_eval.acl_int, 0, out=sol_eval.acl_int)
+    numpy.subtract(1, sol_eval.acl_t_u_on, out=sol_eval.acl_t_int)
+    numpy.multiply(
+        numpy.reshape(sol_eval.acl_int, newshape=(sol_eval.problem.num_acl, 1)), sol_eval.acl_t_int, out=sol_eval.acl_t_int)
+    acl_t_nonzero = numpy.nonzero(sol_eval.acl_t_int)
+    num_acl_t_nonzero = acl_t_nonzero[0].size
+    for i in range(num_acl_t_nonzero):
+        t_active_acl_delta_t[acl_t_nonzero[1][i]].append(acl_t_nonzero[0][i])
+    t_active_acl_delta_t = [numpy.array(t, dtype=int) for t in t_active_acl_delta_t]
+    t_active_xfr_delta_t = [[] for t in range(sol_eval.problem.num_t)]
+    numpy.sum(sol_eval.xfr_t_u_on, axis=1, out=sol_eval.xfr_int)
+    numpy.greater(sol_eval.xfr_int, 0, out=sol_eval.xfr_int)
+    numpy.subtract(1, sol_eval.xfr_t_u_on, out=sol_eval.xfr_t_int)
+    numpy.multiply(
+        numpy.reshape(sol_eval.xfr_int, newshape=(sol_eval.problem.num_xfr, 1)), sol_eval.xfr_t_int, out=sol_eval.xfr_t_int)
+    xfr_t_nonzero = numpy.nonzero(sol_eval.xfr_t_int)
+    num_xfr_t_nonzero = xfr_t_nonzero[0].size
+    for i in range(num_xfr_t_nonzero):
+        t_active_xfr_delta_t[xfr_t_nonzero[1][i]].append(xfr_t_nonzero[0][i])
+    t_active_xfr_delta_t = [numpy.array(t, dtype=int) for t in t_active_xfr_delta_t]
+    t_active_br_delta_t = [
+        numpy.concatenate((t_active_acl_delta_t[t], t_active_xfr_delta_t[t]))
+        for t in range(sol_eval.problem.num_t)]
+    t_active_br_delta_t_in_active_br = [
+        numpy.array([active_br_map[i] for i in t], dtype=int)
+        for t in active_br_delta_t]
+
+    # get contingencies that outage an active branch,
+    # i.e. not a DC branch and not a branch that is disconnected for all intervals anyway
+    # get delta branches that are disconnected in each interval
+    # get delta branch that are disconnected in each contingency
+
+    # what about DC branches?
+    # those that are disconnected for all intervals have no role in the model
+    # those that are connected for some intervals and are not outaged for any contingency contribute to the time-indexed
+    # pre-contingency right hand side
+    # those that are connected for some intervals and are outaged for some contingencies contributed to a right hand side
+    # delta for those intervals and contingencies where the branch is outaged in the contingency but is connected in the
+    # time interval
+
+    # anything special about transformer?
+    # phi adds to the pre-contingency right-hand side
+    # contingency outage causes a right-hand side k-delta
+
+    # choose a reference bus
+    ref_bus = 0
+    nonref_bus = numpy.array(list(range(ref_bus)) + list(range(ref_bus + 1, sol_eval.problem.num_bus)), dtype=int)
+
+    # active branch matrices
+    nonref_bus_active_acl_inc = sol_eval.bus_acl_to_inj_mat - sol_eval.bus_acl_fr_inj_mat # inj_mat has -1.0, so (to - fr)
+    nonref_bus_active_acl_inc = nonref_bus_active_acl_inc[nonref_bus, :]
+    nonref_bus_active_acl_inc = nonref_bus_active_acl_inc[:, active_acl]
+    nonref_bus_active_xfr_inc = sol_eval.bus_xfr_to_inj_mat - sol_eval.bus_xfr_fr_inj_mat
+    nonref_bus_active_xfr_inc = nonref_bus_active_xfr_inc[nonref_bus, :]
+    nonref_bus_active_xfr_inc = nonref_bus_active_xfr_inc[:, active_xfr]
+    nonref_bus_active_br_inc = scipy.sparse.hstack((nonref_bus_active_acl_inc, nonref_bus_active_xfr_inc))
+    active_acl_b = numpy.array(sol_eval.problem.acl_b_sr[active_acl], dtype=float)
+    active_xfr_b = numpy.array(sol_eval.problem.xfr_b_sr[active_xfr], dtype=float)
+    active_br_b = numpy.concatenate((active_acl_b, active_xfr_b))
+
+    # static matrix A = -B = - M*Bsr*Mt on non-reference buses, generally symmetric nonsingular
+    # usually positive definite but may be indefinite if some branches have X_sr < 0
+    # if positive definite, using a Cholesky factorization instead of LU can improve run time
+    a_mat = nonref_bus_active_br_inc.transpose().multiply(numpy.reshape(active_br_b, newshape=(num_active_br, 1)))
+    a_mat = nonref_bus_active_br_inc.dot(a_mat)
+    a_mat = a_mat.multiply(-1.0)
+    a_mat_factors = scipy.sparse.linalg.splu(a_mat)
+
+    # w - all columns needed
+    w = numpy.zeros(shape=(sol_eval.problem.num_bus - 1, num_active_br_delta), dtype=float)
+    w = nonref_bus_active_br_inc[:, active_br_delta_in_active_br].toarray() # can this be faster?
+    w = a_mat_factors.solve(w)
+
+    # t_v[t] = t_c[t]^-1 + t_m[t]^T t_w[t]
+    # t_v = [
+    #     numpy.zeros(shape=self.
+    # t_v = [None for t in range(sol_eval.problem.num_t)]
+    # for t in range(sol_eval.problem.num_t):
+    #     if t_num_delta[t] > 0:
+    #         t_v[t] = nonref_bus_active_br_inc[:, ??].dot(w[:, ??])
+    #         i = list(range(t_num_delta[t]))
+    #         t_v[t][i, i] = t_v[t][i, i] + 
+
+    print('end of contingency model method 2, memory info: {}'.format(utils.get_memory_info()))
