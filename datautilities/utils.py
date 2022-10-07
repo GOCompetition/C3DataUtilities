@@ -133,15 +133,31 @@ def get_max_abs(arr, idx_lists=None):
         out = min_out
     return out
 
+def make_empty_viol(val=None, num_indices=None):
+
+    if num_indices is None:
+        return val
+    else:
+        idx = {i: None for i in range(num_indices)}
+        return({'val': val, 'idx': idx})
+
 def get_max_min(arr, use_max=True, idx_lists=None):
     
-    out = {
-        'val': None,
-        #'abs': None,
-        #'idx_lin': None,
-        #'idx_int': None,
-        'idx': None,
-    }
+    # out = {
+    #     'val': None,
+    #     #'abs': None,
+    #     #'idx_lin': None,
+    #     #'idx_int': None,
+    #     'idx': None,
+    # }
+    if idx_lists is None:
+        out = make_empty_viol()
+    else:
+        out = make_empty_viol(num_indices=len(idx_lists))
+    # print('arr.size', arr.size)
+    # print('use_max', use_max)
+    # print('idx_lists', idx_lists)
+    # print('out', out)
     if arr.size > 0:
         if use_max:
             arg = numpy.argmax(arr)

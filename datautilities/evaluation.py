@@ -13,6 +13,7 @@ class SolutionEvaluator(object):
     def __init__(self, problem, solution, config={}):
         
         self.config = config
+        self.set_summary()
         self.set_problem(problem)
         self.set_solution(solution)
         self.set_solution_zero()
@@ -187,7 +188,7 @@ class SolutionEvaluator(object):
         self.eval_post_contingency_model()
 
         # objective - net market surplus
-        self.eval_t_k_z_k()
+        self.eval_t_k_z()
         self.eval_t_z_base()
         self.eval_t_z_k_worst_case()
         self.eval_t_z_k_average_case()
@@ -199,6 +200,539 @@ class SolutionEvaluator(object):
 
         # feasibility determination
         self.eval_infeas()
+
+    @utils.timeit
+    def set_summary(self):
+
+        tol = self.config['hard_constr_tol']
+
+        self.summary_structure = [
+            {'key': 'viol_sd_t_u_on_max',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_u_on_min',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'sum_sd_t_su',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_sd',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'viol_sd_t_d_up_min',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_d_dn_min',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'viol_sd_max_startup_constr',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'sum_sd_t_z_on',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_su',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_sd',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_sus',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'viol_bus_t_v_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_bus_t_v_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sh_t_u_st_max',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'viol_sh_t_u_st_min',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'viol_dcl_t_p_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_dcl_t_p_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_dcl_t_q_fr_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_dcl_t_q_fr_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_dcl_t_q_to_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_dcl_t_q_to_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_xfr_t_tau_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_xfr_t_tau_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_xfr_t_phi_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_xfr_t_phi_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_acl_t_u_su_max',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'viol_acl_t_u_sd_max',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'viol_xfr_t_u_su_max',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'viol_xfr_t_u_sd_max',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 2},
+            {'key': 'sum_acl_t_u_su',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_acl_t_u_sd',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_xfr_t_u_su',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_xfr_t_u_sd',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_acl_t_z_su',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_acl_t_z_sd',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_xfr_t_z_su',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_xfr_t_z_sd',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_acl_t_z_s',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'viol_acl_t_s_max',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'sum_xfr_t_z_s',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'viol_xfr_t_s_max',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_bus_t_p_balance_max',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_bus_t_p_balance_min',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'sum_bus_t_z_p',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'viol_bus_t_q_balance_max',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_bus_t_q_balance_min',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'sum_bus_t_z_q',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_pr_t_z_p',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_cs_t_z_p',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            #'sum_sd_t_z_p', # separate to pr and cs
+            {'key': 'sum_sd_t_z_rgu',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_rgd',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_scr',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_nsc',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_rru_on',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_rrd_on',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_rru_off',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_rrd_off',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_qru',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_z_qrd',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'viol_prz_t_p_rgu_balance',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_prz_t_p_rgd_balance',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_prz_t_p_scr_balance',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_prz_t_p_nsc_balance',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_prz_t_p_rru_balance',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_prz_t_p_rrd_balance',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_qrz_t_q_qru_balance',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_qrz_t_q_qrd_balance',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'sum_prz_t_z_rgu',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_prz_t_z_rgd',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_prz_t_z_scr',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_prz_t_z_nsc',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_prz_t_z_rru',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_prz_t_z_rrd',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_qrz_t_z_qru',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_qrz_t_z_qrd',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'viol_t_connected_base',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 1},
+            {'key': 'viol_t_connected_ctg',
+             'val_type': int,
+             'tol': 0,
+             'num_indices': 1},
+            # {'key': 'info_connected_base',
+            {'key': 'info_i_i_t_disconnected_base',
+             'val_type': int,
+             'tol': None, 
+             'num_indices': 3},
+            # {'key': 'info_connected_ctg',
+            {'key': 'info_i_i_k_t_disconnected_ctg',
+             'val_type': int,
+             'tol': None, 
+             'num_indices': 4},
+            {'key': 'viol_pr_t_p_on_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_cs_t_p_on_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_pr_t_p_off_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_cs_t_p_off_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_pr_t_p_on_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_cs_t_p_on_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_pr_t_p_off_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_cs_t_p_off_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_pr_t_q_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_pr_t_q_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_cs_t_q_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_cs_t_q_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_pr_t_q_p_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_pr_t_q_p_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_cs_t_q_p_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_cs_t_q_p_min',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_ramp_dn_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_ramp_up_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_max_energy_constr',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_min_energy_constr',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rgu_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rgd_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_scr_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_nsc_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rru_on_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rru_off_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rrd_on_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rrd_off_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_q_qru_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_q_qrd_nonneg',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rgu_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rgd_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_scr_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_nsc_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rru_on_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rrd_on_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rru_off_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_sd_t_p_rrd_off_max',
+             'val_type': float,
+             'tol': tol,
+             'num_indices': 2},
+            {'key': 'viol_acl_acl_t_s_max_ctg',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_xfr_acl_t_s_max_ctg',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_acl_dcl_t_s_max_ctg',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_xfr_dcl_t_s_max_ctg',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_acl_xfr_t_s_max_ctg',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            {'key': 'viol_xfr_xfr_t_s_max_ctg',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 2},
+            #'t_min_t_k_z', # this is a list of dicts and may be awkward to put in the summary - others too
+            {'key': 'z',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'z_base',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'z_k_worst_case',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'z_k_average_case',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'feas',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'infeas',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+        ]
+
+        # set up the summary items based on the structure
+        for i in self.summary_structure:
+            assert(not hasattr(self, i['key']))
+            setattr(self, i['key'], utils.make_empty_viol(val=i['val_type'](0), num_indices=i['num_indices']))
 
     @utils.timeit
     def set_problem(self, prob):
@@ -391,101 +925,13 @@ class SolutionEvaluator(object):
         0 else
         '''
 
-        summary = self.get_summary()
-        keys = [
-            'viol_sd_t_u_on_max',
-            'viol_sd_t_u_on_min',
-            'viol_sd_t_d_up_min',
-            'viol_sd_t_d_dn_min',
-            'viol_sd_max_startup_constr',
-            'viol_bus_t_v_max', # projected
-            'viol_bus_t_v_min', # projected
-            'viol_sh_t_u_st_max',
-            'viol_sh_t_u_st_min',
-            'viol_dcl_t_p_max', # projected
-            'viol_dcl_t_p_min', # projected
-            'viol_dcl_t_q_fr_max', # projected
-            'viol_dcl_t_q_fr_min', # projected
-            'viol_dcl_t_q_to_max', # projected
-            'viol_dcl_t_q_to_min', # projected
-            'viol_xfr_t_tau_max', # projected
-            'viol_xfr_t_tau_min', # projected
-            'viol_xfr_t_phi_max', # projected
-            'viol_xfr_t_phi_min', # projected
-            'viol_acl_t_u_su_max',
-            'viol_acl_t_u_sd_max',
-            'viol_xfr_t_u_su_max',
-            'viol_xfr_t_u_sd_max',
-            #'viol_acl_t_s_max', # penalized
-            #'viol_xfr_t_s_max', # penalized
-            #'viol_bus_t_p_balance_max', # penalized
-            #'viol_bus_t_p_balance_min', # penalized
-            #'viol_bus_t_q_balance_max', # penalized
-            #'viol_bus_t_q_balance_min', # penalized
-            #'viol_prz_t_p_rgu_balance', # penalized
-            #'viol_prz_t_p_rgd_balance', # penalized
-            #'viol_prz_t_p_scr_balance', # penalized
-            #'viol_prz_t_p_nsc_balance', # penalized
-            #'viol_prz_t_p_rru_balance', # penalized
-            #'viol_prz_t_p_rrd_balance', # penalized
-            #'viol_qrz_t_q_qru_balance', # penalized
-            #'viol_qrz_t_q_qrd_balance', # penalized
-            'viol_t_connected_base',
-            'viol_t_connected_ctg',
-            'viol_pr_t_p_on_max',
-            'viol_cs_t_p_on_max',
-            'viol_pr_t_p_off_max',
-            'viol_cs_t_p_off_max',
-            'viol_pr_t_p_on_min',
-            'viol_cs_t_p_on_min',
-            'viol_pr_t_p_off_min',
-            'viol_cs_t_p_off_min',
-            'viol_pr_t_q_max',
-            'viol_pr_t_q_min',
-            'viol_cs_t_q_max',
-            'viol_cs_t_q_min',
-            'viol_pr_t_q_p_max',
-            'viol_pr_t_q_p_min',
-            'viol_cs_t_q_p_max',
-            'viol_cs_t_q_p_min',
-            'viol_sd_t_p_ramp_dn_max',
-            'viol_sd_t_p_ramp_up_max',
-            'viol_sd_max_energy_constr',
-            'viol_sd_min_energy_constr',
-            'viol_sd_t_p_rgu_nonneg',
-            'viol_sd_t_p_rgd_nonneg',
-            'viol_sd_t_p_scr_nonneg',
-            'viol_sd_t_p_nsc_nonneg',
-            'viol_sd_t_p_rru_on_nonneg',
-            'viol_sd_t_p_rru_off_nonneg',
-            'viol_sd_t_p_rrd_on_nonneg',
-            'viol_sd_t_p_rrd_off_nonneg',
-            'viol_sd_t_q_qru_nonneg',
-            'viol_sd_t_q_qrd_nonneg',
-            'viol_sd_t_p_rgu_max',
-            'viol_sd_t_p_rgd_max',
-            'viol_sd_t_p_scr_max',
-            'viol_sd_t_p_nsc_max',
-            'viol_sd_t_p_rru_on_max',
-            'viol_sd_t_p_rrd_on_max',
-            'viol_sd_t_p_rru_off_max',
-            'viol_sd_t_p_rrd_off_max',
-        ]
-        infeas_keys = [
-            k for k in set(keys).intersection(set(summary.keys()))
-            if summary[k] is not None
-            and summary[k]['val'] is not None
-            and summary[k]['val'] > self.config['hard_constr_tol']]
-        self.infeas_summary = {k:summary[k] for k in infeas_keys}
-        self.infeas = int(len(self.infeas_summary) > 0)
-        self.feas = int(len(self.infeas_summary) == 0)
-
-    def get_infeas_summary(self):
-        '''
-        return items from summary causing determination of infeasibility
-        '''
-
-        return self.infeas_summary
+        infeas_summary = self.get_infeas_summary()
+        if len(infeas_summary) > 0:
+            self.feas = 0
+            self.infeas = 1
+        else:
+            self.feas = 1
+            self.infeas = 0
 
     def get_feas(self):
         '''
@@ -514,135 +960,39 @@ class SolutionEvaluator(object):
 
     def get_summary(self):
 
-        keys = [
-            'viol_sd_t_u_on_max',
-            'viol_sd_t_u_on_min',
-            'sum_sd_t_su',
-            'sum_sd_t_sd',
-            'viol_sd_t_d_up_min',
-            'viol_sd_t_d_dn_min',
-            'viol_sd_max_startup_constr',
-            'sum_sd_t_z_on',
-            'sum_sd_t_z_su',
-            'sum_sd_t_z_sd',
-            'sum_sd_t_z_sus',
-            'viol_bus_t_v_max',
-            'viol_bus_t_v_min',
-            'viol_sh_t_u_st_max',
-            'viol_sh_t_u_st_min',
-            'viol_dcl_t_p_max',
-            'viol_dcl_t_p_min',
-            'viol_dcl_t_q_fr_max',
-            'viol_dcl_t_q_fr_min',
-            'viol_dcl_t_q_to_max',
-            'viol_dcl_t_q_to_min',
-            'viol_xfr_t_tau_max',
-            'viol_xfr_t_tau_min',
-            'viol_xfr_t_phi_max',
-            'viol_xfr_t_phi_min',
-            'viol_acl_t_u_su_max',
-            'viol_acl_t_u_sd_max',
-            'viol_xfr_t_u_su_max',
-            'viol_xfr_t_u_sd_max',
-            'sum_acl_t_u_su',
-            'sum_acl_t_u_sd',
-            'sum_xfr_t_u_su',
-            'sum_xfr_t_u_sd',
-            'sum_acl_t_z_su',
-            'sum_acl_t_z_sd',
-            'sum_xfr_t_z_su',
-            'sum_xfr_t_z_sd',
-            'sum_acl_t_z_s',
-            'viol_acl_t_s_max',
-            'sum_xfr_t_z_s',
-            'viol_xfr_t_s_max',
-            'viol_bus_t_p_balance_max',
-            'viol_bus_t_p_balance_min',
-            'sum_bus_t_z_p',
-            'viol_bus_t_q_balance_max',
-            'viol_bus_t_q_balance_min',
-            'sum_bus_t_z_q',
-            'sum_pr_t_z_p',
-            'sum_cs_t_z_p',
-            #'sum_sd_t_z_p', # separate to pr and cs
-            'sum_sd_t_z_rgu',
-            'sum_sd_t_z_rgd',
-            'sum_sd_t_z_scr',
-            'sum_sd_t_z_nsc',
-            'sum_sd_t_z_rru_on',
-            'sum_sd_t_z_rrd_on',
-            'sum_sd_t_z_rru_off',
-            'sum_sd_t_z_rrd_off',
-            'sum_sd_t_z_qru',
-            'sum_sd_t_z_qrd',
-            'viol_prz_t_p_rgu_balance',
-            'viol_prz_t_p_rgd_balance',
-            'viol_prz_t_p_scr_balance',
-            'viol_prz_t_p_nsc_balance',
-            'viol_prz_t_p_rru_balance',
-            'viol_prz_t_p_rrd_balance',
-            'viol_qrz_t_q_qru_balance',
-            'viol_qrz_t_q_qrd_balance',
-            'sum_prz_t_z_rgu',
-            'sum_prz_t_z_rgd',
-            'sum_prz_t_z_scr',
-            'sum_prz_t_z_nsc',
-            'sum_prz_t_z_rru',
-            'sum_prz_t_z_rrd',
-            'sum_qrz_t_z_qru',
-            'sum_qrz_t_z_qrd',
-            'viol_t_connected_base',
-            'viol_t_connected_ctg',
-            'info_connected_base',
-            'info_connected_ctg',
-            'viol_pr_t_p_on_max',
-            'viol_cs_t_p_on_max',
-            'viol_pr_t_p_off_max',
-            'viol_cs_t_p_off_max',
-            'viol_pr_t_p_on_min',
-            'viol_cs_t_p_on_min',
-            'viol_pr_t_p_off_min',
-            'viol_cs_t_p_off_min',
-            'viol_pr_t_q_max',
-            'viol_pr_t_q_min',
-            'viol_cs_t_q_max',
-            'viol_cs_t_q_min',
-            'viol_pr_t_q_p_max',
-            'viol_pr_t_q_p_min',
-            'viol_cs_t_q_p_max',
-            'viol_cs_t_q_p_min',
-            'viol_sd_t_p_ramp_dn_max',
-            'viol_sd_t_p_ramp_up_max',
-            'viol_sd_max_energy_constr',
-            'viol_sd_min_energy_constr',
-            'viol_sd_t_p_rgu_nonneg',
-            'viol_sd_t_p_rgd_nonneg',
-            'viol_sd_t_p_scr_nonneg',
-            'viol_sd_t_p_nsc_nonneg',
-            'viol_sd_t_p_rru_on_nonneg',
-            'viol_sd_t_p_rru_off_nonneg',
-            'viol_sd_t_p_rrd_on_nonneg',
-            'viol_sd_t_p_rrd_off_nonneg',
-            'viol_sd_t_q_qru_nonneg',
-            'viol_sd_t_q_qrd_nonneg',
-            'viol_sd_t_p_rgu_max',
-            'viol_sd_t_p_rgd_max',
-            'viol_sd_t_p_scr_max',
-            'viol_sd_t_p_nsc_max',
-            'viol_sd_t_p_rru_on_max',
-            'viol_sd_t_p_rrd_on_max',
-            'viol_sd_t_p_rru_off_max',
-            'viol_sd_t_p_rrd_off_max',
-            #'t_min_t_k_z_k', # this is a list of dicts and may be awkward to put in the summary - others too
-            'z',
-            'z_base',
-            'z_k_worst_case',
-            'z_k_average_case',
-            'feas',
-            'infeas',
-        ]
+        keys = [i['key'] for i in self.summary_structure]
         summary = {k: getattr(self, k, None) for k in keys}
         return summary
+
+    def get_infeas_summary(self):
+        '''
+        return items from summary causing determination of infeasibility
+        '''
+
+        items = [
+            (i['key'], i['tol'], getattr(self, i['key'], None))
+            for i in self.summary_structure]
+
+        items = [i for i in items if i[1] is not None] # those that have a tolerance
+
+        items = [i for i in items if i[2] is not None] # those that have a summary item
+
+        # what type of summary item?
+        items_int = [i for i in items if isinstance(i[2], int)]
+        items_float = [i for i in items if isinstance(i[2], float)]
+        items_dict = [i for i in items if isinstance(i[2], dict)]
+
+        items_dict = [i for i in items_dict if i[2].get('val') is not None] # dict summary items should have a value
+
+        # items violating the tolerance
+        items_int = [i for i in items_int if i[2] > i[1]]
+        items_float = [i for i in items_float if i[2] > i[1]]
+        items_dict = [i for i in items_dict if i[2]['val'] > i[1]]
+
+        items = items_int + items_float + items_dict
+        infeas_summary = {i[0]: i[2] for i in items}
+
+        return infeas_summary
 
     def eval_z(self):
 
@@ -704,22 +1054,22 @@ class SolutionEvaluator(object):
             -self.t_sum_qrz_t_z_qrd,
         ])
 
-    def eval_t_k_z_k(self):
+    def eval_t_k_z(self):
 
-        self.t_k_z_k = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float) # todo add everything
-        self.t_min_t_k_z_k = [utils.get_min(self.t_k_z_k[t, :].flatten(), idx_lists=[self.problem.k_uid]) for t in range(self.problem.num_t)]
+        #self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float)
+        self.t_min_t_k_z = [utils.get_min(self.t_k_z[t, :].flatten(), idx_lists=[self.problem.k_uid]) for t in range(self.problem.num_t)]
 
     def eval_t_z_k_worst_case(self):
 
         if self.problem.num_k > 0:
-            self.t_z_k_worst_case = numpy.amin(self.t_k_z_k, axis=1)
+            self.t_z_k_worst_case = numpy.amin(self.t_k_z, axis=1)
         else:
             self.t_z_k_worst_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
 
     def eval_t_z_k_average_case(self):
 
         if self.problem.num_k > 0:
-            self.t_z_k_average_case = numpy.mean(self.t_k_z_k, axis=1)
+            self.t_z_k_average_case = numpy.mean(self.t_k_z, axis=1)
         else:
             self.t_z_k_average_case = numpy.zeros(shape=(self.problem.num_t, ), dtype=float)
 
@@ -827,46 +1177,24 @@ class SolutionEvaluator(object):
                 ctg_violation_k = t_ctg_edge_ctg_map[(ctg_violation_i0, ctg_violation_i1)][0]
 
         # report violations
-        self.viol_t_connected_base = utils.get_max(self.t_connected_components_base - 1, idx_lists=[self.problem.t_num])
+        self.viol_t_connected_base = utils.get_max(
+            self.t_connected_components_base - 1, idx_lists=[self.problem.t_num])
         self.viol_t_connected_ctg = utils.get_max(self.t_ctg_bridges, idx_lists=[self.problem.t_num])
 
         # useful information on violations
         # * at least two buses (i1, i2) not connected in the base case
         # * at least one contingency k and two buses (i1, i2) not connected in contingency k
-        self.info_connected_base = {
-            'violation': False,
-            't': None,
-            'i0': None,
-            'i1': None,
-            'i0_idx': None,
-            'i1_idx': None,
-        }
-        self.info_connected_ctg = {
-            'violation': False,
-            't': None,
-            'k': None,
-            'i0': None,
-            'i1': None,
-            'k_idx': None,
-            'i0_idx': None,
-            'i1_idx': None,
-        }
         if found_base_violation:
-            self.info_connected_base['violation'] = True
-            self.info_connected_base['t'] = base_violation_t
-            self.info_connected_base['i0_idx'] = base_violation_i0
-            self.info_connected_base['i0'] = self.problem.bus_uid[base_violation_i0]
-            self.info_connected_base['i1_idx'] = base_violation_i1
-            self.info_connected_base['i1'] = self.problem.bus_uid[base_violation_i1]
+            self.info_i_i_t_disconnected_base['val'] = 1
+            self.info_i_i_t_disconnected_base['idx'][0] = self.problem.bus_uid[base_violation_i0]
+            self.info_i_i_t_disconnected_base['idx'][1] = self.problem.bus_uid[base_violation_i1]
+            self.info_i_i_t_disconnected_base['idx'][2] = base_violation_t
         if found_ctg_violation:
-            self.info_connected_ctg['violation'] = True
-            self.info_connected_ctg['t'] = ctg_violation_t
-            self.info_connected_ctg['k_idx'] = ctg_violation_k
-            self.info_connected_ctg['k'] = self.problem.k_uid[ctg_violation_k]
-            self.info_connected_ctg['i0_idx'] = ctg_violation_i0
-            self.info_connected_ctg['i0'] = self.problem.bus_uid[ctg_violation_i0]
-            self.info_connected_ctg['i1_idx'] = ctg_violation_i1
-            self.info_connected_ctg['i1'] = self.problem.bus_uid[ctg_violation_i1]
+            self.info_i_i_k_t_disconnected_ctg['val'] = 1
+            self.info_i_i_k_t_disconnected_ctg['idx'][0] = self.problem.bus_uid[ctg_violation_i0]
+            self.info_i_i_k_t_disconnected_ctg['idx'][1] = self.problem.bus_uid[ctg_violation_i1]
+            self.info_i_i_k_t_disconnected_ctg['idx'][2] = ctg_violation_k
+            self.info_i_i_k_t_disconnected_ctg['idx'][3] = ctg_violation_t
 
         print('end of eval_connectedness(), memory info: {}'.format(utils.get_memory_info()))
 
@@ -875,14 +1203,18 @@ class SolutionEvaluator(object):
         '''
         '''
 
-        try:
-            from datautilities import ctgmodel
-        except Exception as e:
-            print("Failed to import module ctgmodel. The module may not exist. Or it may have an error. Bypassing evaluation of post-contingency AC branch limits.")
-            print(e)
-            return
-        else:
-            ctgmodel.eval_post_contingency_model(self)
+        self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float) # update this
+        # skip post-contingency evaluation if not connected
+        # todo set the violations as empty, not None
+        if self.viol_t_connected_base['val'] == 0 and self.viol_t_connected_ctg['val'] == 0:
+            try:
+                from datautilities import ctgmodel
+            except Exception as e:
+                print("Failed to import module ctgmodel. The module may not exist. Or it may have an error. Bypassing evaluation of post-contingency AC branch limits.")
+                print(e)
+                return # todo remove this - if it fails the error should be raised, once we have the code for it
+            else:
+                ctgmodel.eval_post_contingency_model(self)
 
     @utils.timeit
     def eval_sd_t_z_p(self):
