@@ -1,5 +1,36 @@
 '''
-Uses ideas from the following, and sources cited therein:
+Evaluates the post-contingency AC branch apparent power flow limits
+under the DC post-contingency model described in the formulation.
+
+The main computation is the solution of a sequence of closely related
+square symmetric nonsingular linear systems.
+There is one such system for each time interval and each contingency.
+The matrix of each of these systems is the negative admittance matrix
+of the network of in service AC branches in a given time interval
+and following a given contingency.
+The right hand side is derived from the power injections from generators,
+loads, and shunts at the buses in the pre-contingency solution,
+together with a distributed slack to ensure DC lossless power balance,
+along with adjustments from contingencies outaging transformers or
+DC lines.
+
+If each of the linear systems is formed and solved from scratch,
+in one loop over intervals and contingencies, the evaluation takes a
+very long time. This challenge is faced in commercial and academic
+work on evaluating security constraints, and a number of technical
+approaches have been developed or adapted from more general contexts
+in order to handle this, including:
+* line outage distribution factors (LODFs)
+* partial matrix refactorization and factorization update/downdate
+* Sherman-Morrison-Woodbury (SMW) identity for inverse of a matrix with a low rank update
+
+This code uses the SMW approach, which is a generalization of LODFs to network
+changes involving more than one branch.
+We use ideas from the following sources, and sources cited therein:
+
+O. Alsac, B. Stott, and W. F. Tinney, "Sparsity-Oriented Compensation Methods for Modified Network Solutions", in IEEE Transactions on Power Apparatus and Systems, vol. PAS-102, no. 5, pp. 1050-1060, May 1983.
+
+W. W. Hager. "Updating the Inverse of a Matrix", in SIAM Review, 31(2):221–239, 1989.
 
 Holzer, Jesse; Chen, Yonghong; wu, zhongyu; Pan, Feng; Veeramany, Arun, "Fast Simultaneous Feasibility Test for Security Constrained Unit Commitment". Submitted to IEEE Trans. Pow. Sys. (2022). TechRxiv. Preprint. https://doi.org/10.36227/techrxiv.20280384.v1
 
@@ -12,10 +43,6 @@ Feng Pan, Yonghong Chen, Yongpei Guan, Jesse Holzer, Jim Ostrowski, Edward Rothb
 Y. Chen, F. Pan, J. Holzer, E. Rothberg, Y. Ma, and A. Veeramany, "A High PerformanceComputing Based Market Economics Driven Neighborhood Search and Polishing Algorithm for Security Constrained Unit Commitment", in IEEE Transactions on Power Systems, vol. 36, no. 1, pp. 292-302, Jan. 2021.
 
 Y. Chen, F. Pan, J. Holzer, A. Veeramany, and Z. Wu, "On Improving Efficiency of Electricity Market Clearing Software with A Concurrent High Performance Computer Based Security Constrained Unit Commitment Solver", in IEEE PES General Meeting, 2021.
-
-O. Alsac, B. Stott, and W. F. Tinney, "Sparsity-Oriented Compensation Methods for Modified Network Solutions", in IEEE Transactions on Power Apparatus and Systems, vol. PAS-102, no. 5, pp. 1050-1060, May 1983.
-
-W. W. Hager. "Updating the Inverse of a Matrix", in SIAM Review, 31(2):221–239, 1989.
 '''
 
 import time, numpy, scipy, scipy.sparse, scipy.sparse.linalg

@@ -4,8 +4,7 @@ Evaluation of solutions to the GO Competition Challenge 3 problem.
 
 import time
 import numpy, scipy, scipy.sparse, scipy.sparse.linalg
-from datautilities import arraydata
-from datautilities import utils
+from datautilities import arraydata, utils, ctgmodel
 
 class SolutionEvaluator(object):
 
@@ -1205,16 +1204,8 @@ class SolutionEvaluator(object):
 
         self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float) # update this
         # skip post-contingency evaluation if not connected
-        # todo set the violations as empty, not None
         if self.viol_t_connected_base['val'] == 0 and self.viol_t_connected_ctg['val'] == 0:
-            try:
-                from datautilities import ctgmodel
-            except Exception as e:
-                print("Failed to import module ctgmodel. The module may not exist. Or it may have an error. Bypassing evaluation of post-contingency AC branch limits.")
-                print(e)
-                return # todo remove this - if it fails the error should be raised, once we have the code for it
-            else:
-                ctgmodel.eval_post_contingency_model(self)
+            ctgmodel.eval_post_contingency_model(self)
 
     @utils.timeit
     def eval_sd_t_z_p(self):
