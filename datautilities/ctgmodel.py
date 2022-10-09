@@ -239,6 +239,8 @@ def eval_post_contingency_model(sol_eval):
         # todo skip certain computations if there was no change from the previous t, i.e. ac br u_su/sd == 0
 
         # todo low rank update with respect to t, as in HIPPO/MISO paper
+        # need to create test data with more line switching to test this sufficiently
+        # e.g. ~ 10 to 100 switches per time interval, some connecting, some disconnecting
 
         t_start_time = time.time()
 
@@ -371,12 +373,7 @@ def eval_post_contingency_model(sol_eval):
         end_time = time.time()
         compute_br_acl_delta_k_p_delta_time += (end_time - start_time)
 
-
-
-
-
-
-        # todo before adding, eliminate entries that do not need to be added because they cannot exceed the limit
+        # before adding, eliminate entries that do not need to be added because they cannot exceed the limit
         # that could reduce the compute time (and memory use)
         # this appears to be the earliest we could do this
         start_time = time.time()
