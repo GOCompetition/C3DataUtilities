@@ -95,12 +95,18 @@ def eval_post_contingency_model(sol_eval):
     acl_s_max = numpy.array(sol_eval.problem.acl_s_max_ctg, dtype=float)
     xfr_s_max = numpy.array(sol_eval.problem.xfr_s_max_ctg, dtype=float)
     br_s_max = numpy.concatenate((acl_s_max, xfr_s_max))
+    acl_u_max_over_t = numpy.amax(sol_eval.acl_t_u_on, axis=1)
+    xfr_u_max_over_t = numpy.amax(sol_eval.xfr_t_u_on, axis=1)
+    br_u_max_over_t = numpy.concatenate((acl_u_max_over_t, xfr_u_max_over_t))
+    br_b_u_max_over_t = numpy.multiply(br_u_max_over_t, br_b)
 
     # static matrix A = -B = - M*Bsr*Mt on non-reference buses, generally symmetric nonsingular
     # usually positive definite but may be indefinite if some branches have X_sr < 0
     # if positive definite, using a Cholesky factorization instead of LU can improve run time
+    # note we exclude branches that are out of service for all t
+    # t delta will be on those that are out of service for a given t but in service for at least some t
     start_time = time.time()
-    a_mat = nonref_bus_br_inc.transpose().multiply(numpy.reshape(br_b, newshape=(num_br, 1)))
+    a_mat = nonref_bus_br_inc.transpose().multiply(numpy.reshape(br_b_u_max_over_t, newshape=(num_br, 1)))
     a_mat = nonref_bus_br_inc.dot(a_mat)
     a_mat = a_mat.multiply(-1.0)
     end_time = time.time()
@@ -111,6 +117,39 @@ def eval_post_contingency_model(sol_eval):
     a_factors = scipy.sparse.linalg.splu(a_mat)
     end_time = time.time()
     print('factor static bus admittance matrix. time: {}'.format(end_time - start_time))
+
+    # get AC branches that are in service in at least one t but out of service in a given t
+    acl_in_some_t = numpy.nonzero(acl_u_max_over_t)[0]
+    xfr_in_some_t = numpy.nonzero(xfr_u_max_over_t)[0]
+    br_in_some_t = numpy.concatenate((acl_in_some_t, num_acl + xfr_in_some_t))
+    numpy.subtract(1, sol_eval.acl_t_u_on, out=sol_eval.acl_t_int)
+    numpy.subtract(1, sol_eval.xfr_t_u_on, out=sol_eval.xfr_t_int)
+    acl_out_nonzeros = numpy.nonzero(sol_eval.acl_t_int)
+    xfr_out_nonzeros = numpy.nonzero(sol_eval.xfr_t_int)
+    t_acl_delta_t = [numpy.nonzero(sol_eval.acl_t_int[:, t])[0] for t in range(num_t)]
+    t_xfr_delta_t = [numpy.nonzero(sol_eval.xfr_t_int[:, t])[0] for t in range(num_t)]
+    t_acl_delta_t = [numpy.intersect1d(acl_in_some_t, t_acl_delta_t[t], assume_unique=True) for t in range(num_t)]
+    t_xfr_delta_t = [numpy.intersect1d(xfr_in_some_t, t_xfr_delta_t[t], assume_unique=True) for t in range(num_t)]
+    t_br_delta_t = [numpy.concatenate((t_acl_delta_t[t], num_acl + t_xfr_delta_t[t])) for t in range(num_t)]
+    acl_delta_t = numpy.unique(numpy.nonzero(sol_eval.acl_t_int)[0])
+    xfr_delta_t = numpy.unique(numpy.nonzero(sol_eval.xfr_t_int)[0])
+    acl_delta_t = numpy.intersect1d(acl_in_some_t, acl_delta_t, assume_unique=True)
+    xfr_delta_t = numpy.intersect1d(xfr_in_some_t, xfr_delta_t, assume_unique=True)
+    br_delta_t = numpy.concatenate((acl_delta_t, num_acl + xfr_delta_t))
+    # get index of t_*_out (acl, xfr, br) in *_delta_t
+    acl_delta_t_map = {acl_delta_t[i]:i for i in range(acl_delta_t.size)}
+    xfr_delta_t_map = {xfr_delta_t[i]:i for i in range(xfr_delta_t.size)}
+    br_delta_t_map = {br_delta_t[i]:i for i in range(br_delta_t.size)}
+    num_acl_delta_t = acl_delta_t.size
+    num_xfr_delta_t = xfr_delta_t.size
+    num_br_delta_t = br_delta_t.size
+    t_num_t_acl_delta_t = [t_acl_delta_t[t].size for t in range(num_t)]
+    t_num_t_xfr_delta_t = [t_xfr_delta_t[t].size for t in range(num_t)]
+    t_num_t_br_delta_t = [t_br_delta_t[t].size for t in range(num_t)]
+    # todo compute Wt and Vt on these
+    # Wt can just be all of the columns we need over any t
+    # compute Vt in the loop
+    print('t_acl_delta_t: {}, t_xfr_delta_t: {}, t_br_delta_t: {}, acl_delta_t: {}, xfr_delta_t: {}, br_delta_t: {}'.format(t_acl_delta_t, t_xfr_delta_t, t_br_delta_t, acl_delta_t, xfr_delta_t, br_delta_t))
 
     # get AC branches going out of service in at least one contingency
     #acl_delta_k = numpy.array([
@@ -173,14 +212,39 @@ def eval_post_contingency_model(sol_eval):
     end_time = time.time()
     print('solve for base case bus,t-indexed theta. time: {}'.format(end_time - start_time))
 
+    # initialize some storage for m and w columns of SMW approach
+    start_time = time.time()
     #br_t_u = numpy.concatenate((sol_eval.acl_t_u_on, sol_eval.xfr_t_u_on), axis=0)
     #br_t_phi
     acl_phi = numpy.zeros(shape=(num_acl, ), dtype=float)
-    m_acl_k = nonref_bus_br_inc[:, acl_delta_k].toarray()
-    m_xfr_k = nonref_bus_br_inc[:, xfr_delta_k].toarray()
+    m_acl_k = nonref_bus_acl_inc[:, acl_delta_k].toarray()
+    m_xfr_k = nonref_bus_xfr_inc[:, xfr_delta_k].toarray()
+    m_acl_t = nonref_bus_acl_inc[:, acl_delta_t].toarray() # todo could be a bug here - should we add num_acl? - and elsewhere in this section. may be better to stick with separate m matrices - yes, fixed a bug here : br -> acl, br -> xfr
+    m_xfr_t = nonref_bus_xfr_inc[:, xfr_delta_t].toarray()
     #mw_k = numpy.zeros(shape=(num_bus - 1, num_br_delta_k), dtype=float)
-    w_acl_k = numpy.zeros(shape=(num_bus - 1, num_acl_delta_k), dtype=float)
-    w_xfr_k = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float)
+    w_acl_k = numpy.zeros(shape=(num_bus - 1, num_acl_delta_k), dtype=float) # t->k
+    w_xfr_k = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float) # t->k
+    w0_acl_k = numpy.zeros(shape=(num_bus - 1, num_acl_delta_k), dtype=float) # 0->k
+    w0_xfr_k = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float) # 0->k
+    w_acl_t = numpy.zeros(shape=(num_bus - 1, num_acl_delta_t), dtype=float) # 0->t
+    w_xfr_t = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_t), dtype=float) # 0->t
+    end_time = time.time()
+    initialize_m_w_time = end_time - start_time
+
+    # compute static w columns,
+    # i.e. Wk and W_t for the SMW approach with respect to
+    # k on A0 and t on A0
+    # this is expensive but it is a one time cost, not recurring for each t
+    start_time = time.time()
+    w0_acl_k[:] = a_factors.solve(m_acl_k)
+    w0_xfr_k[:] = a_factors.solve(m_xfr_k)
+    w_acl_t[:] = a_factors.solve(m_acl_t)
+    w_xfr_t[:] = a_factors.solve(m_xfr_t)
+    #w_k = a_factors_t.solve(m_k) # no in-place, creating w_k for each t (instead of w[:] = ..) is better
+    #for k in range(sol_eval.problem.num_k):
+    #    w[:, k] = bus_b_mat_factors.solve(m[:, k])
+    end_time = time.time()
+    compute_static_w_time = end_time - start_time
 
     bus_rhs = numpy.zeros(shape=(num_bus - 1, ), dtype=float) # main term of RHS
     bus_theta = numpy.zeros(shape=(num_bus - 1, ), dtype=float) # main term
@@ -512,6 +576,8 @@ def eval_post_contingency_model(sol_eval):
     sol_eval.viol_acl_xfr_t_s_max_ctg = max_viol_acl_xfr_delta_k
     sol_eval.viol_xfr_xfr_t_s_max_ctg = max_viol_xfr_xfr_delta_k
         
+    print('initialize_m_w_time: {}'.format(initialize_m_w_time))
+    print('compute_static_w_time: {}'.format(compute_static_w_time))
     print('get_time_varying_branch_characteristics_time: {}'.format(get_time_varying_branch_characteristics_time))
     print('construct_a_t_time: {}'.format(construct_a_t_time))
     print('factor_a_t_time: {}'.format(factor_a_t_time))
