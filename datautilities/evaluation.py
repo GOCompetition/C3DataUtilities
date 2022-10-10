@@ -1203,7 +1203,7 @@ class SolutionEvaluator(object):
         '''
 
         self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float) # update this
-        # skip post-contingency evaluation if not connected
+        # skip post-contingency evaluation if not connected - might as well skip if infeasible so far - todo
         if self.viol_t_connected_base['val'] == 0 and self.viol_t_connected_ctg['val'] == 0:
             ctgmodel.eval_post_contingency_model(self)
 
