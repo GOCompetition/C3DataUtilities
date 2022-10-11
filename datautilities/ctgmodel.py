@@ -256,6 +256,7 @@ def eval_post_contingency_model(sol_eval):
 
     bus_rhs = numpy.zeros(shape=(num_bus - 1, ), dtype=float) # main term of RHS
     bus_theta = numpy.zeros(shape=(num_bus - 1, ), dtype=float) # main term
+    bus_float = numpy.zeros(shape=(num_bus - 1, ), dtype=float)
     bus_acl_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_acl_delta_k), dtype=float)
     bus_dcl_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_dcl_delta_k), dtype=float)
     bus_xfr_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float)
@@ -277,6 +278,7 @@ def eval_post_contingency_model(sol_eval):
     construct_a_t_time = 0.0
     factor_a_t_time = 0.0
     compute_w_with_t_a_solve_time = 0.0
+    compute_v_t_time = 0.0
     compute_w_with_t_smw_time = 0.0
     compute_v_time = 0.0 # includes v_inv
     compute_bus_theta_with_t_a_solve_time = 0.0
@@ -336,17 +338,17 @@ def eval_post_contingency_model(sol_eval):
 
         # form A_t
         start_time = time.time()
-        # if not t_use_smw:
-        a_mat_t = nonref_bus_br_inc.transpose().multiply(numpy.reshape(br_b_t, newshape=(num_br, 1)))
-        a_mat_t = nonref_bus_br_inc.dot(a_mat_t)
-        a_mat_t = a_mat_t.multiply(-1.0)
+        if not t_use_smw:
+            a_mat_t = nonref_bus_br_inc.transpose().multiply(numpy.reshape(br_b_t, newshape=(num_br, 1)))
+            a_mat_t = nonref_bus_br_inc.dot(a_mat_t)
+            a_mat_t = a_mat_t.multiply(-1.0)
         end_time = time.time()
         construct_a_t_time += (end_time - start_time)
 
         # factor A_t
         start_time = time.time()
-        # if not t_use_smw:
-        a_factors_t = scipy.sparse.linalg.splu(a_mat_t)
+        if not t_use_smw:
+            a_factors_t = scipy.sparse.linalg.splu(a_mat_t)
         end_time = time.time()
         factor_a_t_time += (end_time - start_time)
 
@@ -355,12 +357,12 @@ def eval_post_contingency_model(sol_eval):
         # skipping updates if ac br u_su/sd == 0
         # applying low rank update technique to network changes with respect to t
         start_time = time.time()
-        # if not t_use_smw:
-        w_acl_k[:] = a_factors_t.solve(m_acl_k)
-        w_xfr_k[:] = a_factors_t.solve(m_xfr_k)
-        #w_k = a_factors_t.solve(m_k) # no in-place, creating w_k for each t (instead of w[:] = ..) is better
-        #for k in range(sol_eval.problem.num_k):
-        #    w[:, k] = bus_b_mat_factors.solve(m[:, k])
+        if not t_use_smw:
+            w_acl_k[:] = a_factors_t.solve(m_acl_k)
+            w_xfr_k[:] = a_factors_t.solve(m_xfr_k)
+            #w_k = a_factors_t.solve(m_k) # no in-place, creating w_k for each t (instead of w[:] = ..) is better
+            #for k in range(sol_eval.problem.num_k):
+            #    w[:, k] = bus_b_mat_factors.solve(m[:, k])
         end_time = time.time()
         compute_w_with_t_a_solve_time += (end_time - start_time)
 
@@ -368,23 +370,31 @@ def eval_post_contingency_model(sol_eval):
         if t_use_smw:
             # note w_t, v_t, etc., are with all branches, - need to make sure the phi term is multiplied by u_t todo
             if t_num_br_delta_t[t] > 0:
-                # todo
                 # set w_acl_k and w_xfr_k equal to the delta term in SMW formula for w_tk, then subtract from w_k
                 t_br_delta_t_in_br_delta_t = [br_delta_t_map[i] for i in t_br_delta_t[t]]
-                # construct v_t todo
-                # factor v_t todo
+                # construct v_t
+                v_t = numpy.diag(1.0 / br_b[t_br_delta_t[t]]) + m_br_t[:, t_br_delta_t_in_br_delta_t].transpose().dot(w_br_t[:, t_br_delta_t_in_br_delta_t])
+                # factor v_t
+                v_t_factors = scipy.linalg.lu_factor(v_t)
+        end_time = time.time()
+        compute_v_t_time += (end_time - start_time)
+
+        start_time = time.time()
+        if t_use_smw:
+            # note w_t, v_t, etc., are with all branches, - need to make sure the phi term is multiplied by u_t todo
+            if t_num_br_delta_t[t] > 0:
                 #w_t_m_acl_k = w_br_t[:, t_br_delta_t_in_br_delta_t].transpose().dot(m_acl_k) # dense m
                 #w_t_m_xfr_k = w_br_t[:, t_br_delta_t_in_br_delta_t].transpose().dot(m_xfr_k) # dense m
                 w_t_m_acl_k = nonref_bus_acl_inc[:, acl_delta_k].transpose().dot( # sparse m, should return dense
                     w_br_t[:, t_br_delta_t_in_br_delta_t]).transpose()
                 w_t_m_xfr_k = nonref_bus_xfr_inc[:, xfr_delta_k].transpose().dot( # sparse m, should return dense
                     w_br_t[:, t_br_delta_t_in_br_delta_t]).transpose()
-                # solve with v_t - todo
+                # solve with v_t
+                w_t_m_acl_k = scipy.linalg.lu_solve(v_t_factors, w_t_m_acl_k)
+                w_t_m_xfr_k = scipy.linalg.lu_solve(v_t_factors, w_t_m_xfr_k)
                 # multiply w_t onto w_t_m_k
                 numpy.dot(w_br_t[:, t_br_delta_t_in_br_delta_t], w_t_m_acl_k, out=w_acl_k)
                 numpy.dot(w_br_t[:, t_br_delta_t_in_br_delta_t], w_t_m_xfr_k, out=w_xfr_k)
-                # w_acl_k[:] = 0.0
-                # w_xfr_k[:] = 0.0
                 numpy.subtract(w0_acl_k, w_acl_k, out=w_acl_k)
                 numpy.subtract(w0_xfr_k, w_xfr_k, out=w_xfr_k)
             else:
@@ -434,15 +444,19 @@ def eval_post_contingency_model(sol_eval):
         # every contingency outages exactly one branch
         # some branches might be outaged by more than one contingency - why though?
         start_time = time.time()
-        # if not t_use_smw:
-        bus_theta[:] = a_factors_t.solve(bus_rhs)
+        if not t_use_smw:
+            bus_theta[:] = a_factors_t.solve(bus_rhs)
         end_time = time.time()
         compute_bus_theta_with_t_a_solve_time += (end_time - start_time)
 
         start_time = time.time()
         if t_use_smw:
             bus_theta[:] = a_factors.solve(bus_rhs)
-            # todo - add SMW delta terms
+            if t_num_br_delta_t[t] > 0:
+                w_t_bus_rhs = w_br_t[:, t_br_delta_t_in_br_delta_t].transpose().dot(bus_rhs)
+                w_t_bus_rhs = scipy.linalg.lu_solve(v_t_factors, w_t_bus_rhs)
+                numpy.dot(w_br_t[:, t_br_delta_t_in_br_delta_t], w_t_bus_rhs, out=bus_float)
+                numpy.subtract(bus_theta, bus_float, out=bus_theta)
         end_time = time.time()
         compute_bus_theta_with_t_smw_time += (end_time - start_time)
 
@@ -630,6 +644,7 @@ def eval_post_contingency_model(sol_eval):
     print('construct_a_t_time: {}'.format(construct_a_t_time))
     print('factor_a_t_time: {}'.format(factor_a_t_time))
     print('compute_w_with_t_a_solve_time: {}'.format(compute_w_with_t_a_solve_time))
+    print('compute_v_t_time: {}'.format(compute_v_t_time))
     print('compute_w_with_t_smw_time: {}'.format(compute_w_with_t_smw_time))
     print('compute_v_time: {}'.format(compute_v_time))
     print('compute_bus_theta_with_t_a_solve_time: {}'.format(compute_bus_theta_with_t_a_solve_time))
