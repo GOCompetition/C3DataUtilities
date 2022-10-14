@@ -57,6 +57,7 @@ import time, numpy, scipy, scipy.sparse, scipy.sparse.linalg
 from datautilities import utils
 
 # todo - refactor, with a class
+# obviously this huge block of code should be refactored
 
 @utils.timeit
 def eval_post_contingency_model(sol_eval):
@@ -72,6 +73,7 @@ def eval_post_contingency_model(sol_eval):
     br_filter_by_worst_ctg = True
     t_use_smw = True
     t_skip_update_if_no_br_change = False # not implemented yet - probably not much value, at least in the test cases we have so far
+    check_power_balance = True # not implemented yet # note this will be skipped if br_filter_by_worst_ctg is True
 
     # problem dimensions
     num_bus = sol_eval.problem.num_bus
@@ -151,9 +153,6 @@ def eval_post_contingency_model(sol_eval):
     t_num_acl_delta_t = [t_acl_delta_t[t].size for t in range(num_t)]
     t_num_xfr_delta_t = [t_xfr_delta_t[t].size for t in range(num_t)]
     t_num_br_delta_t = [t_br_delta_t[t].size for t in range(num_t)]
-    # todo compute Wt and Vt on these
-    # Wt can just be all of the columns we need over any t
-    # compute Vt in the loop
     print('t_acl_delta_t: {}, t_xfr_delta_t: {}, t_br_delta_t: {}, acl_delta_t: {}, xfr_delta_t: {}, br_delta_t: {}'.format(t_acl_delta_t, t_xfr_delta_t, t_br_delta_t, acl_delta_t, xfr_delta_t, br_delta_t))
 
     # get AC branches going out of service in at least one contingency
@@ -242,6 +241,8 @@ def eval_post_contingency_model(sol_eval):
     # i.e. Wk and W_t for the SMW approach with respect to
     # k on A0 and t on A0
     # this is expensive but it is a one time cost, not recurring for each t
+    # Wt can just be all of the columns we need over any t
+    # compute Vt in the loop
     start_time = time.time()
     w0_acl_k[:] = a_factors.solve(m_acl_k)
     w0_xfr_k[:] = a_factors.solve(m_xfr_k)
@@ -262,7 +263,9 @@ def eval_post_contingency_model(sol_eval):
     bus_xfr_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float)
 
     br_p = numpy.zeros(shape=(num_br, ), dtype=float) # main term
-    br_bool = numpy.zeros(shape=(num_br, ), dtype=bool)
+    br_bool_1 = numpy.zeros(shape=(num_br, ), dtype=bool)
+    br_bool_2 = numpy.zeros(shape=(num_br, ), dtype=bool)
+    br_bool_3 = numpy.zeros(shape=(num_br, ), dtype=bool)
     br_float = numpy.zeros(shape=(num_br, ), dtype=float)
     br_float_1 = numpy.zeros(shape=(num_br, ), dtype=float)
     br_acl_delta_k_float = numpy.zeros(shape=(num_br, num_acl_delta_k), dtype=float)
@@ -285,13 +288,26 @@ def eval_post_contingency_model(sol_eval):
     compute_bus_theta_with_t_smw_time = 0.0
     compute_br_p_time = 0.0
     apply_w_v_wt_time = 0.0
+    compute_bus_dtheta_rhs_dcl_k_time = 0.0
+    compute_w_v_wt_xfr_k_time = 0.0
+    compute_bus_dtheta_rhs_xfr_k_time = 0.0
     compute_br_acl_delta_k_p_delta_time = 0.0
-    filter_branches_time = 0.0
+    compute_br_dcl_delta_k_p_delta_time = 0.0
+    compute_br_xfr_delta_k_p_delta_time = 0.0
+    filter_branches_acl_k_time = 0.0
+    filter_branches_dcl_k_time = 0.0
+    filter_branches_xfr_k_time = 0.0
     compute_br_acl_delta_k_p_time = 0.0
+    compute_br_dcl_delta_k_p_time = 0.0
+    compute_br_xfr_delta_k_p_time = 0.0
     compute_br_acl_delta_k_s_over_time = 0.0
-    zero_out_acl_delta_k_time = 0.0
+    compute_br_dcl_delta_k_s_over_time = 0.0
+    compute_br_xfr_delta_k_s_over_time = 0.0
+    zero_out_time = 0.0
     get_max_br_acl_delta_k_s_over_time = 0.0
-    compute_br_acl_delta_k_z_time = 0.0
+    get_max_br_dcl_delta_k_s_over_time = 0.0
+    get_max_br_xfr_delta_k_s_over_time = 0.0
+    compute_br_k_z_time = 0.0
     collect_penalties_into_obj_array_time = 0.0
 
     # largest violations
@@ -307,16 +323,22 @@ def eval_post_contingency_model(sol_eval):
 
     for t in range(num_t):
 
+        t_start_time = time.time()
+
         br_acl_delta_k_float[:] = 0.0
         acl_delta_k_float[:] = 0.0
+        br_dcl_delta_k_float[:] = 0.0
+        dcl_delta_k_float[:] = 0.0
+        br_xfr_delta_k_float[:] = 0.0
+        xfr_delta_k_float[:] = 0.0
 
-        # todo skip certain computations if there was no change from the previous t, i.e. ac br u_su/sd == 0
+        # not needed
+        # skip certain computations if there was no change from the previous t, i.e. ac br u_su/sd == 0
+        # probably not much value in this though
 
-        # todo low rank update with respect to t, as in HIPPO/MISO paper
-        # need to create test data with more line switching to test this sufficiently
+        # do low rank update with respect to t, as in HIPPO/MISO paper
+        # todo create test data with more line switching to test this sufficiently
         # e.g. ~ 10 to 100 switches per time interval, some connecting, some disconnecting
-
-        t_start_time = time.time()
 
         # get some time-varying characteristics of branches from the base case solution
         start_time = time.time()
@@ -366,6 +388,7 @@ def eval_post_contingency_model(sol_eval):
         end_time = time.time()
         compute_w_with_t_a_solve_time += (end_time - start_time)
 
+        # compute v_t
         start_time = time.time()
         if t_use_smw:
             # note w_t, v_t, etc., are with all branches, - need to make sure the phi term is multiplied by u_t todo
@@ -379,6 +402,7 @@ def eval_post_contingency_model(sol_eval):
         end_time = time.time()
         compute_v_t_time += (end_time - start_time)
 
+        # compute w_tk using SMW with respect to t
         start_time = time.time()
         if t_use_smw:
             # note w_t, v_t, etc., are with all branches, - need to make sure the phi term is multiplied by u_t todo
@@ -449,6 +473,7 @@ def eval_post_contingency_model(sol_eval):
         end_time = time.time()
         compute_bus_theta_with_t_a_solve_time += (end_time - start_time)
 
+        # solve for base case bus theta using SMW-t
         start_time = time.time()
         if t_use_smw:
             bus_theta[:] = a_factors.solve(bus_rhs)
@@ -460,7 +485,7 @@ def eval_post_contingency_model(sol_eval):
         end_time = time.time()
         compute_bus_theta_with_t_smw_time += (end_time - start_time)
 
-        # compute br p under no outages
+        # compute br p under no outages from theta
         start_time = time.time()
         #numpy.multiply(nonref_bus_br_inc.transpose(), bus_acl_delta_k_float, out=br_acl_delta_k_float)
         br_p[:] = nonref_bus_br_inc.transpose().dot(bus_theta)
@@ -470,8 +495,7 @@ def eval_post_contingency_model(sol_eval):
         end_time = time.time()
         compute_br_p_time += (end_time - start_time)
 
-        # compute bus theta under ACL outages
-        # main theta perturbation term for AC lines
+        # compute bus theta delta term under ACL outages - from w rank 1 update of matrix
         # this is somewhat expensive ~7 s
         # might be able to apply the idea on eliminating AC line computations that cannot possibly lead to violation
         start_time = time.time()
@@ -480,6 +504,37 @@ def eval_post_contingency_model(sol_eval):
         bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
         end_time = time.time()
         apply_w_v_wt_time += (end_time - start_time)
+
+        # compute bus theta delta term under DCL outages - from RHS
+        # todo
+        # copied from ACL outages
+        start_time = time.time()
+        #w_acl_k_rhs = numpy.dot(w_acl_k.transpose(), bus_rhs)
+        #w_acl_k_rhs = v_acl_k_inv * w_acl_k_rhs
+        #bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
+        bus_dcl_delta_k_float[:] = 0.0 # todo this is a placeholder
+        end_time = time.time()
+        compute_bus_dtheta_rhs_dcl_k_time += (end_time - start_time)
+
+        # compute bus theta delta term under XFR outages - from rhs
+        # todo
+        start_time = time.time()
+        #w_acl_k_rhs = numpy.dot(w_acl_k.transpose(), bus_rhs)
+        #w_acl_k_rhs = v_acl_k_inv * w_acl_k_rhs
+        #bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
+        bus_xfr_delta_k_float[:] = 0.0 # todo this is a placeholder
+        end_time = time.time()
+        compute_w_v_wt_xfr_k_time += (end_time - start_time)
+
+        # compute bus theta delta term under XFR outages - from w rank 1 update of matrix
+        # todo
+        start_time = time.time()
+        #w_acl_k_rhs = numpy.dot(w_acl_k.transpose(), bus_rhs)
+        #w_acl_k_rhs = v_acl_k_inv * w_acl_k_rhs
+        #bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
+        bus_xfr_delta_k_float[:] = 0.0 # todo this is a placeholder
+        end_time = time.time()
+        compute_bus_dtheta_rhs_xfr_k_time += (end_time - start_time)
         
         # compute AC branch flow deltas under ACL outages
         # this is somewhat expensive ~9 s
@@ -498,6 +553,25 @@ def eval_post_contingency_model(sol_eval):
         br_acl_delta_k_float[br_acl_delta_k_out_idx_lists] = 0.0
         end_time = time.time()
         compute_br_acl_delta_k_p_delta_time += (end_time - start_time)
+        
+        # compute AC branch flow deltas under DCL outages
+        start_time = time.time()
+        br_dcl_delta_k_float[:] = nonref_bus_br_inc.transpose().dot(bus_dcl_delta_k_float)
+        numpy.multiply(
+            numpy.reshape(br_b_t, newshape=(num_br, 1)), br_dcl_delta_k_float, out=br_dcl_delta_k_float)
+        # zero-out step not necessary here since
+        # these contingencies are DC line outages and we are computing AC branch flow
+        end_time = time.time()
+        compute_br_dcl_delta_k_p_delta_time += (end_time - start_time)
+        
+        # compute AC branch flow deltas under ACL outages
+        start_time = time.time()
+        br_xfr_delta_k_float[:] = nonref_bus_br_inc.transpose().dot(bus_xfr_delta_k_float)
+        numpy.multiply(
+            numpy.reshape(br_b_t, newshape=(num_br, 1)), br_xfr_delta_k_float, out=br_xfr_delta_k_float)
+        br_xfr_delta_k_float[br_xfr_delta_k_out_idx_lists] = 0.0
+        end_time = time.time()
+        compute_br_xfr_delta_k_p_delta_time += (end_time - start_time)
 
         # before adding, eliminate entries that do not need to be added because they cannot exceed the limit
         # that could reduce the compute time (and memory use)
@@ -519,25 +593,88 @@ def eval_post_contingency_model(sol_eval):
         numpy.power(br_float, 0.5, out=br_float)
         numpy.subtract(br_float, br_s_max, out=br_float)
         numpy.maximum(0.0, br_float, out=br_float)
-        
         # do we want a list of nonzero indices?
         # or a boolean array with true at the nonzero indices and false at the others?
-        numpy.greater(br_float, 0.0, out=br_bool)
-        br_viol_list = numpy.nonzero(br_float)[0]
-        num_br_viol_list = br_viol_list.size
-        print('num AC branches with possible violations in ACL contingencies: {}'.format(num_br_viol_list))
+        numpy.greater(br_float, 0.0, out=br_bool_1)
+        br_viol_list_acl_k = numpy.nonzero(br_float)[0]
+        num_br_viol_list_acl_k = br_viol_list_acl_k.size
+        print('num AC branches with possible violations in ACL contingencies: {}'.format(num_br_viol_list_acl_k))
         end_time = time.time()
-        filter_branches_time += (end_time - start_time)
+        filter_branches_acl_k_time += (end_time - start_time)
+
+        # before adding, eliminate entries that do not need to be added because they cannot exceed the limit
+        start_time = time.time()
+        if num_dcl_delta_k > 0:
+            numpy.amax(br_dcl_delta_k_float, axis=1, out=br_float)
+            numpy.amin(br_dcl_delta_k_float, axis=1, out=br_float_1)
+            numpy.add(br_p, br_float, out=br_float)
+            numpy.add(br_p, br_float_1, out=br_float_1)
+            numpy.absolute(br_float, out=br_float)
+            numpy.absolute(br_float_1, out=br_float_1)
+            numpy.maximum(br_float, br_float_1, out=br_float)
+        else:
+            br_float[:] = br_p
+        numpy.power(br_float, 2, out=br_float)
+        numpy.power(br_q, 2, out=br_float_1)
+        numpy.add(br_float, br_float_1, out=br_float)
+        numpy.power(br_float, 0.5, out=br_float)
+        numpy.subtract(br_float, br_s_max, out=br_float)
+        numpy.maximum(0.0, br_float, out=br_float)
+        numpy.greater(br_float, 0.0, out=br_bool_2)
+        br_viol_list_dcl_k = numpy.nonzero(br_float)[0]
+        num_br_viol_list_dcl_k = br_viol_list_dcl_k.size
+        print('num AC branches with possible violations in DCL contingencies: {}'.format(num_br_viol_list_dcl_k))
+        end_time = time.time()
+        filter_branches_dcl_k_time += (end_time - start_time)
+
+        # before adding, eliminate entries that do not need to be added because they cannot exceed the limit
+        start_time = time.time()
+        if num_xfr_delta_k > 0:
+            numpy.amax(br_xfr_delta_k_float, axis=1, out=br_float)
+            numpy.amin(br_xfr_delta_k_float, axis=1, out=br_float_1)
+            numpy.add(br_p, br_float, out=br_float)
+            numpy.add(br_p, br_float_1, out=br_float_1)
+            numpy.absolute(br_float, out=br_float)
+            numpy.absolute(br_float_1, out=br_float_1)
+            numpy.maximum(br_float, br_float_1, out=br_float)
+        else:
+            br_float[:] = br_p
+        numpy.power(br_float, 2, out=br_float)
+        numpy.power(br_q, 2, out=br_float_1)
+        numpy.add(br_float, br_float_1, out=br_float)
+        numpy.power(br_float, 0.5, out=br_float)
+        numpy.subtract(br_float, br_s_max, out=br_float)
+        numpy.maximum(0.0, br_float, out=br_float)
+        numpy.greater(br_float, 0.0, out=br_bool_3)
+        br_viol_list_xfr_k = numpy.nonzero(br_float)[0]
+        num_br_viol_list_xfr_k = br_viol_list_xfr_k.size
+        print('num AC branches with possible violations in XFR contingencies: {}'.format(num_br_viol_list_xfr_k))
+        end_time = time.time()
+        filter_branches_xfr_k_time += (end_time - start_time)
 
         # add br_p delta term from base case br_p to get post-k br_p - only on filtered branches
         start_time = time.time()
         numpy.add(
             numpy.reshape(br_p, newshape=(num_br, 1)), br_acl_delta_k_float, out=br_acl_delta_k_float,
-            where=(numpy.reshape(br_bool, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+            where=(numpy.reshape(br_bool_1, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
         end_time = time.time()
         compute_br_acl_delta_k_p_time += (end_time - start_time)
 
+        # add br_p delta term from base case br_p to get post-k br_p - only on filtered branches - dcl k
+        start_time = time.time()
+        numpy.add(
+            numpy.reshape(br_p, newshape=(num_br, 1)), br_dcl_delta_k_float, out=br_dcl_delta_k_float,
+            where=(numpy.reshape(br_bool_2, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        end_time = time.time()
+        compute_br_dcl_delta_k_p_time += (end_time - start_time)
 
+        # add br_p delta term from base case br_p to get post-k br_p - only on filtered branches - xfr k
+        start_time = time.time()
+        numpy.add(
+            numpy.reshape(br_p, newshape=(num_br, 1)), br_xfr_delta_k_float, out=br_xfr_delta_k_float,
+            where=(numpy.reshape(br_bool_3, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        end_time = time.time()
+        compute_br_xfr_delta_k_p_time += (end_time - start_time)
 
         # compute AC branch flow violations under ACL outages
         # this is expensive ~83 s but reduced hugely to about 2 or 3 s by
@@ -554,56 +691,143 @@ def eval_post_contingency_model(sol_eval):
         # this redundancy is critical to many security constraint evaluation and enforcement techniques.
         start_time = time.time()
         numpy.power(br_acl_delta_k_float, 2, out=br_acl_delta_k_float,
-            where=(numpy.reshape(br_bool, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+            where=(numpy.reshape(br_bool_1, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
         numpy.add(
             br_acl_delta_k_float, numpy.reshape(numpy.power(br_q, 2), newshape=(num_br, 1)),
             out=br_acl_delta_k_float,
-            where=(numpy.reshape(br_bool, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+            where=(numpy.reshape(br_bool_1, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
         numpy.power(br_acl_delta_k_float, 0.5, out=br_acl_delta_k_float,
-            where=(numpy.reshape(br_bool, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+            where=(numpy.reshape(br_bool_1, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
         numpy.subtract(
             br_acl_delta_k_float, numpy.reshape(br_s_max, newshape=(num_br, 1)), out=br_acl_delta_k_float,
-            where=(numpy.reshape(br_bool, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+            where=(numpy.reshape(br_bool_1, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
         numpy.maximum(0.0, br_acl_delta_k_float, out=br_acl_delta_k_float,
-            where=(numpy.reshape(br_bool, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+            where=(numpy.reshape(br_bool_1, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
         end_time = time.time()
         compute_br_acl_delta_k_s_over_time += (end_time - start_time)
 
+        # compute AC branch flow violations under DCL outages
+        start_time = time.time()
+        numpy.power(br_dcl_delta_k_float, 2, out=br_dcl_delta_k_float,
+            where=(numpy.reshape(br_bool_2, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.add(
+            br_dcl_delta_k_float, numpy.reshape(numpy.power(br_q, 2), newshape=(num_br, 1)),
+            out=br_dcl_delta_k_float,
+            where=(numpy.reshape(br_bool_2, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.power(br_dcl_delta_k_float, 0.5, out=br_dcl_delta_k_float,
+            where=(numpy.reshape(br_bool_2, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.subtract(
+            br_dcl_delta_k_float, numpy.reshape(br_s_max, newshape=(num_br, 1)), out=br_dcl_delta_k_float,
+            where=(numpy.reshape(br_bool_2, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.maximum(0.0, br_dcl_delta_k_float, out=br_dcl_delta_k_float,
+            where=(numpy.reshape(br_bool_2, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        end_time = time.time()
+        compute_br_dcl_delta_k_s_over_time += (end_time - start_time)
+
+        # compute AC branch flow violations under XFR outages
+        start_time = time.time()
+        numpy.power(br_xfr_delta_k_float, 2, out=br_xfr_delta_k_float,
+            where=(numpy.reshape(br_bool_3, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.add(
+            br_xfr_delta_k_float, numpy.reshape(numpy.power(br_q, 2), newshape=(num_br, 1)),
+            out=br_xfr_delta_k_float,
+            where=(numpy.reshape(br_bool_3, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.power(br_xfr_delta_k_float, 0.5, out=br_xfr_delta_k_float,
+            where=(numpy.reshape(br_bool_3, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.subtract(
+            br_xfr_delta_k_float, numpy.reshape(br_s_max, newshape=(num_br, 1)), out=br_xfr_delta_k_float,
+            where=(numpy.reshape(br_bool_3, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.maximum(0.0, br_xfr_delta_k_float, out=br_xfr_delta_k_float,
+            where=(numpy.reshape(br_bool_3, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        end_time = time.time()
+        compute_br_xfr_delta_k_s_over_time += (end_time - start_time)
+
         # zero out flows for branch-contingency pairs where the branch is out of service
         # may need to use this multiple times so time it - it should be trivial
+        # not needed on DC lines since the outaged branch is not in the computed branches
         start_time = time.time()
         br_acl_delta_k_float[br_acl_delta_k_out_idx_lists] = 0.0
+        br_xfr_delta_k_float[br_xfr_delta_k_out_idx_lists] = 0.0
         end_time = time.time()
-        zero_out_acl_delta_k_time += (end_time - start_time)
+        zero_out_time += (end_time - start_time)
 
         # get worst violations under ACL outages
         start_time = time.time()
-        viol = utils.get_max(
-            br_acl_delta_k_float[0:num_acl, :],
-            idx_lists=[sol_eval.problem.acl_uid, sol_eval.problem.acl_uid[acl_delta_k]])
-        if viol['val'] > max_viol_acl_acl_delta_k['val']:
-            viol['idx'][2] = t
-            max_viol_acl_acl_delta_k = viol
-        viol = utils.get_max(
-            br_acl_delta_k_float[0:num_xfr, :],
-            idx_lists=[sol_eval.problem.xfr_uid, sol_eval.problem.acl_uid[acl_delta_k]])
-        if viol['val'] > max_viol_xfr_acl_delta_k['val']:
-            viol['idx'][2] = t
-            max_viol_xfr_acl_delta_k = viol
+        if num_acl_delta_k > 0:
+            # on acl
+            viol = utils.get_max(
+                br_acl_delta_k_float[0:num_acl, :],
+                idx_lists=[sol_eval.problem.acl_uid, sol_eval.problem.acl_uid[acl_delta_k]])
+            if viol['val'] > max_viol_acl_acl_delta_k['val']:
+                viol['idx'][2] = t
+                max_viol_acl_acl_delta_k = viol
+            # on xfr
+            viol = utils.get_max(
+                br_acl_delta_k_float[0:num_xfr, :],
+                idx_lists=[sol_eval.problem.xfr_uid, sol_eval.problem.acl_uid[acl_delta_k]])
+            if viol['val'] > max_viol_xfr_acl_delta_k['val']:
+                viol['idx'][2] = t
+                max_viol_xfr_acl_delta_k = viol
         end_time = time.time()
         get_max_br_acl_delta_k_s_over_time += (end_time - start_time)
 
-        # compute AC branch flow penalties under ACL outages
+        # get worst violations under DCL outages
         start_time = time.time()
-        numpy.sum(br_acl_delta_k_float, axis=0, out=acl_delta_k_float,
-            where=(numpy.reshape(br_bool, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
-        numpy.multiply(sol_eval.problem.c_s, acl_delta_k_float, out=acl_delta_k_float)
+        if num_dcl_delta_k > 0:
+            # on acl
+            viol = utils.get_max(
+                br_dcl_delta_k_float[0:num_acl, :],
+                idx_lists=[sol_eval.problem.acl_uid, sol_eval.problem.dcl_uid[dcl_delta_k]])
+            if viol['val'] > max_viol_acl_dcl_delta_k['val']:
+                viol['idx'][2] = t
+                max_viol_acl_dcl_delta_k = viol
+            # on xfr
+            viol = utils.get_max(
+                br_dcl_delta_k_float[0:num_xfr, :],
+                idx_lists=[sol_eval.problem.xfr_uid, sol_eval.problem.dcl_uid[dcl_delta_k]])
+            if viol['val'] > max_viol_xfr_dcl_delta_k['val']:
+                viol['idx'][2] = t
+                max_viol_xfr_dcl_delta_k = viol
         end_time = time.time()
-        compute_br_acl_delta_k_z_time += (end_time - start_time)
+        get_max_br_dcl_delta_k_s_over_time += (end_time - start_time)
 
-        # todo compute dcl rhs
-        # todo compute xfr rhs and xfr perturbation
-        
+        # get worst violations under XFR outages
+        start_time = time.time()
+        if num_xfr_delta_k > 0:
+            # on acl
+            viol = utils.get_max(
+                br_xfr_delta_k_float[0:num_acl, :],
+                idx_lists=[sol_eval.problem.acl_uid, sol_eval.problem.xfr_uid[xfr_delta_k]])
+            if viol['val'] > max_viol_acl_xfr_delta_k['val']:
+                viol['idx'][2] = t
+                max_viol_acl_xfr_delta_k = viol
+            # on xfr
+            viol = utils.get_max(
+                br_xfr_delta_k_float[0:num_xfr, :],
+                idx_lists=[sol_eval.problem.xfr_uid, sol_eval.problem.xfr_uid[xfr_delta_k]])
+            if viol['val'] > max_viol_xfr_xfr_delta_k['val']:
+                viol['idx'][2] = t
+                max_viol_xfr_xfr_delta_k = viol
+        end_time = time.time()
+        get_max_br_xfr_delta_k_s_over_time += (end_time - start_time)
+
+        # compute AC branch flow penalties
+        start_time = time.time()
+        # acl out
+        numpy.sum(br_acl_delta_k_float, axis=0, out=acl_delta_k_float,
+            where=(numpy.reshape(br_bool_1, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.multiply(sol_eval.problem.c_s, acl_delta_k_float, out=acl_delta_k_float)
+        # dcl out
+        numpy.sum(br_dcl_delta_k_float, axis=0, out=dcl_delta_k_float,
+            where=(numpy.reshape(br_bool_2, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.multiply(sol_eval.problem.c_s, dcl_delta_k_float, out=dcl_delta_k_float)
+        # xfr out
+        numpy.sum(br_xfr_delta_k_float, axis=0, out=xfr_delta_k_float,
+            where=(numpy.reshape(br_bool_3, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
+        numpy.multiply(sol_eval.problem.c_s, xfr_delta_k_float, out=xfr_delta_k_float)
+        end_time = time.time()
+        compute_br_k_z_time += (end_time - start_time)
+
         # acl_delta_k_float, dcl_delta_k_float, and xfr_delta_k_float
         # have the total penalties for this t under ACL, DCL, and XFR outages
         # need to collect these into total penalty for this t under each contingency
@@ -621,13 +845,13 @@ def eval_post_contingency_model(sol_eval):
 
     # todo check result
 
-    # todo
+    # not needed
     # reduce as in HIPPO SFT
     # LHS : monitored branches (well, they are all monitored so this will not help)
     # RHS : injection buses (generators, loads, shunts) and deal with distributed slack
     # really this is only of value in case of repeated evaluation, as in a solver callback, not in solution eval
 
-    # todo
+    # not needed
     # GPU deployment of linear algebra, as in DMC-SCY0 paper
 
     # report worst violations
@@ -651,12 +875,25 @@ def eval_post_contingency_model(sol_eval):
     print('compute_bus_theta_with_t_smw_time: {}'.format(compute_bus_theta_with_t_smw_time))
     print('compute_br_p_time: {}'.format(compute_br_p_time))
     print('apply_w_v_wt_time: {}'.format(apply_w_v_wt_time))
+    print('compute_bus_dtheta_rhs_dcl_k_time: {}'.format(compute_bus_dtheta_rhs_dcl_k_time))
+    print('compute_w_v_wt_xfr_k_time: {}'.format(compute_w_v_wt_xfr_k_time))
+    print('compute_bus_dtheta_rhs_xfr_k_time: {}'.format(compute_bus_dtheta_rhs_xfr_k_time))
     print('compute_br_acl_delta_k_p_delta_time: {}'.format(compute_br_acl_delta_k_p_delta_time))
-    print('filter_branches_time: {}'.format(filter_branches_time))
+    print('compute_br_dcl_delta_k_p_delta_time: {}'.format(compute_br_dcl_delta_k_p_delta_time))
+    print('compute_br_xfr_delta_k_p_delta_time: {}'.format(compute_br_xfr_delta_k_p_delta_time))
+    print('filter_branches_acl_k_time: {}'.format(filter_branches_acl_k_time))
+    print('filter_branches_dcl_k_time: {}'.format(filter_branches_dcl_k_time))
+    print('filter_branches_xfr_k_time: {}'.format(filter_branches_xfr_k_time))
     print('compute_br_acl_delta_k_p_time: {}'.format(compute_br_acl_delta_k_p_time))
+    print('compute_br_dcl_delta_k_p_time: {}'.format(compute_br_dcl_delta_k_p_time))
+    print('compute_br_xfr_delta_k_p_time: {}'.format(compute_br_xfr_delta_k_p_time))
     print('compute_br_acl_delta_k_s_over_time: {}'.format(compute_br_acl_delta_k_s_over_time))
-    print('zero_out_acl_delta_k_time: {}'.format(zero_out_acl_delta_k_time))
+    print('compute_br_dcl_delta_k_s_over_time: {}'.format(compute_br_dcl_delta_k_s_over_time))
+    print('compute_br_xfr_delta_k_s_over_time: {}'.format(compute_br_xfr_delta_k_s_over_time))
+    print('zero_out_time: {}'.format(zero_out_time))
     print('get_max_br_acl_delta_k_s_over_time: {}'.format(get_max_br_acl_delta_k_s_over_time))
-    print('compute_br_acl_delta_k_z_time: {}'.format(compute_br_acl_delta_k_z_time))
+    print('get_max_br_dcl_delta_k_s_over_time: {}'.format(get_max_br_dcl_delta_k_s_over_time))
+    print('get_max_br_xfr_delta_k_s_over_time: {}'.format(get_max_br_xfr_delta_k_s_over_time))
+    print('compute_br_k_z_time: {}'.format(compute_br_k_z_time))
     print('collect_penalties_into_obj_array_time: {}'.format(collect_penalties_into_obj_array_time))
     print('end of contingency model method 1, memory info: {}'.format(utils.get_memory_info()))
