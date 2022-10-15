@@ -93,6 +93,8 @@ def eval_post_contingency_model(sol_eval):
     # branch matrices
     nonref_bus_acl_inc = sol_eval.bus_acl_to_inj_mat - sol_eval.bus_acl_fr_inj_mat # inj_mat has -1.0, so (to - fr)
     nonref_bus_acl_inc = nonref_bus_acl_inc[nonref_bus, :]
+    nonref_bus_dcl_inc = sol_eval.bus_dcl_to_inj_mat - sol_eval.bus_dcl_fr_inj_mat
+    nonref_bus_dcl_inc = nonref_bus_dcl_inc[nonref_bus, :]
     nonref_bus_xfr_inc = sol_eval.bus_xfr_to_inj_mat - sol_eval.bus_xfr_fr_inj_mat
     nonref_bus_xfr_inc = nonref_bus_xfr_inc[nonref_bus, :]
     nonref_bus_br_inc = scipy.sparse.hstack((nonref_bus_acl_inc, nonref_bus_xfr_inc))
@@ -260,7 +262,10 @@ def eval_post_contingency_model(sol_eval):
     bus_float = numpy.zeros(shape=(num_bus - 1, ), dtype=float)
     bus_acl_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_acl_delta_k), dtype=float)
     bus_dcl_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_dcl_delta_k), dtype=float)
+    bus_dcl_delta_k_float_1 = numpy.zeros(shape=(num_bus - 1, num_dcl_delta_k), dtype=float)
     bus_xfr_delta_k_float = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float)
+    bus_xfr_delta_k_float_1 = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float)
+    bus_xfr_delta_k_float_2 = numpy.zeros(shape=(num_bus - 1, num_xfr_delta_k), dtype=float)
 
     br_p = numpy.zeros(shape=(num_br, ), dtype=float) # main term
     br_bool_1 = numpy.zeros(shape=(num_br, ), dtype=bool)
@@ -355,6 +360,7 @@ def eval_post_contingency_model(sol_eval):
         xfr_q_to = sol_eval.xfr_t_q_to[:, t]
         br_q_to = numpy.concatenate((acl_q_to, xfr_q_to))
         br_q = numpy.maximum(numpy.absolute(br_q_fr), numpy.absolute(br_q_to)) # no need to track which side is violated
+        dcl_p = sol_eval.dcl_t_p[:, t]
         end_time = time.time()
         get_time_varying_branch_characteristics_time += (end_time - start_time)
 
@@ -501,38 +507,70 @@ def eval_post_contingency_model(sol_eval):
         start_time = time.time()
         w_acl_k_rhs = numpy.dot(w_acl_k.transpose(), bus_rhs)
         w_acl_k_rhs = v_acl_k_inv * w_acl_k_rhs
-        bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
+        numpy.multiply(
+            w_acl_k, numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)), out=bus_acl_delta_k_float) #subtract this from A^-1 p
         end_time = time.time()
         apply_w_v_wt_time += (end_time - start_time)
 
         # compute bus theta delta term under DCL outages - from RHS
-        # todo
-        # copied from ACL outages
         start_time = time.time()
-        #w_acl_k_rhs = numpy.dot(w_acl_k.transpose(), bus_rhs)
-        #w_acl_k_rhs = v_acl_k_inv * w_acl_k_rhs
-        #bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
-        bus_dcl_delta_k_float[:] = 0.0 # todo this is a placeholder
+        bus_dcl_delta_k_float_1[:] = 0.0 # todo does toarray do this already?
+        nonref_bus_dcl_inc[:, dcl_delta_k].toarray(out=bus_dcl_delta_k_float_1)
+        numpy.multiply(
+            bus_dcl_delta_k_float_1,
+            numpy.reshape(dcl_p[dcl_delta_k], newshape=(1, num_dcl_delta_k)),
+            out=bus_dcl_delta_k_float_1)
+        if t_use_smw:
+            bus_dcl_delta_k_float[:] = a_factors.solve(bus_dcl_delta_k_float_1)
+            if t_num_br_delta_t[t] > 0:
+                w_t_bus_rhs = w_br_t[:, t_br_delta_t_in_br_delta_t].transpose().dot(bus_dcl_delta_k_float_1)
+                w_t_bus_rhs = scipy.linalg.lu_solve(v_t_factors, w_t_bus_rhs)
+                numpy.dot(w_br_t[:, t_br_delta_t_in_br_delta_t], w_t_bus_rhs, out=bus_dcl_delta_k_float_1)
+                numpy.subtract(bus_dcl_delta_k_float, bus_dcl_delta_k_float_1, out=bus_dcl_delta_k_float)
+        else:
+            bus_dcl_delta_k_float[:] = a_factors_t.solve(bus_dcl_delta_k_float_1)
+        numpy.negative(bus_dcl_delta_k_float, out=bus_dcl_delta_k_float) # could eliminate this
         end_time = time.time()
         compute_bus_dtheta_rhs_dcl_k_time += (end_time - start_time)
 
+        # todo - definitely some benefit from treating xfr with phi==0 as acl - only if we have large cases with many xfr outage contingencies
         # compute bus theta delta term under XFR outages - from rhs
-        # todo
         start_time = time.time()
-        #w_acl_k_rhs = numpy.dot(w_acl_k.transpose(), bus_rhs)
-        #w_acl_k_rhs = v_acl_k_inv * w_acl_k_rhs
-        #bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
-        bus_xfr_delta_k_float[:] = 0.0 # todo this is a placeholder
+        numpy.multiply(xfr_b[xfr_delta_k], xfr_phi[xfr_delta_k], out=xfr_delta_k_float)
+        numpy.multiply(xfr_u[xfr_delta_k], xfr_delta_k_float, out=xfr_delta_k_float)
+        bus_xfr_delta_k_float_1[:] = 0.0 # todo does toarray do this already?
+        nonref_bus_xfr_inc[:, xfr_delta_k].toarray(out=bus_xfr_delta_k_float_1)
+        numpy.multiply(
+            bus_xfr_delta_k_float_1,
+            numpy.reshape(xfr_delta_k_float, newshape=(1, num_xfr_delta_k)),
+            out=bus_xfr_delta_k_float_1)
+        if t_use_smw:
+            bus_xfr_delta_k_float[:] = a_factors.solve(bus_xfr_delta_k_float_1)
+            if t_num_br_delta_t[t] > 0:
+                w_t_bus_rhs = w_br_t[:, t_br_delta_t_in_br_delta_t].transpose().dot(bus_xfr_delta_k_float_1)
+                w_t_bus_rhs = scipy.linalg.lu_solve(v_t_factors, w_t_bus_rhs)
+                numpy.dot(w_br_t[:, t_br_delta_t_in_br_delta_t], w_t_bus_rhs, out=bus_xfr_delta_k_float_2)
+                numpy.subtract(bus_xfr_delta_k_float, bus_xfr_delta_k_float_2, out=bus_xfr_delta_k_float)
+        else:
+            bus_xfr_delta_k_float[:] = a_factors_t.solve(bus_xfr_delta_k_float_1)
+        numpy.add(
+            numpy.reshape(bus_rhs, newshape=(num_bus - 1, 1)), bus_xfr_delta_k_float_1, out=bus_xfr_delta_k_float_1)
+        w_xfr_k_rhs = numpy.einsum('ij,ij->j', w_xfr_k, bus_xfr_delta_k_float_1)
+        w_xfr_k_rhs = v_xfr_k_inv * w_xfr_k_rhs
+        numpy.multiply(
+            w_xfr_k, numpy.reshape(w_xfr_k_rhs, newshape=(1, num_xfr_delta_k)), out=bus_xfr_delta_k_float_1)
+        numpy.subtract(bus_xfr_delta_k_float_1, bus_xfr_delta_k_float, out=bus_xfr_delta_k_float) #subtract this from A^-1 p
         end_time = time.time()
         compute_w_v_wt_xfr_k_time += (end_time - start_time)
 
+        # todo we do not need this separate block
         # compute bus theta delta term under XFR outages - from w rank 1 update of matrix
         # todo
         start_time = time.time()
         #w_acl_k_rhs = numpy.dot(w_acl_k.transpose(), bus_rhs)
         #w_acl_k_rhs = v_acl_k_inv * w_acl_k_rhs
         #bus_acl_delta_k_float[:] = w_acl_k * numpy.reshape(w_acl_k_rhs, newshape=(1, num_acl_delta_k)) #subtract this from A^-1 p
-        bus_xfr_delta_k_float[:] = 0.0 # todo this is a placeholder
+        #bus_xfr_delta_k_float[:] = 0.0 # todo this is a placeholder
         end_time = time.time()
         compute_bus_dtheta_rhs_xfr_k_time += (end_time - start_time)
         
@@ -548,7 +586,7 @@ def eval_post_contingency_model(sol_eval):
         # zero out br-acl-delta-k that are outaged
         # this is correct, but still need to do it again after adding
         # it is not necessary to do it here for correctness,
-        # but ifwe do not do it here, then we lose much of the gain from filtering the delta terms
+        # but if we do not do it here, then we lose much of the gain from filtering the delta terms
         # drops number of branches down from ~1700 (out of 3000) to ~40
         br_acl_delta_k_float[br_acl_delta_k_out_idx_lists] = 0.0
         end_time = time.time()
@@ -564,7 +602,7 @@ def eval_post_contingency_model(sol_eval):
         end_time = time.time()
         compute_br_dcl_delta_k_p_delta_time += (end_time - start_time)
         
-        # compute AC branch flow deltas under ACL outages
+        # compute AC branch flow deltas under XFR outages
         start_time = time.time()
         br_xfr_delta_k_float[:] = nonref_bus_br_inc.transpose().dot(bus_xfr_delta_k_float)
         numpy.multiply(
