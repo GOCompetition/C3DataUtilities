@@ -70,10 +70,10 @@ def eval_post_contingency_model(sol_eval):
     '''
 
     # algorithm control parameters
-    br_filter_by_worst_ctg = True
-    t_use_smw = True
+    br_filter_by_worst_ctg = False
+    t_use_smw = False
     t_skip_update_if_no_br_change = False # not implemented yet - probably not much value, at least in the test cases we have so far
-    check_power_balance = True # not implemented yet # note this will be skipped if br_filter_by_worst_ctg is True
+    check_power_balance = True # not implemented yet # note this has to be skipped if br_filter_by_worst_ctg is True
 
     # problem dimensions
     num_bus = sol_eval.problem.num_bus

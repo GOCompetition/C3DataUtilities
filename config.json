@@ -12,6 +12,7 @@
     "time_eq_tol": 0.000001,
     "minimum_time_unit": 0.005,
     "hard_constr_tol": 0.00000001,
+    "beta_zero_tol": 0.000001,
     "interval_duration_schedules": [
         [
             0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,

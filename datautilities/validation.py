@@ -2,7 +2,7 @@
 
 '''
 
-import networkx, traceback, pprint, json, re, pandas, time
+import numpy, networkx, traceback, pprint, json, re, pandas, time
 from pydantic.error_wrappers import ValidationError
 from datamodel.input.data import InputDataFile
 from datamodel.output.data import OutputDataFile
@@ -22,6 +22,149 @@ def read_json(file_name):
     #print('config: {}'.format(config))
     #print(config['timestamp_pattern_str'])
     return data
+
+def get_p_q_linking_geometry(data, config):
+
+    info = {
+        i.uid: {
+            # basic geometry - exactly one is True, others False
+            # narrowest possible description, e.g. a line is not a band
+            'all': False,
+            'empty': False,
+            'line': False,
+            'band': False,
+            'cone': False,
+            # line/band/cone slope info
+            'upper_sloped_up': False,
+            'upper_horiz': False,
+            'upper_sloped_down': False,
+            'lower_sloped_up': False,
+            'lower_horiz': False,
+            'lower_sloped_down': False,
+            # cone orientation info
+            'opening_right': False,
+            'opening_left': False,
+            # line/band/cone constraints
+            'qmax0': None,
+            'qmin0': None,
+            'bmax': None,
+            'bmin': None,
+            # cone vertex
+            'pvx': None,
+            'qvx': None,
+            # too small nonzero slope errors
+            'b_too_small': False,
+            'bmax_too_small': False,
+            'bmin_too_small': False,
+            'bdiff_too_small': False,
+        }
+        for i in data.network.simple_dispatchable_device
+    }
+
+    # set info for each device
+    for i in data.network.simple_dispatchable_device:
+
+        # more convenient names to type
+        uid = i.uid
+        ineq = i.q_bound_cap
+        eq = i.q_linear_cap
+        b = i.beta if i.q_linear_cap == 1 else None
+        bmax = i.beta_ub if i.q_bound_cap == 1 else None
+        bmin = i.beta_lb if i.q_bound_cap == 1 else None
+        q0 = i.q_0 if i.q_linear_cap == 1 else None
+        qmax0 = i.q_0_ub if i.q_bound_cap == 1 else None
+        qmin0 = i.q_0_lb if i.q_bound_cap == 1 else None
+
+        # set info for this device
+        if ineq == 1: # inequality constraints, so not whole plane
+            if bmax != 0.0 and abs(bmax) < config['beta_zero_tol']:
+                info[uid]['bmax_too_small'] = True
+            if bmin != 0.0 and abs(bmin) < config['beta_zero_tol']:
+                info[uid]['bmin_too_small'] = True
+            info[uid]['qmax0'] = qmax0
+            info[uid]['qmin0'] = qmin0
+            info[uid]['bmax'] = bmax
+            info[uid]['bmin'] = bmin
+            if bmax == bmin: # upper and lower constraints parallel, so not cone
+                if qmin0 > qmax0: # empty
+                    info[uid]['empty'] = True
+                else: # not empty
+                    if qmin0 == qmax0: # line
+                        info[uid]['line'] = True
+                        if bmax == 0.0: # horiz
+                            info[uid]['upper_horiz'] = True
+                            info[uid]['lower_horiz'] = True
+                        else: # sloped
+                            if bmax > 0.0: # sloped up
+                                info[uid]['upper_sloped_up'] = True
+                                info[uid]['lower_sloped_up'] = True
+                            else: # sloped down
+                                info[uid]['upper_sloped_down'] = True
+                                info[uid]['lower_sloped_down'] = True
+                    else: # band
+                        info[uid]['band'] = True
+                        if bmax == 0.0: # horiz
+                            info[uid]['upper_horiz'] = True
+                            info[uid]['lower_horiz'] = True
+                        else: # sloped
+                            if bmax > 0.0: # sloped up
+                                info[uid]['upper_sloped_up'] = True
+                                info[uid]['lower_sloped_up'] = True
+                            else: # sloped down
+                                info[uid]['upper_sloped_down'] = True
+                                info[uid]['lower_sloped_down'] = True
+            else: # upper and lower constraints not parallel, so cone
+                if abs(bmax - bmin) < config['beta_zero_tol']:
+                    info[uid]['bdiff_too_small'] = True
+                info[uid]['cone'] = True
+                # p vertex
+                info[uid]['pvx'] = (qmin0 - qmax0) / (bmax - bmin)
+                # q vertex
+                if abs(bmax) < abs(bmin):
+                    info[uid]['qvx'] = qmax0 + bmax * info[uid]['pvx']
+                else:
+                    info[uid]['qvx'] = qmin0 + bmin * info[uid]['pvx']
+                if bmax > bmin: # opening right
+                    info[uid]['opening_right'] = True
+                else: # opening left
+                    info[uid]['opening_left'] = True
+                if bmax == 0.0: # upper constraint horiz
+                    info[uid]['upper_horiz'] = True
+                else: # upper constraint sloped
+                    if bmax > 0.0: # upper constraint sloped up
+                        info[uid]['upper_sloped_up'] = True
+                    else: # upper constraint sloped down
+                        info[uid]['upper_sloped_down'] = True
+                if bmin == 0.0: # lower constraint horiz
+                    info[uid]['lower_horiz'] = True
+                else: # lower constraint sloped
+                    if bmin > 0.0: # lower constraint sloped up
+                        info[uid]['lower_sloped_up'] = True
+                    else: # lower constraint sloped down
+                        info[uid]['lower_sloped_down'] = True
+        else: # no inequality constraints, so not empty, also not band and not cone
+            if eq == 1: # equality constraints, so line
+                if b != 0.0 and abs(b) < config['beta_zero_tol']:
+                    info[uid]['b_too_small'] = True
+                info[uid]['line'] = True
+                info[uid]['qmax0'] = q0
+                info[uid]['qmin0'] = q0
+                info[uid]['bmax'] = b
+                info[uid]['bmin'] = b
+                if b == 0.0: # horiz line
+                    info[uid]['upper_horiz'] = True
+                    info[uid]['lower_horiz'] = True
+                else: # sloped line
+                    if b > 0.0: # sloped up
+                        info[uid]['upper_sloped_up'] = True
+                        info[uid]['lower_sloped_up'] = True
+                    else: # sloped down
+                        info[uid]['upper_sloped_down'] = True
+                        info[uid]['lower_sloped_down'] = True
+            else: # no equality constraints, and no inequality constraints, so whole plane
+                info[uid]['all'] = True
+
+    return info
 
 def check_data(problem_file, solution_file, config_file, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
@@ -400,6 +543,12 @@ def model_checks(data, config):
         sd_w_a_en_min_end_discrete,
         sd_w_a_su_max_start_discrete,
         sd_w_a_su_max_end_discrete,
+        sd_p_q_linking_set_nonempty,
+        sd_p_q_beta_not_too_small,
+        sd_p_q_beta_max_not_too_small,
+        sd_p_q_beta_min_not_too_small,
+        sd_p_q_beta_diff_not_too_small,
+        ts_sd_p_q_feas,
         ]
     errors = []
     # try:
@@ -1226,6 +1375,222 @@ def ts_sd_on_status_lb_le_ub(data, config):
     if len(idx_err) > 0:
         msg = "fails time_series_input simple_dispatchable_device on_status_lb <= on_status_ub. failures (device index, device uid, interval index, on_status_lb, on_status_ub): {}".format(idx_err)
         raise ModelError(msg)
+
+def sd_p_q_linking_set_nonempty(data, config):
+
+    sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    # print('geometry:')
+    # print(sd_p_q_linking_geometry)
+    idx_err = [(k, v['qmax0'], v['qmin0'], v['bmax'], v['bmin']) for k, v in sd_p_q_linking_geometry.items() if v['empty']]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device q_bound_cap either q_0_lb <= q_0_ub or beta_max != beta_min. failures (uid, q_0_ub, q_0_lb, beta_ub, beta_lb): {}".format(idx_err)
+        raise ModelError(msg)
+
+def sd_p_q_beta_not_too_small(data, config):
+
+    sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    idx_err = [(k, v['b']) for k, v in sd_p_q_linking_geometry.items() if v['b_too_small']]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device q_linear_cap either beta == 0.0 or abs(beta) >= tol. tol = {}. failures (uid, beta): {}".format(config['beta_zero_tol'], idx_err)
+        raise ModelError(msg)
+
+def sd_p_q_beta_max_not_too_small(data, config):
+
+    sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    idx_err = [(k, v['bmax']) for k, v in sd_p_q_linking_geometry.items() if v['bmax_too_small']]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device q_bound_cap either beta_max == 0.0 or abs(beta_max) >= tol. tol = {}. failures (uid, beta_max): {}".format(config['beta_zero_tol'], idx_err)
+        raise ModelError(msg)
+
+def sd_p_q_beta_min_not_too_small(data, config):
+
+    sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    idx_err = [(k, v['bmin']) for k, v in sd_p_q_linking_geometry.items() if v['bmin_too_small']]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device q_bound_cap either beta_min == 0.0 or abs(beta_min) >= tol. tol = {}. failures (uid, beta_min): {}".format(config['beta_zero_tol'], idx_err)
+        raise ModelError(msg)
+
+def sd_p_q_beta_diff_not_too_small(data, config):
+
+    sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    idx_err = [(k, v['bmax'], v['bmin']) for k, v in sd_p_q_linking_geometry.items() if v['bdiff_too_small']]
+    if len(idx_err) > 0:
+        msg = "fails network simple_dispatchable_device q_bound_cap either beta_max == beta_min or abs(beta_max - beta_min) >= tol. tol = {}. failures (uid, beta_max, beta_min): {}".format(config['beta_zero_tol'], idx_err)
+        raise ModelError(msg)
+
+def check_p_q_feas(
+        # float t-arrays
+        pmax, pmin, qmax, qmin, float1,
+        # bool t-arrays
+        feas, bool1,
+        # dict
+        p_q_linking_geometry):
+
+    # # either an = constraint or a <= constraint and a >= constraint
+    # assert(
+    #     (qmax0 is None and qmin0 is None and bmax is None and bmin is None
+    #      and q0 is not None and b is not None) or
+    #     (qmax0 is not None and qmin0 is not None and bmax is not None and bmin is not None
+    #      and q0 is None and b is None))
+
+    # # reduce = constraint to a <= constraint and a >= constraint
+    # if qmax0 is None:
+    #     qmax0 = q0
+    # if qmin0 is None:
+    #     qmin0 = q0
+    # if bmax is None:
+    #     bmax = b
+    # if bmin is None:
+    #     bmin = b
+
+    feas[:] = False
+
+    # todo remove
+    feas[:] = True
+
+    # the p-q linking constraints are either mutually exclusive or define a cone in R2.
+    # so if there is a feasible point then there must be a feasible point on the boundary
+    # of the p/q max/min rectangle, i.e. satisfying one of the following conditions:
+    #
+    # p = pmax
+    # p = pmin
+    # q = qmax
+    # q = qmin
+    #
+    # check each of them in turn.
+    # The latter two cases are more complicated as they depend on the sign
+    # of beta_max and beta_min, leading to 6 subcases.
+    # the case beta = 0.0 requires care when beta is very small,
+    # so we add to the earlier checks a requirement that beta > tol or beta = 0.0.
+    # for cases we can assume
+    # there is no feasible point with p = pmax or p = pmin
+    # since otherwise we would already have determined feasibility in the p cases.
+
+    # todo pick up here
+    # first check x = pmax
+    # compute ymax and ymin from q-p max/min curves
+    # if [ymin, ymax] intersect [qmin, qmax] is nonempty, then feas
+    # float1[:] = pmax
+    # float2[:] = qmax
+    # float3[:] = qmin
+    # numpy.multiply(bmax, float1, out=float4)
+    # numpy.add(qmax0, float4, out=float4)
+    # numpy.minimum(float2, float4, out=float2)
+    # numpy.multiply(sd.beta_lb, t_x, out=t_float)
+    # numpy.add(sd.q_0_lb, t_float, out=t_float)
+    # numpy.maximum(t_ymin, t_float, out=t_ymin)
+    # numpy.lessequal(t_ymin, t_ymax, out=t_bool)
+    # numpy.add(t_feas, t_bool, out=t_feas)
+
+    '''
+
+            # suppose x = pmax_t
+            # compute ymax and ymin from the q-p max/min curves.
+            # if [ymin, ymax] intersect [qmin_t, qmax_t] is nonempty, then feas
+
+            # x = pmin_t
+            t_x[:] = t_pmin
+            t_ymax[:] = t_qmax
+            t_ymin[:] = t_qmin
+            numpy.multiply(sd.beta_ub, t_x, out=t_float)
+            numpy.add(sd.q_0_ub, t_float, out=t_float)
+            numpy.minimum(t_ymax, t_float, out=t_ymax)
+            numpy.multiply(sd.beta_lb, t_x, out=t_float)
+            numpy.add(sd.q_0_lb, t_float, out=t_float)
+            numpy.maximum(t_ymin, t_float, out=t_ymin)
+            numpy.lessequal(t_ymin, t_ymax, out=t_bool)
+            numpy.add(t_feas, t_bool, out=t_feas)
+            # x = qmax_t - ?? todo
+            t_x[:] = t_qmax
+            t_ymax[:] = t_pmax
+            t_ymin[:] = t_pmin
+            numpy.subtract(t_x, sd.q_0_ub, out=t_float)
+            # if sd.beta_ub == 0.0:
+            #     nump
+            if sd.beta_ub > 0.0:
+                numpy.divide(t_float, sd.beta_ub, out=t_float)
+                numpy.maximum(t_ymin, t_float, out=t_ymin)
+            if sd.beta_ub < 0.0:
+                numpy.divide(t_float, sd.beta_ub, out=t_float
+
+            numpy.multiply(sd.beta_ub, t_x, out=t_float)
+            numpy.add(sd.q_0_ub, t_float, out=t_float)
+            numpy.minimum(t_qmax, t_float, out=t_ymax)
+            numpy.multiply(sd.beta_lb, t_x, out=t_float)
+            numpy.add(sd.q_0_lb, t_float, out=t_float)
+            numpy.maximum(t_qmin, t_float, out=t_ymin)
+            numpy.lessequal(t_ymin, t_ymax, out=t_bool)
+            numpy.add(t_feas, t_bool, out=t_feas)
+            # x = qmin_t
+
+    '''
+
+
+def ts_sd_p_q_feas(data, config):
+    '''
+    check that the intersection of the p/q max/min rectangle and the p/q linking constraints is nonempty
+
+    q_linear_cap == 1
+    q_0
+    beta
+
+    q_bound_cap == 1
+    q_0_ub
+    q_0_lb
+    beta_ub
+    beta_lb
+
+    q = q0 + beta*p
+    q = qmax
+    p = (qmax - q0)/beta
+
+    Consider
+    A = [pmin,max] times [qmin,qmax]
+    B = {(p,q) : q
+
+    check that the intersection of the q-p max and min curves is <= pmax
+    for devices that have
+    * a q-p max curve
+    * a q-p min curve
+    * beta_max > beta_min so trapezoid opens to the right
+
+    q_p_0_max + beta_max * p_int = q_p_0_min + beta_min * p_int
+    (beta_max - beta_min) * p_int = q_p_0_min - q_p_0_max
+    p_int = (q_p_0_min - q_p_0_max) / (beta_max - beta_min)
+    '''
+
+    idx_err = []
+    uid_sd_ts_map = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.time_series_input.simple_dispatchable_device)
+    pmax = numpy.zeros(shape=(num_t, ), dtype=float)
+    pmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    qmax = numpy.zeros(shape=(num_t, ), dtype=float)
+    qmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    feas = numpy.zeros(shape=(num_t, ), dtype=bool)
+    float1 = numpy.zeros(shape=(num_t, ), dtype=float)
+    bool1 = numpy.zeros(shape=(num_t, ), dtype=bool)
+    sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    for j in range(num_sd):
+        sd = data.network.simple_dispatchable_device[j]
+        if sd.q_bound_cap == 1 or sd.q_linear_cap == 1:
+            sd_ts = uid_sd_ts_map[sd.uid]
+            pmax[:] = sd_ts.p_ub
+            pmin[:] = sd_ts.p_lb
+            qmax[:] = sd_ts.q_ub
+            qmin[:] = sd_ts.q_lb
+            feas[:] = False
+            p_q_linking_geometry = sd_p_q_linking_geometry[sd.uid]
+            check_p_q_feas(
+                pmax, pmin, qmax, qmin, float1,
+                feas, bool1,
+                p_q_linking_geometry)
+            numpy.logical_not(feas, out=bool1)
+            infeas_t = numpy.flatnonzero(bool1)
+            idx_err += [(sd.uid, t) for t in infeas_t]
+    if len(idx_err) > 0:
+        msg = "fails simple_dispatchable_device p/q max/min time series constraints and p/q linking constraints have nonempty intersection. failures (device uid, interval index): {}".format(idx_err)
+        raise ModelError(msg)    
 
 def ts_sd_p_lb_le_ub(data, config):
 
