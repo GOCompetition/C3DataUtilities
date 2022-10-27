@@ -29,7 +29,7 @@ def get_p_q_linking_geometry(data, config):
         i.uid: {
             # basic geometry - exactly one is True, others False
             # narrowest possible description, e.g. a line is not a band
-            'all': False,
+            'plane': False,
             'empty': False,
             'line': False,
             'band': False,
@@ -162,9 +162,137 @@ def get_p_q_linking_geometry(data, config):
                         info[uid]['upper_sloped_down'] = True
                         info[uid]['lower_sloped_down'] = True
             else: # no equality constraints, and no inequality constraints, so whole plane
-                info[uid]['all'] = True
+                info[uid]['plane'] = True
 
     return info
+
+def compute_max_min_p_from_max_min_p_q_and_linking(p_max, p_min, q_max, q_min, linking):
+    '''
+
+    feas, y_max, y_min = compute_max_min_p_from_max_min_p_q_and_linking(p_max, p_min, q_max, q_min, linking)
+
+    Let W be the set of (p,q) satisfying the linking constaints and
+    p_min <= p <= p_max and q_min <= q <= q_max.
+
+    determine feas, y_max, y_min, where
+
+    feas =
+      True if W is not empty
+      False else
+
+    y_max =
+      maximum value of p such that (p, q) is in W for some q if W is not empty
+      None else
+
+    y_min =
+      minimum value of p such that (p, q) is in W for some q if W is not empty
+      None else
+    '''
+
+    # assume feasible unless prove otherwise
+    feas = True
+
+    # start with rectangle bounds on p, then cut them down
+    y_max = p_max
+    y_min = p_min
+
+    if p_min > p_max: # p bounds infeas
+        feas = False
+        return feas, y_max, y_min
+
+    if q_min > q_max: # q bounds infeas
+        y_max = -float('inf')
+        y_min = float('inf')
+        feas = False
+        return feas, y_max, y_min
+
+    if linking['empty']: # empty linking set is infeas
+        y_max = -float('inf')
+        y_min = float('inf')
+        feas = False
+        return feas, y_max, y_min
+
+    if linking['cone']: # cone
+        # print('pmax: {}, pmin: {}, qmax: {}, qmin: {}, geometry: {}'.format(p_max, p_min, q_max, q_min, linking))
+        # constraints on p implied by upper linking constraint and q_min
+        if linking['upper_sloped_up']: # if upper constraint slopes up, then it constrains p from below
+            y_min = max(y_min, (q_min - linking['qmax0']) / linking['bmax'])
+        elif linking['upper_sloped_down']: # if upper constraint slopes down, then it constrains p from above
+            y_max = min(y_max, (q_min - linking['qmax0']) / linking['bmax'])
+        elif linking['qmax0'] < q_min: # if upper constraint is horizontal, then q_min can make infeas
+            y_max = -float('inf')
+            y_min = float('inf')
+            feas = False
+            return feas, y_max, y_min
+        # constraints on p implied by lower linking constraint and q_max
+        if linking['lower_sloped_up']: # if lower constraint slopes up, then it constrains p from above
+            y_max = min(y_max, (q_max - linking['qmin0']) / linking['bmin'])
+        elif linking['lower_sloped_down']: # if lower constraint slopes down, then it constrains p from below
+            y_min = max(y_min, (q_max - linking['qmin0']) / linking['bmin'])
+        elif linking['qmin0'] > q_max: # if lower constraint is horizontal, then q_max can make infeas
+            y_max = -float('inf')
+            y_min = float('inf')
+            feas = False
+            return feas, y_max, y_min
+        # constraints on p implied by upper and lower linking constraints
+        if linking['opening_right']: # opening right, so vertex constrains p from below
+            y_min = max(y_min, linking['pvx'])
+        else: # opening left, so vertex constrains p from above
+            y_max = min(y_max, linking['pvx'])
+        # ready to return
+        if y_min > y_max:
+            feas = False
+        return feas, y_max, y_min
+
+    if linking['band']: # band
+        if linking['upper_horiz']: # horizontal band
+            if linking['qmax0'] < q_min:
+                y_max = -float('inf')
+                y_min = float('inf')
+                feas = False
+                return feas, y_max, y_min
+            if linking['qmin0'] > q_max:
+                y_max = -float('inf')
+                y_min = float('inf')
+                feas = False
+                return feas, y_max, y_min
+        else: # sloped band
+            if linking['upper_sloped_up']: # band sloping up
+                y_max = min(y_max, (q_max - linking['qmin0']) / linking['bmin'])
+                y_min = max(y_min, (q_min - linking['qmax0']) / linking['bmax'])
+            else: # band sloping down
+                y_max = min(y_max, (q_min - linking['qmax0']) / linking['bmax'])
+                y_min = max(y_min, (q_max - linking['qmin0']) / linking['bmin'])
+        # ready to return
+        if y_min > y_max:
+            feas = False
+        return feas, y_max, y_min
+
+    if linking['line']: # line
+        if linking['upper_horiz']: # horizontal line
+            if linking['qmin0'] > q_max:
+                y_max = -float('inf')
+                y_min = float('inf')
+                feas = False
+                return feas, y_max, y_min
+            if linking['qmax0'] < q_min:
+                y_max = -float('inf')
+                y_min = float('inf')
+                feas = False
+                return feas, y_max, y_min
+        else: # sloped line
+            if linking['upper_sloped_up']: # line sloping up
+                y_max = min(y_max, (q_max - linking['qmax0']) / linking['bmax'])
+                y_min = max(y_min, (q_min - linking['qmax0']) / linking['bmax'])
+            else: # line sloping down
+                y_max = min(y_max, (q_min - linking['qmax0']) / linking['bmax'])
+                y_min = max(y_min, (q_max - linking['qmax0']) / linking['bmax'])
+        # ready to return
+        if y_min > y_max:
+            feas = False
+        return feas, y_max, y_min
+
+    # if we have not returned yet, there is a problem
 
 def check_data(problem_file, solution_file, config_file, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
@@ -1420,9 +1548,9 @@ def sd_p_q_beta_diff_not_too_small(data, config):
 
 def check_p_q_feas(
         # float t-arrays
-        pmax, pmin, qmax, qmin, float1,
+        p_max, p_min, q_max, q_min, y_max, y_min,
         # bool t-arrays
-        feas, bool1,
+        feas,
         # dict
         p_q_linking_geometry):
 
@@ -1444,87 +1572,19 @@ def check_p_q_feas(
     #     bmin = b
 
     feas[:] = False
+    y_max[:] = 0.0
+    y_min[:] = 0.0
+    feas_scalar = False
+    y_max_scalar = 0.0
+    y_min_scalar = 0.0
 
-    # todo remove
-    feas[:] = True
-
-    # the p-q linking constraints are either mutually exclusive or define a cone in R2.
-    # so if there is a feasible point then there must be a feasible point on the boundary
-    # of the p/q max/min rectangle, i.e. satisfying one of the following conditions:
-    #
-    # p = pmax
-    # p = pmin
-    # q = qmax
-    # q = qmin
-    #
-    # check each of them in turn.
-    # The latter two cases are more complicated as they depend on the sign
-    # of beta_max and beta_min, leading to 6 subcases.
-    # the case beta = 0.0 requires care when beta is very small,
-    # so we add to the earlier checks a requirement that beta > tol or beta = 0.0.
-    # for cases we can assume
-    # there is no feasible point with p = pmax or p = pmin
-    # since otherwise we would already have determined feasibility in the p cases.
-
-    # todo pick up here
-    # first check x = pmax
-    # compute ymax and ymin from q-p max/min curves
-    # if [ymin, ymax] intersect [qmin, qmax] is nonempty, then feas
-    # float1[:] = pmax
-    # float2[:] = qmax
-    # float3[:] = qmin
-    # numpy.multiply(bmax, float1, out=float4)
-    # numpy.add(qmax0, float4, out=float4)
-    # numpy.minimum(float2, float4, out=float2)
-    # numpy.multiply(sd.beta_lb, t_x, out=t_float)
-    # numpy.add(sd.q_0_lb, t_float, out=t_float)
-    # numpy.maximum(t_ymin, t_float, out=t_ymin)
-    # numpy.lessequal(t_ymin, t_ymax, out=t_bool)
-    # numpy.add(t_feas, t_bool, out=t_feas)
-
-    '''
-
-            # suppose x = pmax_t
-            # compute ymax and ymin from the q-p max/min curves.
-            # if [ymin, ymax] intersect [qmin_t, qmax_t] is nonempty, then feas
-
-            # x = pmin_t
-            t_x[:] = t_pmin
-            t_ymax[:] = t_qmax
-            t_ymin[:] = t_qmin
-            numpy.multiply(sd.beta_ub, t_x, out=t_float)
-            numpy.add(sd.q_0_ub, t_float, out=t_float)
-            numpy.minimum(t_ymax, t_float, out=t_ymax)
-            numpy.multiply(sd.beta_lb, t_x, out=t_float)
-            numpy.add(sd.q_0_lb, t_float, out=t_float)
-            numpy.maximum(t_ymin, t_float, out=t_ymin)
-            numpy.lessequal(t_ymin, t_ymax, out=t_bool)
-            numpy.add(t_feas, t_bool, out=t_feas)
-            # x = qmax_t - ?? todo
-            t_x[:] = t_qmax
-            t_ymax[:] = t_pmax
-            t_ymin[:] = t_pmin
-            numpy.subtract(t_x, sd.q_0_ub, out=t_float)
-            # if sd.beta_ub == 0.0:
-            #     nump
-            if sd.beta_ub > 0.0:
-                numpy.divide(t_float, sd.beta_ub, out=t_float)
-                numpy.maximum(t_ymin, t_float, out=t_ymin)
-            if sd.beta_ub < 0.0:
-                numpy.divide(t_float, sd.beta_ub, out=t_float
-
-            numpy.multiply(sd.beta_ub, t_x, out=t_float)
-            numpy.add(sd.q_0_ub, t_float, out=t_float)
-            numpy.minimum(t_qmax, t_float, out=t_ymax)
-            numpy.multiply(sd.beta_lb, t_x, out=t_float)
-            numpy.add(sd.q_0_lb, t_float, out=t_float)
-            numpy.maximum(t_qmin, t_float, out=t_ymin)
-            numpy.lessequal(t_ymin, t_ymax, out=t_bool)
-            numpy.add(t_feas, t_bool, out=t_feas)
-            # x = qmin_t
-
-    '''
-
+    num_t = p_max.size
+    for i in range(num_t):
+        feas_scalar, y_max_scalar, y_min_scalar = compute_max_min_p_from_max_min_p_q_and_linking(
+            p_max[i], p_min[i], q_max[i], q_min[i], p_q_linking_geometry)
+        feas[i] = feas_scalar
+        y_max[i] = y_max_scalar
+        y_min[i] = y_min_scalar
 
 def ts_sd_p_q_feas(data, config):
     '''
@@ -1539,24 +1599,6 @@ def ts_sd_p_q_feas(data, config):
     q_0_lb
     beta_ub
     beta_lb
-
-    q = q0 + beta*p
-    q = qmax
-    p = (qmax - q0)/beta
-
-    Consider
-    A = [pmin,max] times [qmin,qmax]
-    B = {(p,q) : q
-
-    check that the intersection of the q-p max and min curves is <= pmax
-    for devices that have
-    * a q-p max curve
-    * a q-p min curve
-    * beta_max > beta_min so trapezoid opens to the right
-
-    q_p_0_max + beta_max * p_int = q_p_0_min + beta_min * p_int
-    (beta_max - beta_min) * p_int = q_p_0_min - q_p_0_max
-    p_int = (q_p_0_min - q_p_0_max) / (beta_max - beta_min)
     '''
 
     idx_err = []
@@ -1567,8 +1609,10 @@ def ts_sd_p_q_feas(data, config):
     pmin = numpy.zeros(shape=(num_t, ), dtype=float)
     qmax = numpy.zeros(shape=(num_t, ), dtype=float)
     qmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    ymax = numpy.zeros(shape=(num_t, ), dtype=float)
+    ymin = numpy.zeros(shape=(num_t, ), dtype=float)
     feas = numpy.zeros(shape=(num_t, ), dtype=bool)
-    float1 = numpy.zeros(shape=(num_t, ), dtype=float)
+    #float1 = numpy.zeros(shape=(num_t, ), dtype=float)
     bool1 = numpy.zeros(shape=(num_t, ), dtype=bool)
     sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
     for j in range(num_sd):
@@ -1580,16 +1624,22 @@ def ts_sd_p_q_feas(data, config):
             qmax[:] = sd_ts.q_ub
             qmin[:] = sd_ts.q_lb
             feas[:] = False
+            ymax[:] = 0.0
+            ymin[:] = 0.0
             p_q_linking_geometry = sd_p_q_linking_geometry[sd.uid]
             check_p_q_feas(
-                pmax, pmin, qmax, qmin, float1,
-                feas, bool1,
+                pmax, pmin, qmax, qmin, ymax, ymin,
+                feas,
                 p_q_linking_geometry)
             numpy.logical_not(feas, out=bool1)
             infeas_t = numpy.flatnonzero(bool1)
-            idx_err += [(sd.uid, t) for t in infeas_t]
+            idx_err += [
+                (sd.uid, t, sd_ts.p_ub[t], sd_ts.p_lb[t], sd_ts.q_ub[t], sd_ts.q_lb[t],
+                 sd.q_linear_cap, sd.q_bound_cap, sd.q_0, sd.q_0_ub, sd.q_0_lb, sd.beta, sd.beta_ub, sd.beta_lb,
+                 ymax[t], ymin[t])
+                for t in infeas_t]
     if len(idx_err) > 0:
-        msg = "fails simple_dispatchable_device p/q max/min time series constraints and p/q linking constraints have nonempty intersection. failures (device uid, interval index): {}".format(idx_err)
+        msg = "fails simple_dispatchable_device p/q max/min time series constraints and p/q linking constraints have nonempty intersection. failures (device uid, interval index, pmax, pmin, qmax, qmin, q_linear_cap, q_bound_cap, q_0, q_0_ub, q_0_lb, beta, beta_ub, beta_lb, pmax_implied, pmin_implied): {}".format(idx_err)
         raise ModelError(msg)    
 
 def ts_sd_p_lb_le_ub(data, config):
