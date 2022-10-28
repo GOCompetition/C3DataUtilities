@@ -187,6 +187,13 @@ def compute_max_min_p_from_max_min_p_q_and_linking(p_max, p_min, q_max, q_min, l
     y_min =
       minimum value of p such that (p, q) is in W for some q if W is not empty
       None else
+
+    If feas is False, y_max and y_min will generally be floats with y_min > y_max.
+    In some cases we will return y_max = -float('inf') and y_min = float('inf').
+    This happens when the infeasibility is due to nonoverlapping constraints of the form
+    q <= q_up and q >= q_lo with q_up < q_lo. In that case nothing about p_min or p_max
+    can restore feasibility, so we set y_max = -float('inf') and y_min = float('inf').
+    In any case, feas = True if and only if y_min <= y_max.
     '''
 
     # assume feasible unless prove otherwise
@@ -676,7 +683,9 @@ def model_checks(data, config):
         sd_p_q_beta_max_not_too_small,
         sd_p_q_beta_min_not_too_small,
         sd_p_q_beta_diff_not_too_small,
-        ts_sd_p_q_feas,
+        ts_sd_p_q_linking_feas,
+        ts_sd_p_q_ramping_feas,
+        ts_sd_p_q_linking_ramping_feas,
         ]
     errors = []
     # try:
@@ -1546,47 +1555,54 @@ def sd_p_q_beta_diff_not_too_small(data, config):
         msg = "fails network simple_dispatchable_device q_bound_cap either beta_max == beta_min or abs(beta_max - beta_min) >= tol. tol = {}. failures (uid, beta_max, beta_min): {}".format(config['beta_zero_tol'], idx_err)
         raise ModelError(msg)
 
-def check_p_q_feas(
+def check_p_q_linking_ramping_feas(
         # float t-arrays
-        p_max, p_min, q_max, q_min, y_max, y_min,
+        d, # interval duration
+        p_max, p_min, q_max, q_min,
+        y_max, y_min, # max and min real power (output)
         # bool t-arrays
-        feas,
-        # dict
-        p_q_linking_geometry):
-
-    # # either an = constraint or a <= constraint and a >= constraint
-    # assert(
-    #     (qmax0 is None and qmin0 is None and bmax is None and bmin is None
-    #      and q0 is not None and b is not None) or
-    #     (qmax0 is not None and qmin0 is not None and bmax is not None and bmin is not None
-    #      and q0 is None and b is None))
-
-    # # reduce = constraint to a <= constraint and a >= constraint
-    # if qmax0 is None:
-    #     qmax0 = q0
-    # if qmin0 is None:
-    #     qmin0 = q0
-    # if bmax is None:
-    #     bmax = b
-    # if bmin is None:
-    #     bmin = b
+        feas, # feasibility (output)
+        # dicts
+        p_q_linking_geometry=None,
+        ramping_info=None,
+):
 
     feas[:] = False
     y_max[:] = 0.0
     y_min[:] = 0.0
     feas_scalar = False
+    feas_scalar_2 = False
     y_max_scalar = 0.0
     y_min_scalar = 0.0
-
     num_t = p_max.size
-    for i in range(num_t):
-        feas_scalar, y_max_scalar, y_min_scalar = compute_max_min_p_from_max_min_p_q_and_linking(
-            p_max[i], p_min[i], q_max[i], q_min[i], p_q_linking_geometry)
-        feas[i] = feas_scalar
-        y_max[i] = y_max_scalar
-        y_min[i] = y_min_scalar
 
-def ts_sd_p_q_feas(data, config):
+    y_max[:] = p_max
+    y_min[:] = p_min
+    numpy.less_equal(y_min, y_max, out=feas)
+
+    if p_q_linking_geometry is not None or ramping_info is not None:
+        if ramping_info is not None:
+            y_max_scalar = ramping_info['p0']
+            y_min_scalar = ramping_info['p0']
+        for i in range(num_t):
+            if ramping_info is not None:
+                y_max_scalar = y_max_scalar + d[i] * ramping_info['pru']
+                y_min_scalar = y_min_scalar - d[i] * ramping_info['prd']
+                y_max_scalar = min(y_max_scalar, p_max[i])
+                y_min_scalar = max(y_min_scalar, p_min[i])
+            else:
+                y_max_scalar = p_max[i]
+                y_min_scalar = p_min[i]
+            feas_scalar = (y_min_scalar <= y_max_scalar)
+            if p_q_linking_geometry is not None:
+                feas_scalar_2, y_max_scalar, y_min_scalar = compute_max_min_p_from_max_min_p_q_and_linking(
+                    y_max_scalar, y_min_scalar, q_max[i], q_min[i], p_q_linking_geometry)
+                feas_scalar = (feas_scalar and feas_scalar_2)
+            y_max[i] = y_max_scalar
+            y_min[i] = y_min_scalar
+            feas[i] = feas_scalar
+
+def ts_sd_p_q_linking_feas(data, config):
     '''
     check that the intersection of the p/q max/min rectangle and the p/q linking constraints is nonempty
 
@@ -1605,6 +1621,7 @@ def ts_sd_p_q_feas(data, config):
     uid_sd_ts_map = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
     num_t = len(data.time_series_input.general.interval_duration)
     num_sd = len(data.time_series_input.simple_dispatchable_device)
+    d = numpy.array(data.time_series_input.general.interval_duration, dtype=float)
     pmax = numpy.zeros(shape=(num_t, ), dtype=float)
     pmin = numpy.zeros(shape=(num_t, ), dtype=float)
     qmax = numpy.zeros(shape=(num_t, ), dtype=float)
@@ -1612,7 +1629,6 @@ def ts_sd_p_q_feas(data, config):
     ymax = numpy.zeros(shape=(num_t, ), dtype=float)
     ymin = numpy.zeros(shape=(num_t, ), dtype=float)
     feas = numpy.zeros(shape=(num_t, ), dtype=bool)
-    #float1 = numpy.zeros(shape=(num_t, ), dtype=float)
     bool1 = numpy.zeros(shape=(num_t, ), dtype=bool)
     sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
     for j in range(num_sd):
@@ -1627,10 +1643,11 @@ def ts_sd_p_q_feas(data, config):
             ymax[:] = 0.0
             ymin[:] = 0.0
             p_q_linking_geometry = sd_p_q_linking_geometry[sd.uid]
-            check_p_q_feas(
-                pmax, pmin, qmax, qmin, ymax, ymin,
+            check_p_q_linking_ramping_feas(
+                d, pmax, pmin, qmax, qmin, ymax, ymin,
                 feas,
-                p_q_linking_geometry)
+                p_q_linking_geometry=p_q_linking_geometry,
+                ramping_info=None)
             numpy.logical_not(feas, out=bool1)
             infeas_t = numpy.flatnonzero(bool1)
             idx_err += [
@@ -1640,6 +1657,127 @@ def ts_sd_p_q_feas(data, config):
                 for t in infeas_t]
     if len(idx_err) > 0:
         msg = "fails simple_dispatchable_device p/q max/min time series constraints and p/q linking constraints have nonempty intersection. failures (device uid, interval index, pmax, pmin, qmax, qmin, q_linear_cap, q_bound_cap, q_0, q_0_ub, q_0_lb, beta, beta_ub, beta_lb, pmax_implied, pmin_implied): {}".format(idx_err)
+        raise ModelError(msg)    
+
+def ts_sd_p_q_ramping_feas(data, config):
+    '''
+    check that the intersection of the p max/min interval and the p ramping constraints is nonempty
+    '''
+
+    idx_err = []
+    uid_sd_ts_map = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.time_series_input.simple_dispatchable_device)
+    d = numpy.array(data.time_series_input.general.interval_duration, dtype=float)
+    pmax = numpy.zeros(shape=(num_t, ), dtype=float)
+    pmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    qmax = numpy.zeros(shape=(num_t, ), dtype=float)
+    qmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    ymax = numpy.zeros(shape=(num_t, ), dtype=float)
+    ymin = numpy.zeros(shape=(num_t, ), dtype=float)
+    feas = numpy.zeros(shape=(num_t, ), dtype=bool)
+    bool1 = numpy.zeros(shape=(num_t, ), dtype=bool)
+    #sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    found_err = False
+    first_err = None
+    for j in range(num_sd):
+        sd = data.network.simple_dispatchable_device[j]
+        if sd.initial_status.on_status == 1:
+            sd_ts = uid_sd_ts_map[sd.uid]
+            pmax[:] = sd_ts.p_ub
+            pmin[:] = sd_ts.p_lb
+            qmax[:] = sd_ts.q_ub
+            qmin[:] = sd_ts.q_lb
+            feas[:] = False
+            ymax[:] = 0.0
+            ymin[:] = 0.0
+            # if sd.q_bound_cap == 1 or sd.q_linear_cap == 1:
+            #     p_q_linking_geometry = sd_p_q_linking_geometry[sd.uid]
+            # else:
+            #     p_q_linking_geometry = None
+            p_q_linking_geometry = None
+            check_p_q_linking_ramping_feas(
+                d, pmax, pmin, qmax, qmin, ymax, ymin,
+                feas,
+                p_q_linking_geometry=p_q_linking_geometry,
+                ramping_info={'p0': sd.initial_status.p, 'pru': sd.p_ramp_up_ub, 'prd': sd.p_ramp_down_ub})
+            numpy.logical_not(feas, out=bool1)
+            infeas_t = numpy.flatnonzero(bool1)
+            if infeas_t.size > 0:
+                t = infeas_t[0]
+                idx_err.append(
+                    (sd.uid, t, sd.initial_status.on_status, d[0:(t+1)].tolist(),
+                     sd_ts.p_ub[0:(t+1)], sd_ts.p_lb[0:(t+1)],
+                     sd.initial_status.p, sd.p_ramp_up_ub, sd.p_ramp_down_ub,
+                     ymax[0:(t+1)].tolist(), ymin[0:(t+1)].tolist()))
+    if len(idx_err) > 0:
+        msg = "fails simple_dispatchable_device p max/min time series constraints and p ramping constraints have nonempty intersection. failures (device uid, interval index - first interval per device, u_init, d, pmax, pmin, p_init, pru, prd, pmax_implied, pmin_implied): {}".format(idx_err)
+        raise ModelError(msg)    
+
+def ts_sd_p_q_linking_ramping_feas(data, config):
+    '''
+    check that the intersection of the p/q max/min rectangle and the p/q linking constraints and the p ramping constraints is nonempty
+
+    q_linear_cap == 1
+    q_0
+    beta
+
+    q_bound_cap == 1
+    q_0_ub
+    q_0_lb
+    beta_ub
+    beta_lb
+    '''
+
+    idx_err = []
+    uid_sd_ts_map = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.time_series_input.simple_dispatchable_device)
+    d = numpy.array(data.time_series_input.general.interval_duration, dtype=float)
+    pmax = numpy.zeros(shape=(num_t, ), dtype=float)
+    pmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    qmax = numpy.zeros(shape=(num_t, ), dtype=float)
+    qmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    ymax = numpy.zeros(shape=(num_t, ), dtype=float)
+    ymin = numpy.zeros(shape=(num_t, ), dtype=float)
+    feas = numpy.zeros(shape=(num_t, ), dtype=bool)
+    bool1 = numpy.zeros(shape=(num_t, ), dtype=bool)
+    sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    found_err = False
+    first_err = None
+    for j in range(num_sd):
+        sd = data.network.simple_dispatchable_device[j]
+        if sd.initial_status.on_status == 1:
+            sd_ts = uid_sd_ts_map[sd.uid]
+            pmax[:] = sd_ts.p_ub
+            pmin[:] = sd_ts.p_lb
+            qmax[:] = sd_ts.q_ub
+            qmin[:] = sd_ts.q_lb
+            feas[:] = False
+            ymax[:] = 0.0
+            ymin[:] = 0.0
+            if sd.q_bound_cap == 1 or sd.q_linear_cap == 1:
+                p_q_linking_geometry = sd_p_q_linking_geometry[sd.uid]
+            else:
+                p_q_linking_geometry = None
+            check_p_q_linking_ramping_feas(
+                d, pmax, pmin, qmax, qmin, ymax, ymin,
+                feas,
+                p_q_linking_geometry=p_q_linking_geometry,
+                ramping_info={'p0': sd.initial_status.p, 'pru': sd.p_ramp_up_ub, 'prd': sd.p_ramp_down_ub})
+            numpy.logical_not(feas, out=bool1)
+            infeas_t = numpy.flatnonzero(bool1)
+            if infeas_t.size > 0:
+                t = infeas_t[0]
+                idx_err.append(
+                    (sd.uid, t, sd.initial_status.on_status, d[0:(t+1)].tolist(),
+                     sd_ts.p_ub[0:(t+1)], sd_ts.p_lb[0:(t+1)], sd_ts.q_ub[0:(t+1)], sd_ts.q_lb[0:(t+1)],
+                     sd.q_linear_cap, sd.q_bound_cap, sd.q_0, sd.q_0_ub, sd.q_0_lb,
+                     sd.beta, sd.beta_ub, sd.beta_lb,
+                     sd.initial_status.p, sd.p_ramp_up_ub, sd.p_ramp_down_ub,
+                     ymax[0:(t+1)].tolist(), ymin[0:(t+1)].tolist()))
+    if len(idx_err) > 0:
+        msg = "fails simple_dispatchable_device p/q max/min time series constraints and p/q linking constraints and p ramping constraints have nonempty intersection. failures (device uid, interval index - first interval per device, u_init, d, pmax, pmin, qmax, qmin, q_linear_cap, q_bound_cap, q_0, q_0_ub, q_0_lb, beta, beta_ub, beta_lb, p_init, pru, prd, pmax_implied, pmin_implied): {}".format(idx_err)
         raise ModelError(msg)    
 
 def ts_sd_p_lb_le_ub(data, config):
