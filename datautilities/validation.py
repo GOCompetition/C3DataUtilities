@@ -1556,6 +1556,16 @@ def ts_sd_on_status_lb_le_ub(data, config):
         msg = "fails time_series_input simple_dispatchable_device on_status_lb <= on_status_ub. failures (device index, device uid, interval index, on_status_lb, on_status_ub): {}".format(idx_err)
         raise ModelError(msg)
 
+def get_supc(data, config, device_idx=None, interval_idx=None):
+
+    # [(t', psu[t']) for t' in [t-1, t-2, ...]], p_ambiguous=None
+    return None # todo
+
+def get_sdpc(data, config, device_idx=None, interval_idx=None):
+
+    # [(t', psd[t']) for t' in [t, t+1, ...]], p_ambiguous=None
+    return None # todo
+
 def get_sd_t_cost_function_pmax(data):
 
     num_t = len(data.time_series_input.general.interval_duration)
