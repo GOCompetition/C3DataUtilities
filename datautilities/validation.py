@@ -23,6 +23,11 @@ def read_json(file_name):
     #print(config['timestamp_pattern_str'])
     return data
 
+def write_json(data, file_name):
+
+    with open(file_name, 'w') as f:
+        json.dump(data, f)
+
 def get_p_q_linking_geometry(data, config):
 
     info = {
@@ -300,6 +305,43 @@ def compute_max_min_p_from_max_min_p_q_and_linking(p_max, p_min, q_max, q_min, l
         return feas, y_max, y_min
 
     # if we have not returned yet, there is a problem
+
+def scrub_data(problem_file, config_file, scrubbed_problem_file):
+
+    print('scrub problem data and rewrite to new file')
+
+    # read config
+    config = read_json(config_file)
+
+    # data file
+    print('problem data file: {}\n'.format(problem_file))
+
+    # output file
+    print('scrubbed problem data file: {}\n'.format(scrubbed_problem_file))
+
+    # use json? or pydantic model? - json for now
+    use_json = True
+
+    if use_json:
+        problem_data_dict = read_json(problem_file)
+        scrubbed_problem_data_dict = scrub_problem_data_dict(problem_data_dict, config)
+        write_json(scrubbed_problem_data_dict, scrubbed_problem_file)
+    else:
+        problem_data_model = InputDataFile.load(problem_file)
+        scrubbed_problem_data_model = scrub_problem_data_model(problem_data_model, config)
+        scrubbed_problem_data_model.save(scrubbed_problem_file)
+
+def scrub_problem_data_dict(problem_data_dict, config):
+
+    # todo
+    # anonymize UIDs
+    # ensure dispatchable device cost functions cover all p-values that may need to be evaluated
+
+    return problem_data_dict
+
+def scrub_problem_data_model(problem_data_model, config):
+
+    return problem_data_model
 
 def check_data(problem_file, solution_file, config_file, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
@@ -678,6 +720,7 @@ def model_checks(data, config):
         sd_w_a_en_min_end_discrete,
         sd_w_a_su_max_start_discrete,
         sd_w_a_su_max_end_discrete,
+        ts_sd_cost_function_covers_p_max,
         sd_p_q_linking_set_nonempty,
         sd_p_q_beta_not_too_small,
         sd_p_q_beta_max_not_too_small,
@@ -1513,6 +1556,104 @@ def ts_sd_on_status_lb_le_ub(data, config):
         msg = "fails time_series_input simple_dispatchable_device on_status_lb <= on_status_ub. failures (device index, device uid, interval index, on_status_lb, on_status_ub): {}".format(idx_err)
         raise ModelError(msg)
 
+def get_sd_t_cost_function_pmax(data):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_ts_dict = {c.uid: c for c in data.time_series_input.simple_dispatchable_device}
+    sd_t_sum_cpmax = [
+            [numpy.sum([p[1] for p in sd_ts_dict[sd_uid[i]].cost[t]]) for t in range(num_t)]
+        for i in range(num_sd)]
+    return sd_t_sum_cpmax
+
+def ts_sd_cost_function_covers_p_max(data, config):
+    '''
+    check that for each t, the cost function covers pmax
+    note - here we are not necessarily covering the startup or shutdown trajectories
+    this needs to be checked in some other way
+    '''
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_p0 = [c.initial_status.p for c in data.network.simple_dispatchable_device]
+    #sd_p0 = [0.05 for c in data.network.simple_dispatchable_device]
+    sd_ts_dict = {c.uid: c for c in data.time_series_input.simple_dispatchable_device}
+    sd_t_pmax = [
+            sd_ts_dict[sd_uid[i]].p_ub
+        for i in range(num_sd)]
+    sd_t_cpmax = get_sd_t_cost_function_pmax(data)
+    idx_err = [
+        (i, sd_uid[i], t, sd_t_pmax[i][t], sd_t_cpmax[i][t])
+        for i in range(num_sd) for t in range(num_t) if sd_t_cpmax[i][t] < sd_t_pmax[i][t]]
+    pmax_err = [[p[1] for p in sd_ts_dict[sd_uid[i[0]]].cost[i[2]]] for i in idx_err]
+    idx_err = [
+        (idx_err[i][0], idx_err[i][1], idx_err[i][2], idx_err[i][3], idx_err[i][4], pmax_err[i])
+        for i in range(len(idx_err))]
+    if len(idx_err) > 0:
+        msg = "fails cost function covers p_max for each time. failures (device index, device uid, interval index, p_max, cost_pmax, cost_block_pmax): {}".format(idx_err)
+        raise ModelError(msg)
+
+# def ts_sd_cost_function_covers_p_init(data, config):
+#     '''
+#     check that cost function for time t covers p_init for all t
+#     '''
+
+#     num_t = len(data.time_series_input.general.interval_duration)
+#     num_sd = len(data.network.simple_dispatchable_device)
+#     sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+#     sd_p0 = [c.initial_status.p for c in data.network.simple_dispatchable_device]
+#     sd_ts_dict = {c.uid: c for c in data.time_series_input.simple_dispatchable_device}
+#     sd_min_t_sum_cpmax = [
+#         numpy.amin(
+#             [numpy.sum([p[1] for p in sd_ts_dict[sd_uid[i]].cost[t]]) for t in range(num_t)],
+#             initial=float('inf'))
+#         for i in range(num_sd)]
+#     idx_err = [(i, sd_uid[i], sd_p0[i]) for i in range(num_sd) if sd_min_t_sum_cpmax[i] < sd_p0[i]]
+#     t_err = [
+#         numpy.argmin([numpy.sum([p[1] for p in sd_ts_dict[sd_uid[i[0]]].cost[t]]) for t in range(num_t)])
+#         for i in idx_err]
+#     pmax_err = [[p[1] for p in sd_ts_dict[sd_uid[idx_err[i][0]]].cost[t_err[i]]] for i in range(len(idx_err))]
+#     idx_err = [
+#         (idx_err[i][0], idx_err[i][1], t_err[i], idx_err[i][2], sd_min_t_sum_cpmax[idx_err[i][0]], pmax_err[i])
+#         for i in range(len(idx_err))]
+#     if len(idx_err) > 0:
+#         msg = "fails cost function for each time covers p_init. failures worst t for each device (device index, device uid, interval index, p_init, cost_total_pmax, cost_pmax): {}".format(idx_err)
+#         raise ModelError(msg)
+
+# def ts_sd_cost_function_covers_p_max(data, config):
+
+
+#     num_t = len(data.time_series_input.general.interval_duration)
+#     num_sd = len(data.network.simple_dispatchable_device)
+#     sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+#     sd_p0 = [c.initial_status.p for c in data.network.simple_dispatchable_device]
+#     #sd_p0 = [0.05 for c in data.network.simple_dispatchable_device]
+#     sd_ts_dict = {c.uid: c for c in data.time_series_input.simple_dispatchable_device}
+#     sd_max_t_pmax = [
+#         numpy.amax(
+#             sd_ts_dict[sd_uid[i]].p_ub,
+#             initial=-float('inf'))
+#         for i in range(num_sd)]
+#     sd_min_t_sum_cpmax = [
+#         numpy.amin(
+#             [numpy.sum([p[1] for p in sd_ts_dict[sd_uid[i]].cost[t]]) for t in range(num_t)],
+#             initial=float('inf'))
+#         for i in range(num_sd)]
+#     idx_err = [(i, sd_uid[i], sd_max_t_pmax[i]) for i in range(num_sd) if sd_min_t_sum_cpmax[i] < sd_max_t_pmax[i]]
+#     t1_err = [
+#         numpy.argmin([numpy.sum([p[1] for p in sd_ts_dict[sd_uid[i[0]]].cost[t]]) for t in range(num_t)])
+#         for i in idx_err]
+#     t2_err = [numpy.argmax(sd_ts_dict[sd_uid[i[0]]].p_ub) for i in idx_err]
+#     pmax_err = [[p[1] for p in sd_ts_dict[sd_uid[idx_err[i][0]]].cost[t1_err[i]]] for i in range(len(idx_err))]
+#     idx_err = [
+#         (idx_err[i][0], idx_err[i][1], t1_err[i], t2_err[i], idx_err[i][2], sd_min_t_sum_cpmax[idx_err[i][0]], pmax_err[i])
+#         for i in range(len(idx_err))]
+#     if len(idx_err) > 0:
+#         msg = "fails cost function for each time (t1) covers p_max for each time (t2). failures worst (t1, t2) for each device (device index, device uid, interval index t1, interval index t2, p_max, cost_total_pmax, cost_pmax): {}".format(idx_err)
+#         raise ModelError(msg)
+
 def sd_p_q_linking_set_nonempty(data, config):
 
     sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
@@ -1558,14 +1699,27 @@ def sd_p_q_beta_diff_not_too_small(data, config):
 def check_p_q_linking_ramping_feas(
         # float t-arrays
         d, # interval duration
-        p_max, p_min, q_max, q_min,
+        p_max, p_min, q_max, q_min, # max/min p/q (input)
         y_max, y_min, # max and min real power (output)
         # bool t-arrays
         feas, # feasibility (output)
         # dicts
         p_q_linking_geometry=None,
         ramping_info=None,
+        debug=False,
 ):
+
+    if debug:
+        print('d: ', d)
+        print('p_max: ', p_max)
+        print('p_min: ', p_min)
+        print('q_max: ', q_max)
+        print('q_min: ', q_min)
+        print('y_max: ', y_max)
+        print('y_min: ', y_min)
+        print('feas: ', feas)
+        print('p_q_linking_geometry: ', p_q_linking_geometry)
+        print('ramping_info: ', ramping_info)
 
     feas[:] = False
     y_max[:] = 0.0
@@ -1584,7 +1738,12 @@ def check_p_q_linking_ramping_feas(
         if ramping_info is not None:
             y_max_scalar = ramping_info['p0']
             y_min_scalar = ramping_info['p0']
+            if debug:
+                print('y_max_scalar: ', y_max_scalar)
+                print('y_min_scalar: ', y_min_scalar)
         for i in range(num_t):
+            if debug:
+                print('t: ', i)
             if ramping_info is not None:
                 y_max_scalar = y_max_scalar + d[i] * ramping_info['pru']
                 y_min_scalar = y_min_scalar - d[i] * ramping_info['prd']
@@ -1594,13 +1753,29 @@ def check_p_q_linking_ramping_feas(
                 y_max_scalar = p_max[i]
                 y_min_scalar = p_min[i]
             feas_scalar = (y_min_scalar <= y_max_scalar)
+            if debug:
+                print('t: ', i)
+                print('y_max_scalar: ', y_max_scalar)
+                print('y_min_scalar: ', y_min_scalar)
+                print('feas_scalar: ', feas_scalar)
             if p_q_linking_geometry is not None:
                 feas_scalar_2, y_max_scalar, y_min_scalar = compute_max_min_p_from_max_min_p_q_and_linking(
                     y_max_scalar, y_min_scalar, q_max[i], q_min[i], p_q_linking_geometry)
                 feas_scalar = (feas_scalar and feas_scalar_2)
+                if debug:
+                    print('y_max_scalar: ', y_max_scalar)
+                    print('y_min_scalar: ', y_min_scalar)
+                    print('feas_scalar: ', feas_scalar)
+                    print('feas_scalar_2: ', feas_scalar_2)
             y_max[i] = y_max_scalar
             y_min[i] = y_min_scalar
             feas[i] = feas_scalar
+            if debug:
+                print('y_max: ', y_max)
+                print('y_min: ', y_min)
+                print('feas: ', feas)
+                if not feas_scalar:
+                    debug = False
 
 def ts_sd_p_q_linking_feas(data, config):
     '''
@@ -1695,12 +1870,14 @@ def ts_sd_p_q_ramping_feas(data, config):
             #     p_q_linking_geometry = sd_p_q_linking_geometry[sd.uid]
             # else:
             #     p_q_linking_geometry = None
-            p_q_linking_geometry = None
+            #p_q_linking_geometry = None
             check_p_q_linking_ramping_feas(
                 d, pmax, pmin, qmax, qmin, ymax, ymin,
                 feas,
-                p_q_linking_geometry=p_q_linking_geometry,
-                ramping_info={'p0': sd.initial_status.p, 'pru': sd.p_ramp_up_ub, 'prd': sd.p_ramp_down_ub})
+                p_q_linking_geometry=None,
+                ramping_info={'p0': sd.initial_status.p, 'pru': sd.p_ramp_up_ub, 'prd': sd.p_ramp_down_ub},
+                #debug=(sd.uid == '')
+            )
             numpy.logical_not(feas, out=bool1)
             infeas_t = numpy.flatnonzero(bool1)
             if infeas_t.size > 0:

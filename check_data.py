@@ -51,6 +51,7 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--data_errors", default=data_errors_file, help="Data errors output file")
     parser.add_argument("-i", "--ignored_errors", default=ignored_errors_file, help="Ignored errors output file")
     parser.add_argument("-u", "--solution_errors", default=solution_errors_file, help="Solution errors output file")
+    parser.add_argument("-r", "--scrubbed_problem", default=None, help="File path name to write scrubbed problem file")
 
     args = parser.parse_args()
 
@@ -63,4 +64,7 @@ if __name__ == '__main__':
         problem = args.problem_opt
 
     if problem is not None:
-        validation.check_data(problem, args.solution, args.configuration, args.summary_csv, args.summary_json, args.data_errors, args.ignored_errors, args.solution_errors)
+        if args.scrubbed_problem is not None: # if scrubbing, ignore other arguments
+            validation.scrub_data(problem, args.configuration, args.scrubbed_problem)
+        else:
+            validation.check_data(problem, args.solution, args.configuration, args.summary_csv, args.summary_json, args.data_errors, args.ignored_errors, args.solution_errors)
