@@ -720,6 +720,8 @@ def model_checks(data, config):
         sd_w_a_en_min_end_discrete,
         sd_w_a_su_max_start_discrete,
         sd_w_a_su_max_end_discrete,
+        supc_not_ambiguous,
+        sdpc_not_ambiguous,
         ts_sd_cost_function_covers_p_max,
         sd_p_q_linking_set_nonempty,
         sd_p_q_beta_not_too_small,
@@ -729,6 +731,11 @@ def model_checks(data, config):
         ts_sd_p_q_linking_feas,
         ts_sd_p_q_ramping_feas,
         ts_sd_p_q_linking_ramping_feas,
+        sd_t_cost_function_covers_supc,
+        sd_t_cost_function_covers_sdpc,
+        sd_t_q_max_min_p_q_linking_supc_feasible,
+        sd_t_q_max_min_p_q_linking_sdpc_feasible,
+        sd_t_supc_sdpc_no_overlap,
         ]
     errors = []
     # try:
@@ -1556,15 +1563,234 @@ def ts_sd_on_status_lb_le_ub(data, config):
         msg = "fails time_series_input simple_dispatchable_device on_status_lb <= on_status_ub. failures (device index, device uid, interval index, on_status_lb, on_status_ub): {}".format(idx_err)
         raise ModelError(msg)
 
-def get_supc(data, config, device_idx=None, interval_idx=None):
+def supc_not_ambiguous(data, config):
+    '''
+    check that:
 
-    # [(t', psu[t']) for t' in [t-1, t-2, ...]], p_ambiguous=None
-    return None # todo
+    for each dispatchable device j
+    for each interval t
+    the set T_supc[j,t] of intervals in the startup trajectory of device j for startup in interval t
+    is unambiguously defined
+    Specifically, membership of an interval t1 in this set depends on a floating point computation,
+    and this check requires that the result of that computation should be sufficiently far from a threshold,
+    so that no alternative organization of the computation could have arrived at a different determination
+    of memebership of t1 in T_supc[j,t].
+    We say t1 is in T_supc[j,t] if the computed value p_supc[j,t,t1] > 0.0.
+    unmbiguity requires that p_supc[j,t,t1] be not close to 0.0,
+    and the tolerance is contained in config.
+    If p_supc[j,t,t1] is too close to 0.0, then there is some ambiguity on whether t1 should be considered
+    as part of the startup trajectory or not.
+    The data needs to be set up so that no such ambiguity occurs.
+    '''
 
-def get_sdpc(data, config, device_idx=None, interval_idx=None):
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
 
-    # [(t', psd[t']) for t' in [t, t+1, ...]], p_ambiguous=None
-    return None # todo
+    # time it here. If this is expensive we might need to re-think the organization of the code
+    # so as to only get the su/sd trajectories once.
+    start_time = time.time()
+    sd_t_supc = get_supc(data, config, check_ambiguous=True)
+    end_time = time.time()
+    print('get_supc time: {}'.format(end_time - start_time))
+
+    idx_err = [(i, t) for i in range(num_sd) for t in range(num_t) if sd_t_supc[i][t][1] is not None]
+    if len(idx_err) > 0:
+        errors = [(sd_uid[i[0]], i[1], sd_t_supc[i[0]][i[1]][0], sd_t_supc[i[0]][i[1]][1]) for i in idx_err]
+        msg = 'fails startup trajectory unambiguous, i.e. p-value too close to 0.0. tolerance: {}. failures (device uid, startup interval index, startup trajectory list of (t, p), ambiguous (t, p)): {}'.format(config['su_sd_pc_zero_tol'], errors)
+        raise ModelError(msg)
+
+def sdpc_not_ambiguous(data, config):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_t_sdpc = get_sdpc(data, config, check_ambiguous=True)
+    idx_err = [(i, t) for i in range(num_sd) for t in range(num_t) if sd_t_sdpc[i][t][1] is not None]
+    if len(idx_err) > 0:
+        errors = [(sd_uid[i[0]], i[1], sd_t_sdpc[i[0]][i[1]][0], sd_t_sdpc[i[0]][i[1]][1]) for i in idx_err]
+        msg = 'fails shutdown trajectory unambiguous, i.e. p-value too close to 0.0. tolerance: {}. failures (device uid, shutdown interval index, shutdown trajectory list of (t, p), ambiguous (t, p)): {}'.format(config['su_sd_pc_zero_tol'], errors)
+        raise ModelError(msg)
+
+def sd_t_cost_function_covers_supc(data, config):
+
+    pass # todo
+
+def sd_t_cost_function_covers_sdpc(data, config):
+
+    pass # todo
+
+def sd_t_q_max_min_p_q_linking_supc_feasible(data, config):
+
+    pass # todo
+
+def sd_t_q_max_min_p_q_linking_sdpc_feasible(data, config):
+
+    pass # todo
+
+def sd_t_supc_sdpc_no_overlap(data, config):
+
+    pass # todo
+
+def get_supc(data, config, check_ambiguous=False):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_ts_dict = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    sd_t_p_min = [sd_ts_dict[i].p_lb for i in sd_uid]
+    sd_p_0 = [c.initial_status.p for c in data.network.simple_dispatchable_device]
+    sd_p_ru_su = [c.p_startup_ramp_ub for c in data.network.simple_dispatchable_device]
+
+    t_d = numpy.array(data.time_series_input.general.interval_duration, dtype=float)
+    t_a_end = numpy.cumsum(t_d)
+    t_a_start = numpy.zeros(shape=(num_t, ), dtype=float)
+    t_a_start[1:num_t] = t_a_end[0:(num_t - 1)]
+
+    if check_ambiguous:
+        sd_t_supc = [
+            [sd_t_get_supc(sd_t_p_min[i], sd_p_0[i], sd_p_ru_su[i], t, num_t, t_a_end, t_a_start, config)
+             for t in range(num_t)]
+            for i in range(num_sd)]
+    else:
+        sd_t_supc = [
+            [sd_t_get_supc(sd_t_p_min[i], sd_p_0[i], sd_p_ru_su[i], t, num_t, t_a_end, t_a_start, config)[0]
+             for t in range(num_t)]
+            for i in range(num_sd)]
+
+    return sd_t_supc
+
+def get_sdpc(data, config, check_ambiguous=False):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_ts_dict = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    sd_t_p_min = [sd_ts_dict[i].p_lb for i in sd_uid]
+    sd_p_0 = [c.initial_status.p for c in data.network.simple_dispatchable_device]
+    sd_p_rd_sd = [c.p_shutdown_ramp_ub for c in data.network.simple_dispatchable_device]
+
+    t_d = numpy.array(data.time_series_input.general.interval_duration, dtype=float)
+    t_a_end = numpy.cumsum(t_d)
+    t_a_start = numpy.zeros(shape=(num_t, ), dtype=float)
+    t_a_start[1:num_t] = t_a_end[0:(num_t - 1)]
+
+    if check_ambiguous:
+        sd_t_sdpc = [
+            [sd_t_get_sdpc(sd_t_p_min[i], sd_p_0[i], sd_p_rd_sd[i], t, num_t, t_a_end, t_a_start, config)
+             for t in range(num_t)]
+            for i in range(num_sd)]
+    else:
+        sd_t_sdpc = [
+            [sd_t_get_sdpc(sd_t_p_min[i], sd_p_0[i], sd_p_rd_sd[i], t, num_t, t_a_end, t_a_start, config)[0]
+             for t in range(num_t)]
+            for i in range(num_sd)]
+
+    return sd_t_sdpc
+
+def sd_t_get_supc(p_min, p_0, p_ru_su, t, num_t, t_a_end, t_a_start, config):
+    '''
+    Get the startup trajectory for a single dispatchable device and a single startup interval
+
+    supc, p_ambiguous = get_supc(p_min, p_0, p_ru_su, t, num_t, t_a_end, t_a_start, config)
+
+    supc = [(t', psu[t']) for t' in [t-1, t-2, ...]] = points on the startup trajectory
+    
+    supc_ambiguous = None if there is no ambiguity in defining the startup trajectory
+    supc_ambiguous = (t', p') where p' is the possible final p-value if there is ambiguity, relative to tolerance
+
+    p_min = array of minimum p-values
+
+    p_0 = initial p-value
+    
+    p_ru_su = startup ramp up rate
+    
+    t = interval index when starting up
+
+    num_t = number of intervals
+
+    t_a_end = array of end time values of intervals
+
+    t_a_start = array of start time values of intervals
+
+    config = configuration data
+    '''
+
+    supc = []
+    supc_ambiguous = None
+    done = False
+    p_start = p_min[t]
+    t_new = t
+    p_new = 0.0
+
+    if t_new <= 0:
+        done = True
+
+    while not done:
+        t_new = t_new - 1
+        p_new = p_start - p_ru_su * (t_a_end[t] - t_a_end[t_new])
+        if p_new <= config['su_sd_pc_zero_tol']:
+            done = True
+            if p_new >= config['su_sd_pc_zero_tol']:
+                supc_ambiguous = (t_new, p_new)
+        else:
+            supc.append((t_new, p_new))
+            if t_new <= 0:
+                done = True
+    
+    return supc, supc_ambiguous # todo - check
+
+def sd_t_get_sdpc(p_min, p_0, p_rd_sd, t, num_t, t_a_end, t_a_start, config):
+    '''
+    Get the shutdown trajectory for a single dispatchable device and a single shutdown interval
+
+    sdpc, sdpc_ambiguous = sd_t_get_sdpc(p_min, p_0, p_rd_sd, t, num_t, t_a_end, t_a_start, config)
+
+    sdpc = [(t', psd[t']) for t' in [t-1, t-2, ...]] = points on the shutdown trajectory
+    
+    sdpc_ambiguous = None if there is no ambiguity in defining the shutdown trajectory
+    sdpc_ambiguous = (t', p') where p' is the possible final p-value if there is ambiguity, relative to tolerance
+
+    p_min = array of minimum p-values
+
+    p_0 = initial p-value
+    
+    p_rd_sd = shutdown ramp down rate
+    
+    t = interval index when starting up
+
+    num_t = number of intervals
+
+    t_a_end = array of end time values of intervals
+
+    t_a_start = array of start time values of intervals
+
+    config = configuration data
+    '''
+
+    sdpc = []
+    sdpc_ambiguous = None
+    done = False
+    if t == 0:
+        p_start = p_0
+    else:
+        p_start = p_min[t - 1]
+    t_new = t
+    p_new = 0.0
+
+    while not done:
+        p_new = p_start - p_rd_sd * (t_a_end[t_new] - t_a_start[t])
+        if p_new <= config['su_sd_pc_zero_tol']:
+            done = True
+            if p_new >= config['su_sd_pc_zero_tol']:
+                sdpc_ambiguous = (t_new, p_new)
+        else:
+            sdpc.append((t_new, p_new))
+            t_new = t_new + 1
+            if t_new >= num_t:
+                done = True
+    
+    return sdpc, sdpc_ambiguous # todo - check
 
 def get_sd_t_cost_function_pmax(data):
 
