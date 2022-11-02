@@ -1614,11 +1614,33 @@ def sdpc_not_ambiguous(data, config):
 
 def sd_t_cost_function_covers_supc(data, config):
 
-    pass # todo
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_t_supc = get_supc(data, config, check_ambiguous=False)
+    sd_t_cpmax = get_sd_t_cost_function_pmax(data)
+    idx_err = [
+        (sd_uid[i], t, c[0], c[1], sd_t_cpmax[i][c[0]])
+        for i in range(num_sd) for t in range(num_t) for c in sd_t_supc[i][t]
+        if c[1] > sd_t_cpmax[i][c[0]]]
+    if len(idx_err) > 0:
+        msg = 'fails startup trajectory covered by energy cost function. failures (device uid, startup interval index, uncovered interval index, uncovered trajectory p value, cost function p max): {}'.format(idx_err)
+        raise ModelError(msg)
 
 def sd_t_cost_function_covers_sdpc(data, config):
 
-    pass # todo
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_t_sdpc = get_sdpc(data, config, check_ambiguous=False)
+    sd_t_cpmax = get_sd_t_cost_function_pmax(data)
+    idx_err = [
+        (sd_uid[i], t, c[0], c[1], sd_t_cpmax[i][c[0]])
+        for i in range(num_sd) for t in range(num_t) for c in sd_t_sdpc[i][t]
+        if c[1] > sd_t_cpmax[i][c[0]]]
+    if len(idx_err) > 0:
+        msg = 'fails shutdown trajectory covered by energy cost function. failures (device uid, shutdown interval index, uncovered interval index, uncovered trajectory p value, cost function p max): {}'.format(idx_err)
+        raise ModelError(msg)
 
 def sd_t_q_max_min_p_q_linking_supc_feasible(data, config):
 
