@@ -1644,11 +1644,99 @@ def sd_t_cost_function_covers_sdpc(data, config):
 
 def sd_t_q_max_min_p_q_linking_supc_feasible(data, config):
 
-    pass # todo
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_p_q_eq = [(c.q_linear_cap == 1) for c in data.network.simple_dispatchable_device]
+    sd_p_q_ineq = [(c.q_bound_cap == 1) for c in data.network.simple_dispatchable_device]
+    sd_q_0 = [(c.q_0 if c.q_linear_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_q_max_0 = [(c.q_0_ub if c.q_bound_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_q_min_0 = [(c.q_0_lb if c.q_bound_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_beta = [(c.beta if c.q_linear_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_beta_max = [(c.beta_ub if c.q_bound_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_beta_min = [(c.beta_lb if c.q_bound_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_ts_dict = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    sd_t_supc = get_supc(data, config, check_ambiguous=False)
+    sd_t_qmax = [sd_ts_dict[sd_uid[i]].q_ub for i in range(num_sd)]
+    sd_t_qmin = [sd_ts_dict[sd_uid[i]].q_lb for i in range(num_sd)]
+    idx_err_eq = [
+        (i, sd_uid[i], t, c[0], c[1])
+        for i in range(num_sd) if sd_p_q_eq[i]
+        for t in range(num_t) for c in sd_t_supc[i][t]
+        if (sd_q_0[i] + sd_beta[i] * c[1] > sd_t_qmax[i][c[0]] or
+            sd_q_0[i] + sd_beta[i] * c[1] < sd_t_qmin[i][c[0]])]
+    idx_err_ineq = [
+        (i, sd_uid[i], t, c[0], c[1])
+        for i in range(num_sd) if sd_p_q_ineq[i]
+        for t in range(num_t) for c in sd_t_supc[i][t]
+        if (sd_q_min_0[i] + sd_beta_min[i] * c[1] > sd_t_qmax[i][c[0]] or
+            sd_q_max_0[i] + sd_beta_max[i] * c[1] < sd_t_qmin[i][c[0]] or
+            sd_q_min_0[i] + sd_beta_min[i] * c[1] > sd_q_max_0[i] + sd_beta_max[i] * c[1])]
+    idx_err_eq = [
+        (i[1], i[2], i[3], i[4], sd_p_q_eq[i[0]], sd_p_q_ineq[i[0]],
+         sd_q_0[i[0]], sd_q_max_0[i[0]], sd_q_min_0[i[0]],
+         sd_beta[i[0]], sd_beta_max_0[i[0]], sd_beta_min[i[0]],
+         sd_q_0[i[0]] + sd_beta[i[0]] * i[4], sd_q_0[i[0]] + sd_beta[i[0]] * i[4],
+         sd_t_qmax[i[0]][i[3]], sd_t_qmin[i[0]][i[3]])
+        for i in idx_err_eq]
+    idx_err_ineq = [
+        (i[1], i[2], i[3], i[4], sd_p_q_eq[i[0]], sd_p_q_ineq[i[0]],
+         sd_q_0[i[0]], sd_q_max_0[i[0]], sd_q_min_0[i[0]],
+         sd_beta[i[0]], sd_beta_max[i[0]], sd_beta_min[i[0]],
+         sd_q_max_0[i[0]] + sd_beta_max[i[0]] * i[4], sd_q_min_0[i[0]] + sd_beta_min[i[0]] * i[4],
+         sd_t_qmax[i[0]][i[3]], sd_t_qmin[i[0]][i[3]])
+        for i in idx_err_ineq]
+    if len(idx_err_eq) + len(idx_err_ineq) > 0:
+        msg = 'fails startup trajectory feasible with respect to q max/min and p-q linking constraints. failures (device uid, startup interval index, infeasible interval index, trajectory p value, p_q_eq, p_q_ineq, q_0, q_max_0, q_min_0, beta, beta_max, beta_min, q_max_computed, q_min_computed, q_max bound, q_min bound): {}'.format(idx_err_eq + idx_err_ineq)
+        raise ModelError(msg)
 
 def sd_t_q_max_min_p_q_linking_sdpc_feasible(data, config):
 
-    pass # todo
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    sd_p_q_eq = [(c.q_linear_cap == 1) for c in data.network.simple_dispatchable_device]
+    sd_p_q_ineq = [(c.q_bound_cap == 1) for c in data.network.simple_dispatchable_device]
+    sd_q_0 = [(c.q_0 if c.q_linear_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_q_max_0 = [(c.q_0_ub if c.q_bound_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_q_min_0 = [(c.q_0_lb if c.q_bound_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_beta = [(c.beta if c.q_linear_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_beta_max = [(c.beta_ub if c.q_bound_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_beta_min = [(c.beta_lb if c.q_bound_cap == 1 else None) for c in data.network.simple_dispatchable_device]
+    sd_ts_dict = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    sd_t_sdpc = get_sdpc(data, config, check_ambiguous=False)
+    sd_t_qmax = [sd_ts_dict[sd_uid[i]].q_ub for i in range(num_sd)]
+    sd_t_qmin = [sd_ts_dict[sd_uid[i]].q_lb for i in range(num_sd)]
+    idx_err_eq = [
+        (i, sd_uid[i], t, c[0], c[1])
+        for i in range(num_sd) if sd_p_q_eq[i]
+        for t in range(num_t) for c in sd_t_sdpc[i][t]
+        if (sd_q_0[i] + sd_beta[i] * c[1] > sd_t_qmax[i][c[0]] or
+            sd_q_0[i] + sd_beta[i] * c[1] < sd_t_qmin[i][c[0]])]
+    idx_err_ineq = [
+        (i, sd_uid[i], t, c[0], c[1])
+        for i in range(num_sd) if sd_p_q_ineq[i]
+        for t in range(num_t) for c in sd_t_sdpc[i][t]
+        if (sd_q_min_0[i] + sd_beta_min[i] * c[1] > sd_t_qmax[i][c[0]] or
+            sd_q_max_0[i] + sd_beta_max[i] * c[1] < sd_t_qmin[i][c[0]] or
+            sd_q_min_0[i] + sd_beta_min[i] * c[1] > sd_q_max_0[i] + sd_beta_max[i] * c[1])]
+    idx_err_eq = [
+        (i[1], i[2], i[3], i[4], sd_p_q_eq[i[0]], sd_p_q_ineq[i[0]],
+         sd_q_0[i[0]], sd_q_max_0[i[0]], sd_q_min_0[i[0]],
+         sd_beta[i[0]], sd_beta_max_0[i[0]], sd_beta_min[i[0]],
+         sd_q_0[i[0]] + sd_beta[i[0]] * i[4], sd_q_0[i[0]] + sd_beta[i[0]] * i[4],
+         sd_t_qmax[i[0]][i[3]], sd_t_qmin[i[0]][i[3]])
+        for i in idx_err_eq]
+    idx_err_ineq = [
+        (i[1], i[2], i[3], i[4], sd_p_q_eq[i[0]], sd_p_q_ineq[i[0]],
+         sd_q_0[i[0]], sd_q_max_0[i[0]], sd_q_min_0[i[0]],
+         sd_beta[i[0]], sd_beta_max[i[0]], sd_beta_min[i[0]],
+         sd_q_max_0[i[0]] + sd_beta_max[i[0]] * i[4], sd_q_min_0[i[0]] + sd_beta_min[i[0]] * i[4],
+         sd_t_qmax[i[0]][i[3]], sd_t_qmin[i[0]][i[3]])
+        for i in idx_err_ineq]
+    if len(idx_err_eq) + len(idx_err_ineq) > 0:
+        msg = 'fails shutdown trajectory feasible with respect to q max/min and p-q linking constraints. failures (device uid, shutdown interval index, infeasible interval index, trajectory p value, p_q_eq, p_q_ineq, q_0, q_max_0, q_min_0, beta, beta_max, beta_min, q_max_computed, q_min_computed, q_max bound, q_min bound): {}'.format(idx_err_eq + idx_err_ineq)
+        raise ModelError(msg)
 
 def sd_t_supc_sdpc_no_overlap(data, config):
 
