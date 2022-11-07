@@ -192,6 +192,8 @@ class SolutionEvaluator(object):
         self.eval_t_z_k_worst_case()
         self.eval_t_z_k_average_case()
         self.eval_t_z()
+        self.eval_z_max_energy()
+        self.eval_z_min_energy()
         self.eval_z_base()
         self.eval_z_k_worst_case()
         self.eval_z_k_average_case()
@@ -706,6 +708,14 @@ class SolutionEvaluator(object):
              'val_type': float,
              'tol': None,
              'num_indices': 0},
+            {'key': 'z_max_energy',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'z_min_energy',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
             {'key': 'z_base',
              'val_type': float,
              'tol': None,
@@ -995,11 +1005,27 @@ class SolutionEvaluator(object):
 
     def eval_z(self):
 
-        self.z = numpy.sum(self.t_z)
+        self.z = (
+            numpy.sum(self.t_z)
+            - self.z_max_energy # z_max_energy is a cost
+            - self.z_min_energy # z_min_energy is a cost
+            )
+
+    def eval_z_max_energy(self):
+
+        self.z_max_energy = numpy.sum(self.sd_z_max_energy)
+    
+    def eval_z_min_energy(self):
+
+        self.z_min_energy = numpy.sum(self.sd_z_min_energy)
 
     def eval_z_base(self):
 
-        self.z_base = numpy.sum(self.t_z_base)
+        self.z_base = (
+            numpy.sum(self.t_z_base)
+            - self.z_max_energy # z_max_energy is a cost
+            - self.z_min_energy # z_min_energy is a cost
+            )
 
     def eval_z_k_worst_case(self):
 
@@ -1951,10 +1977,13 @@ class SolutionEvaluator(object):
         '''
         '''
 
-        max_viol = 0
+        max_viol = 0.0
         max_i = 0
         max_j = 0
+        self.sd_z_max_energy = numpy.zeros(shape=(self.problem.num_sd, ), dtype=float)
+        sum_viol = 0.0
         for i in range(self.problem.num_sd):
+            sum_viol = 0.0
             for j in range(self.problem.sd_num_max_energy_constr[i]):
                 a_start = self.problem.sd_max_energy_constr_a_start_list[i][j]
                 a_end = self.problem.sd_max_energy_constr_a_end_list[i][j]
@@ -1975,10 +2004,12 @@ class SolutionEvaluator(object):
                 viol = max(0, energy - self.problem.sd_max_energy_constr_max_energy_list[i][j])
                 #print('i: {}, j: {}, sd: {}, t: {}, a_start: {}, a_end: {}, max_energy: {}, energy: {}, viol: {}'.format(
                 #    i, j, self.problem.sd_uid[i], self.problem.t_num[j], a_start, a_end, self.problem.sd_max_energy_constr_max_energy_list[i][j], energy, viol))
+                sum_viol += viol
                 if viol > max_viol:
                     max_viol = viol
                     max_i = i
                     max_j = j
+            self.sd_z_max_energy[i] = self.problem.c_e * sum_viol
         self.viol_sd_max_energy_constr = {
             'val': max_viol,
             #'abs': abs(max_viol),
@@ -1993,10 +2024,13 @@ class SolutionEvaluator(object):
         '''
         '''
 
-        max_viol = 0
+        max_viol = 0.0
         max_i = 0
         max_j = 0
+        self.sd_z_min_energy = numpy.zeros(shape=(self.problem.num_sd, ), dtype=float)
+        sum_viol = 0.0
         for i in range(self.problem.num_sd):
+            sum_viol = 0.0
             for j in range(self.problem.sd_num_min_energy_constr[i]):
                 a_start = self.problem.sd_min_energy_constr_a_start_list[i][j]
                 a_end = self.problem.sd_min_energy_constr_a_end_list[i][j]
@@ -2017,10 +2051,12 @@ class SolutionEvaluator(object):
                 viol = max(0, self.problem.sd_min_energy_constr_min_energy_list[i][j] - energy)
                 #print('i: {}, j: {}, sd: {}, t: {}, a_start: {}, a_end: {}, min_energy: {}, energy: {}, viol: {}'.format(
                 #    i, j, self.problem.sd_uid[i], self.problem.t_num[j], a_start, a_end, self.problem.sd_min_energy_constr_min_energy_list[i][j], energy, viol))
+                sum_viol += viol
                 if viol > max_viol:
                     max_viol = viol
                     max_i = i
                     max_j = j
+            self.sd_z_min_energy[i] = self.problem.c_e * sum_viol
         self.viol_sd_min_energy_constr = {
             'val': max_viol,
             #'abs': abs(max_viol),

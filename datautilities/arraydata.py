@@ -142,6 +142,7 @@ class InputData(object):
         self.c_p = float(data.network.violation_cost.p_bus_vio_cost)
         self.c_q = float(data.network.violation_cost.p_bus_vio_cost)
         self.c_s = float(data.network.violation_cost.s_vio_cost)
+        self.c_e = 1.0e6 # 1.0e4 USD/MWh = 1.0e6 USD/pu-h # todo read this from data, validate, including preferred value in config, check value > 0, add assumptions to formulation, add symbol and algebra to formulation 
 
     def set_bus(self, data):
 
