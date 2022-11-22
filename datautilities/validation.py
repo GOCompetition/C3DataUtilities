@@ -518,9 +518,89 @@ def anonymize_contingency_uids(problem_data, config, use_pydantic=False):
         i['uid'] = uid_map[i['uid']]
 
 def remove_optional_fields(problem_data, config, use_pydantic=False):
+    '''
+    In the format document, the "req" column has value "N"
 
-    # todo
-    pass
+    Here are all of the optional fields:
+
+    input
+      network
+        general
+          timestamp_start
+          timestamp_stop
+          season
+          electricity_demand
+          vre_availability
+          solar_availability
+          wind_availability
+          weather_temperature
+          day_type
+          net_load
+        bus
+          area
+          zone
+          longitude latitude
+          city
+          county
+          state
+          country
+          type
+        simple_dispatchable_device
+          description
+          vm_setpoint
+          nameplate_capacity
+        ac_line
+          mva_ub_sht
+        two_winding_transformer
+          mva_ub_sht
+    '''
+
+    for k in [
+            'timestamp_start',
+            'timestamp_stop',
+            'season',
+            'electricity_demand',
+            'vre_availability',
+            'solar_availability',
+            'wind_availability',
+            'weather_temperature',
+            'day_type',
+            'net_load',
+    ]:
+        problem_data['network']['general'].pop(k, None)
+    for i in problem_data['network']['bus']:
+        for k in [
+                'area',
+                'zone',
+                'longitude',
+                'latitude',
+                'city',
+                'county',
+                'state',
+                'country',
+                'type',
+        ]:
+            # if k in i.keys():
+            #     del i[k]
+            #del i[k]
+            i.pop(k, None)
+    for i in problem_data['network']['simple_dispatchable_device']:
+        for k in [
+                'description',
+                'vm_setpoint',
+                'nameplate_capacity',
+        ]:
+            i.pop(k, None)
+    for i in problem_data['network']['ac_line']:
+        for k in [
+                'mva_ub_sht',
+        ]:
+            i.pop(k, None)
+    for i in problem_data['network']['two_winding_transformer']:
+        for k in [
+                'mva_ub_sht',
+        ]:
+            i.pop(k, None)
 
 def check_data(problem_file, solution_file, config_file, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
