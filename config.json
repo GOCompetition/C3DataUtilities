@@ -14,6 +14,7 @@
     "hard_constr_tol": 0.00000001,
     "beta_zero_tol": 0.000001,
     "su_sd_pc_zero_tol": 0.000001,
+    "print_uid_maps": true,
     "interval_duration_schedules": [
         [
             0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 0.25,

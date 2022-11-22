@@ -23,10 +23,10 @@ def read_json(file_name):
     #print(config['timestamp_pattern_str'])
     return data
 
-def write_json(data, file_name):
+def write_json(data, file_name, sort_keys=False):
 
     with open(file_name, 'w') as f:
-        json.dump(data, f)
+        json.dump(data, f, sort_keys=sort_keys)
 
 def get_p_q_linking_geometry(data, config):
 
@@ -307,6 +307,18 @@ def compute_max_min_p_from_max_min_p_q_and_linking(p_max, p_min, q_max, q_min, l
     # if we have not returned yet, there is a problem
 
 def scrub_data(problem_file, config_file, scrubbed_problem_file):
+    '''
+    change some data in a standard way
+    rewrite to a new file
+    The changes should be for things that we are not able to easily check for in the checker.
+    anonymize UIDs - how can we check that the UIDs are anonymous? We can't. But we can create new UIDs
+    in a standard fashion that will definitely be anonymous.
+    scrubber features:
+    * anonymize UIDs
+    * write with standard JSON format, e.g. sorted keys, spaces, tabs, or not
+    * remove optional fields
+    * ???
+    '''
 
     print('scrub problem data and rewrite to new file')
 
@@ -324,24 +336,195 @@ def scrub_data(problem_file, config_file, scrubbed_problem_file):
 
     if use_json:
         problem_data_dict = read_json(problem_file)
-        scrubbed_problem_data_dict = scrub_problem_data_dict(problem_data_dict, config)
-        write_json(scrubbed_problem_data_dict, scrubbed_problem_file)
+        scrub_problem(problem_data_dict, config)
+        write_json(problem_data_dict, scrubbed_problem_file, sort_keys=True)
     else:
         problem_data_model = InputDataFile.load(problem_file)
-        scrubbed_problem_data_model = scrub_problem_data_model(problem_data_model, config)
-        scrubbed_problem_data_model.save(scrubbed_problem_file)
+        scrub_problem(problem_data_model, config, use_pydantic=True)
+        problem_data_model.save(scrubbed_problem_file)
 
-def scrub_problem_data_dict(problem_data_dict, config):
+def scrub_problem(problem_data, config, use_pydantic=False):
+
+    # todo - others?
+    anonymize_uids(problem_data, config, use_pydantic)
+    remove_optional_fields(problem_data, config, use_pydantic)
+
+def anonymize_uids(problem_data, config, use_pydantic=False):
+
+    anonymize_bus_uids(problem_data, config, use_pydantic)
+    anonymize_shunt_uids(problem_data, config, use_pydantic)
+    anonymize_simple_dispatchable_device_uids(problem_data, config, use_pydantic)
+    anonymize_branch_uids(problem_data, config, use_pydantic)
+    # anonymize_ac_line_uids(problem_data, config, use_pydantic)
+    # anonymize_two_winding_transformer_uids(problem_data, config, use_pydantic)
+    # anonymize_dc_line_uids(problem_data, config, use_pydantic)
+    anonymize_active_zonal_reserve_uids(problem_data, config, use_pydantic)
+    anonymize_reactive_zonal_reserve_uids(problem_data, config, use_pydantic)
+    anonymize_contingency_uids(problem_data, config, use_pydantic)
+
+def anonymize_bus_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['network']['bus']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'bus_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('bus_uid_map: {}'.format(uid_map))
+    for i in problem_data['network']['bus']:
+        i['uid'] = uid_map[i['uid']]
+    for i in problem_data['network']['shunt']:
+        i['bus'] = uid_map[i['bus']]
+    for i in problem_data['network']['simple_dispatchable_device']:
+        i['bus'] = uid_map[i['bus']]
+    for i in problem_data['network']['ac_line']:
+        i['fr_bus'] = uid_map[i['fr_bus']]
+        i['to_bus'] = uid_map[i['to_bus']]
+    for i in problem_data['network']['two_winding_transformer']:
+        i['fr_bus'] = uid_map[i['fr_bus']]
+        i['to_bus'] = uid_map[i['to_bus']]
+    for i in problem_data['network']['dc_line']:
+        i['fr_bus'] = uid_map[i['fr_bus']]
+        i['to_bus'] = uid_map[i['to_bus']]
+
+def anonymize_shunt_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['network']['shunt']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'sh_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('shunt_uid_map: {}'.format(uid_map))
+    for i in problem_data['network']['shunt']:
+        i['uid'] = uid_map[i['uid']]
+
+def anonymize_simple_dispatchable_device_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['network']['simple_dispatchable_device']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'sd_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('simple_dispatchable_device_uid_map: {}'.format(uid_map))
+    for i in problem_data['network']['simple_dispatchable_device']:
+        i['uid'] = uid_map[i['uid']]
+    for i in problem_data['time_series_input']['simple_dispatchable_device']:
+        i['uid'] = uid_map[i['uid']]
+
+def anonymize_branch_uids(problem_data, config, use_pydantic=False):
+
+    acl_uid_map = anonymize_ac_line_uids(problem_data, config, use_pydantic)
+    xfr_uid_map = anonymize_two_winding_transformer_uids(problem_data, config, use_pydantic)
+    dcl_uid_map = anonymize_dc_line_uids(problem_data, config, use_pydantic)
+    uid_map = dict({})
+    uid_map.update(acl_uid_map)
+    uid_map.update(xfr_uid_map)
+    uid_map.update(dcl_uid_map)
+    for i in problem_data['reliability']['contingency']:
+        i['components'] = [uid_map[j] for j in i['components']]
+
+def anonymize_ac_line_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['network']['ac_line']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'acl_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('ac_line_uid_map: {}'.format(uid_map))
+    for i in problem_data['network']['ac_line']:
+        i['uid'] = uid_map[i['uid']]
+    return uid_map
+    # uids in contingencies are changed later
+
+def anonymize_two_winding_transformer_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['network']['two_winding_transformer']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'xfr_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('two_winding_transformer_uid_map: {}'.format(uid_map))
+    for i in problem_data['network']['two_winding_transformer']:
+        i['uid'] = uid_map[i['uid']]
+    return uid_map
+    # uids in contingencies are changed later
+
+def anonymize_dc_line_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['network']['dc_line']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'dcl_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('dc_line_uid_map: {}'.format(uid_map))
+    for i in problem_data['network']['dc_line']:
+        i['uid'] = uid_map[i['uid']]
+    return uid_map
+    # uids in contingencies are changed later
+
+def anonymize_active_zonal_reserve_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['network']['active_zonal_reserve']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'prz_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('active_zonal_reserve_uid_map: {}'.format(uid_map))
+    for i in problem_data['network']['active_zonal_reserve']:
+        i['uid'] = uid_map[i['uid']]
+    for i in problem_data['time_series_input']['active_zonal_reserve']:
+        i['uid'] = uid_map[i['uid']]
+    for i in problem_data['network']['bus']:
+        i['active_reserve_uids'] = [uid_map[j] for j in i['active_reserve_uids']]
+
+def anonymize_reactive_zonal_reserve_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['network']['reactive_zonal_reserve']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'qrz_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('reactive_zonal_reserve_uid_map: {}'.format(uid_map))
+    for i in problem_data['network']['reactive_zonal_reserve']:
+        i['uid'] = uid_map[i['uid']]
+    for i in problem_data['time_series_input']['reactive_zonal_reserve']:
+        i['uid'] = uid_map[i['uid']]
+    for i in problem_data['network']['bus']:
+        i['reactive_reserve_uids'] = [uid_map[j] for j in i['reactive_reserve_uids']]
+
+def anonymize_contingency_uids(problem_data, config, use_pydantic=False):
+
+    uids = [i['uid'] for i in problem_data['reliability']['contingency']]
+    num_uids = len(uids)
+    num_digits = len(str(num_uids))
+    format_str = 'ctg_{:0' + str(num_digits) + 'd}'
+    new_uids = [format_str.format(i) for i in range(num_uids)]
+    uid_map = {uids[i]: new_uids[i] for i in range(num_uids)}
+    if config['print_uid_maps']:
+        print('contingency_uid_map: {}'.format(uid_map))
+    for i in problem_data['reliability']['contingency']:
+        i['uid'] = uid_map[i['uid']]
+    # todo change acl, xfr, dcl uids here
+
+def remove_optional_fields(problem_data, config, use_pydantic=False):
 
     # todo
-    # anonymize UIDs
-    # ensure dispatchable device cost functions cover all p-values that may need to be evaluated
-
-    return problem_data_dict
-
-def scrub_problem_data_model(problem_data_model, config):
-
-    return problem_data_model
+    pass
 
 def check_data(problem_file, solution_file, config_file, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
