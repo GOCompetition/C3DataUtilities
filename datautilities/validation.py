@@ -354,10 +354,7 @@ def anonymize_uids(problem_data, config, use_pydantic=False):
     anonymize_bus_uids(problem_data, config, use_pydantic)
     anonymize_shunt_uids(problem_data, config, use_pydantic)
     anonymize_simple_dispatchable_device_uids(problem_data, config, use_pydantic)
-    anonymize_branch_uids(problem_data, config, use_pydantic)
-    # anonymize_ac_line_uids(problem_data, config, use_pydantic)
-    # anonymize_two_winding_transformer_uids(problem_data, config, use_pydantic)
-    # anonymize_dc_line_uids(problem_data, config, use_pydantic)
+    anonymize_branch_uids(problem_data, config, use_pydantic) # this does acl, xfr, dcl and changes them in ctgs
     anonymize_active_zonal_reserve_uids(problem_data, config, use_pydantic)
     anonymize_reactive_zonal_reserve_uids(problem_data, config, use_pydantic)
     anonymize_contingency_uids(problem_data, config, use_pydantic)
@@ -519,7 +516,6 @@ def anonymize_contingency_uids(problem_data, config, use_pydantic=False):
         print('contingency_uid_map: {}'.format(uid_map))
     for i in problem_data['reliability']['contingency']:
         i['uid'] = uid_map[i['uid']]
-    # todo change acl, xfr, dcl uids here
 
 def remove_optional_fields(problem_data, config, use_pydantic=False):
 
