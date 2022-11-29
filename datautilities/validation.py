@@ -9,6 +9,14 @@ from datamodel.output.data import OutputDataFile
 from datautilities import utils, arraydata, evaluation
 from datautilities.errors import ModelError, GitError
 
+# import optimization modules
+# it is OK if this fails as long as config file specifies we do not need optimization solves
+opt_solves_import_error = None
+try:
+    from datautilities.get_feas_comm import get_feas_comm
+except Exception as e:
+    opt_solves_import_error = e
+
 def write(file_name, mode, text):
 
     with open(file_name, mode) as f:
@@ -707,6 +715,50 @@ def check_data(problem_file, solution_file, config_file, summary_csv_file, summa
     print('after checking problem connectedness, memory info: {}'.format(utils.get_memory_info()))
     end_time = time.time()
     print('connected time: {}'.format(end_time - start_time))
+
+    if config['do_opt_solves']:
+
+        if opt_solves_import_error is not None:
+            summary['problem']['pass'] = 0
+            write_summary(summary, summary_csv_file, summary_json_file)
+            print('model error - import error prevents running optimization checks required by config file\n')
+            #print(traceback.format_exception(opt_solves_import_error))
+            #with open(problem_errors_file, 'a') as f:
+            #    f.write(traceback.format_exception(opt_solves_import_error)) # todo - how do we get the message?
+            raise ModelError(opt_solves_import_error)
+
+        # commitment scheduling feasibility check
+        start_time = time.time()
+        try:
+            feas_comm_sched = commitment_scheduling_feasible(data_model, config)
+        except ModelError as e:
+            summary['problem']['pass'] = 0
+            write_summary(summary, summary_csv_file, summary_json_file)
+            print('model error - commitment scheduling feasibility\n')
+            with open(problem_errors_file, 'a') as f:
+                f.write(traceback.format_exc())
+            raise e
+        print('after checking commitment scheduling feasibility, memory info: {}'.format(utils.get_memory_info()))
+        end_time = time.time()
+        print('commitment scheduling feasibility time: {}'.format(end_time - start_time))
+        
+        # dispatch feasibility check under computed feasible commitment schedule
+        start_time = time.time()
+        try:
+            feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
+        except ModelError as e:
+            summary['problem']['pass'] = 0
+            write_summary(summary, summary_csv_file, summary_json_file)
+            print('model error - dispatch feasibility under computed feasible commitment schedule\n')
+            with open(problem_errors_file, 'a') as f:
+                f.write(traceback.format_exc())
+            raise e
+        print('after checking dispatch feasibility under computed feasible commitment schedule, memory info: {}'.format(utils.get_memory_info()))
+        end_time = time.time()
+        print('dispatch feasibility under computed feasible commitment schedule time: {}'.format(end_time - start_time))
+
+        # todo
+        # write prior operating point solution
 
     # summary
     problem_summary = get_summary(data_model)
@@ -2963,6 +3015,59 @@ def connected(data, config):
     # report the errors
     if len(msg) > 0:
         raise ModelError(msg)
+
+def commitment_scheduling_feasible(data_model, config):
+    '''
+    feas_comm_sched = commitment_scheduling_feasible(data_model, config)
+    raises ModelError if infeasible
+    '''
+
+    data = {}
+    data['time_eq_tol'] = config['time_eq_tol']
+    data['t_d'] = [i for i in data_model.time_series_input.general.interval_duration]
+    data['j_u_on_init'] = [i.initial_status.on_status for i in data_model.network.simple_dispatchable_device]
+    data['j_up_time_min'] = [i.in_service_time_lb for i in data_model.network.simple_dispatchable_device]
+    data['j_down_time_min'] = [i.down_time_lb for i in data_model.network.simple_dispatchable_device]
+    data['j_up_time_init'] = [i.initial_status.accu_up_time for i in data_model.network.simple_dispatchable_device]
+    data['j_down_time_init'] = [i.initial_status.accu_down_time for i in data_model.network.simple_dispatchable_device]
+    data['j_t_u_on_max'] = [i.on_status_ub for i in data_model.time_series_input.simple_dispatchable_device]
+    data['j_t_u_on_min'] = [i.on_status_lb for i in data_model.time_series_input.simple_dispatchable_device]
+    data['j_w_startups_max'] = [[j[2] for j in i.startups_ub] for i in data_model.network.simple_dispatchable_device]
+    data['j_w_start_time'] = [[j[0] for j in i.startups_ub] for i in data_model.network.simple_dispatchable_device]
+    data['j_w_end_time'] = [[j[1] for j in i.startups_ub] for i in data_model.network.simple_dispatchable_device]
+    sol = get_feas_comm(data)
+    num_viols = sum([len(v) for k,v in sol['viols'].items()])
+    if num_viols > 0:
+        #viols = {(k1,k):v for k,v in sol['viols'].items() for k1,v1 in v.items()}
+        print('commitment schedule feasibility check violations: {}'.format(sol['viols']))
+        viols = [
+            {'j': data_model.network.simple_dispatchable_device[k1[0]].uid, 'type': k, 'index': k1, 'value': v1}
+            for k,v in sol['viols'].items() for k1,v1 in v.items()]
+        j_has_viols = sorted(list(set([v['j'] for v in viols])))
+        j_viols = {j:[] for j in j_has_viols}
+        for v in viols:
+            j_viols[v['j']].append(v)
+        print('j_viols: {}'.format(j_viols))
+        msg = 'fails commitment scheduling feasible. device_violations (dict with keys in device UIDs and value[k] is the list of violations for device with UID == k): {}'.format(j_viols)
+        raise ModelError(msg)
+    # todo
+    return None
+
+def dispatch_feasible_given_commitment(data_model, feas_comm_sched, config):
+    '''
+    feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
+    raises ModelError if infeasible
+    '''
+
+    # todo
+    return None
+
+def write_pop_solution(data_model, comm_sched, dispatch, config, file_name):
+    '''
+    write_pop_solution(data_model, comm_sched, dispatch, config, file_name)
+    '''
+
+    # todo
 
 def get_buses_branches_ctgs_on_in_service_ac_network(data):
     '''

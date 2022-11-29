@@ -8,6 +8,7 @@
     "acl_switch_dn_allowed": true,
     "xfr_switch_up_allowed": true,
     "xfr_switch_dn_allowed": true,
+    "do_opt_solves": true,
     "float_int_tol": 0.00000001,
     "time_eq_tol": 0.000001,
     "minimum_time_unit": 0.005,
