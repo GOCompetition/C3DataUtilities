@@ -3025,13 +3025,15 @@ def commitment_scheduling_feasible(data_model, config):
     data = {}
     data['time_eq_tol'] = config['time_eq_tol']
     data['t_d'] = [i for i in data_model.time_series_input.general.interval_duration]
+    data['j_uid'] = [i.uid for i in data_model.network.simple_dispatchable_device]
+    uid_ts_map = {i.uid:i for i in data_model.time_series_input.simple_dispatchable_device}
     data['j_u_on_init'] = [i.initial_status.on_status for i in data_model.network.simple_dispatchable_device]
     data['j_up_time_min'] = [i.in_service_time_lb for i in data_model.network.simple_dispatchable_device]
     data['j_down_time_min'] = [i.down_time_lb for i in data_model.network.simple_dispatchable_device]
     data['j_up_time_init'] = [i.initial_status.accu_up_time for i in data_model.network.simple_dispatchable_device]
     data['j_down_time_init'] = [i.initial_status.accu_down_time for i in data_model.network.simple_dispatchable_device]
-    data['j_t_u_on_max'] = [i.on_status_ub for i in data_model.time_series_input.simple_dispatchable_device]
-    data['j_t_u_on_min'] = [i.on_status_lb for i in data_model.time_series_input.simple_dispatchable_device]
+    data['j_t_u_on_max'] = [uid_ts_map[i.uid].on_status_ub for i in data_model.network.simple_dispatchable_device]
+    data['j_t_u_on_min'] = [uid_ts_map[i.uid].on_status_lb for i in data_model.network.simple_dispatchable_device]
     data['j_w_startups_max'] = [[j[2] for j in i.startups_ub] for i in data_model.network.simple_dispatchable_device]
     data['j_w_start_time'] = [[j[0] for j in i.startups_ub] for i in data_model.network.simple_dispatchable_device]
     data['j_w_end_time'] = [[j[1] for j in i.startups_ub] for i in data_model.network.simple_dispatchable_device]
