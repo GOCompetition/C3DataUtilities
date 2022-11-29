@@ -3036,19 +3036,23 @@ def commitment_scheduling_feasible(data_model, config):
     data['j_w_start_time'] = [[j[0] for j in i.startups_ub] for i in data_model.network.simple_dispatchable_device]
     data['j_w_end_time'] = [[j[1] for j in i.startups_ub] for i in data_model.network.simple_dispatchable_device]
     sol = get_feas_comm(data)
-    num_viols = sum([len(v) for k,v in sol['viols'].items()])
-    if num_viols > 0:
-        #viols = {(k1,k):v for k,v in sol['viols'].items() for k1,v1 in v.items()}
-        print('commitment schedule feasibility check violations: {}'.format(sol['viols']))
-        viols = [
-            {'j': data_model.network.simple_dispatchable_device[k1[0]].uid, 'type': k, 'index': k1, 'value': v1}
-            for k,v in sol['viols'].items() for k1,v1 in v.items()]
-        j_has_viols = sorted(list(set([v['j'] for v in viols])))
-        j_viols = {j:[] for j in j_has_viols}
-        for v in viols:
-            j_viols[v['j']].append(v)
-        print('j_viols: {}'.format(j_viols))
-        msg = 'fails commitment scheduling feasible. device_violations (dict with keys in device UIDs and value[k] is the list of violations for device with UID == k): {}'.format(j_viols)
+    if sol['success']:
+        num_viols = sum([len(v) for k,v in sol['viols'].items()])
+        if num_viols > 0:
+            #viols = {(k1,k):v for k,v in sol['viols'].items() for k1,v1 in v.items()}
+            print('commitment schedule feasibility check violations: {}'.format(sol['viols']))
+            viols = [
+                {'j': data_model.network.simple_dispatchable_device[k1[0]].uid, 'type': k, 'index': k1, 'value': v1}
+                for k,v in sol['viols'].items() for k1,v1 in v.items()]
+            j_has_viols = sorted(list(set([v['j'] for v in viols])))
+            j_viols = {j:[] for j in j_has_viols}
+            for v in viols:
+                j_viols[v['j']].append(v)
+            print('j_viols: {}'.format(j_viols))
+            msg = 'fails commitment scheduling feasible. device_violations (dict with keys in device UIDs and value[k] is the list of violations for device with UID == k): {}'.format(j_viols)
+            raise ModelError(msg)
+    else:
+        msg = 'fails commitment scheduling model solvable. model info: {}'.format(sol)
         raise ModelError(msg)
     # todo
     return None
