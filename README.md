@@ -40,3 +40,13 @@ This will read a problem data file, check it against properties specified in the
 ```
 python check_data.py --help
 ```
+
+# Branches
+
+This repository will have at least the following two branches:
+* main
+* dev
+
+```main``` will include only those checks that the publicly available problem instances pass.
+```dev``` may include checks that publicly available instances are failing.
+In general the competition platform will use ```dev```.
