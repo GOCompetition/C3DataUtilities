@@ -41,7 +41,7 @@ if __name__ == '__main__':
         "problem_opt", nargs="?",
         help="The problem file that we are checking - optional positional argument for backward compatibility, do not use with -p")
     group.add_argument("-p", "--problem", help="The problem file that we are checking")
-    parser.add_argument("-s", "--solution", help="The solution file that we are checking - not supported yet")
+    parser.add_argument("-s", "--solution", help="The solution file that we are checking")
     parser.add_argument(
         "-c", "--configuration",
         default=None,
