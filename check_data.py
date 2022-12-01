@@ -17,7 +17,7 @@ python check_data.py [-p, --problem] <problem_file_name> [-s, --solution] <solut
 import argparse, pathlib
 from datautilities import validation, utils
 
-config_file = 'config.json'
+default_config_file = 'config.json'
 summary_csv_file = 'summary.csv'
 summary_json_file = 'summary.json'
 data_errors_file = 'data_errors.txt'
@@ -44,8 +44,8 @@ if __name__ == '__main__':
     parser.add_argument("-s", "--solution", help="The solution file that we are checking - not supported yet")
     parser.add_argument(
         "-c", "--configuration",
-        default=str(pathlib.Path(utils.get_C3DataUtilities_dir(), config_file)),
-        help="Configuration file")
+        default=None,
+        help="Configuration file to override default configuration parameter values")
     parser.add_argument("-m", "--summary_csv", default=summary_csv_file, help="Summary output file - CSV format", )
     parser.add_argument("-j", "--summary_json", default=summary_json_file, help="Summary output file - JSON format", )
     parser.add_argument("-d", "--data_errors", default=data_errors_file, help="Data errors output file")
@@ -58,6 +58,8 @@ if __name__ == '__main__':
     print('args:')
     print(args)
 
+    default_config=str(pathlib.Path(utils.get_C3DataUtilities_dir(), default_config_file))
+
     if args.problem is not None:
         problem = args.problem
     else:
@@ -65,6 +67,6 @@ if __name__ == '__main__':
 
     if problem is not None:
         if args.scrubbed_problem is not None: # if scrubbing, ignore other arguments
-            validation.scrub_data(problem, args.configuration, args.scrubbed_problem)
+            validation.scrub_data(problem, default_config, args.configuration, args.scrubbed_problem)
         else:
-            validation.check_data(problem, args.solution, args.configuration, args.summary_csv, args.summary_json, args.data_errors, args.ignored_errors, args.solution_errors)
+            validation.check_data(problem, args.solution, default_config, args.configuration, args.summary_csv, args.summary_json, args.data_errors, args.ignored_errors, args.solution_errors)
