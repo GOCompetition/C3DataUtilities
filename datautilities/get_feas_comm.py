@@ -255,6 +255,7 @@ class Model(object):
                 self.j_t_u_on[j][t].ub = 0
                 if self.j_t_u_on_min[j,t] > 0:
                     print('j: {}, uid: {}, t: {}, u_on_min: {}, out_end_t: {}'.format(j, self.j_uid[j], t, self.j_t_u_on_min[j,t], self.j_out_end_t[j]))
+        # note the feasibility checks here are now also handled in validation outside of the MIP model
 
     def add_j_t_u_su(self):
 

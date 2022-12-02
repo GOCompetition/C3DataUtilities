@@ -1055,6 +1055,7 @@ def model_checks(data, config):
         sd_t_q_max_min_p_q_linking_supc_feasible,
         sd_t_q_max_min_p_q_linking_sdpc_feasible,
         sd_t_supc_sdpc_no_overlap,
+        sd_mr_out_min_up_down_time_consistent,
         ]
     errors = []
     # try:
@@ -2106,6 +2107,62 @@ def sd_t_supc_sdpc_no_overlap(data, config):
                          sdpc[i][t1], supc[i][t2]))
     if len(idx_err) > 0:
         msg = 'fails no overlap of shutdown and earliest subsequent startup trajectories. failures (device uid, shutdown interval, startup interval, minimum downtime, shutdown ramp rate, startup ramp rate, shutdown trajectory, startup trajectory): {}'.format(idx_err)
+        raise ModelError(msg)
+
+def sd_mr_out_min_up_down_time_consistent(data, config):
+
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.network.simple_dispatchable_device)
+    sd_uid = [c.uid for c in data.network.simple_dispatchable_device]
+    uid_ts_map = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    sd_t_u_max = [uid_ts_map[uid].on_status_ub for uid in sd_uid]
+    sd_t_u_min = [uid_ts_map[uid].on_status_ub for uid in sd_uid]
+    sd_init_u = [c.initial_status.on_status for c in data.network.simple_dispatchable_device]
+    sd_min_up_time = [c.in_service_time_lb for c in data.network.simple_dispatchable_device]
+    sd_min_down_time = [c.down_time_lb for c in data.network.simple_dispatchable_device]
+    sd_init_up_time = [c.initial_status.accu_up_time for c in data.network.simple_dispatchable_device]
+    sd_init_down_time = [c.initial_status.accu_down_time for c in data.network.simple_dispatchable_device]
+    t_d = [i for i in data.time_series_input.general.interval_duration]
+    sd_mr_end_t = [0 for j in range(num_sd)]
+    sd_out_end_t = [0 for j in range(num_sd)]
+    t_end_time = numpy.cumsum(t_d)
+    t_start_time = numpy.zeros(shape=(num_t, ), dtype=float)
+    t_start_time[1:num_t] = t_end_time[0:(num_t - 1)]
+
+    t_float = numpy.zeros(shape=(num_t, ), dtype=float)
+    t_int = numpy.zeros(shape=(num_t, ), dtype=int)
+
+    forced_off_before_min_uptime_viols = []
+    forced_on_before_min_downtime_viols = []
+
+    for j in range(num_sd):
+        if sd_init_up_time[j] > 0.0:
+            numpy.subtract(
+                sd_min_up_time[j] - sd_init_up_time[j] - config['time_eq_tol'],
+                t_start_time, out=t_float)
+            numpy.greater(t_float, 0.0, out=t_int)
+            t_set = numpy.nonzero(t_int)[0]
+            num_t = t_set.size
+            if num_t > 0:
+                sd_mr_end_t[j] = numpy.amax(t_set) + 1
+                t_viol = [t for t in range(sd_mr_end_t[j]) if sd_t_u_max[j][t] < 1]
+                if len(t_viol) > 0:
+                    forced_off_before_min_uptime_viols.append((sd_uid[j], max(t_viol)))
+        if sd_init_down_time[j] > 0.0:
+            numpy.subtract(
+                sd_min_down_time[j] - sd_init_down_time[j] - config['time_eq_tol'],
+                t_start_time, out=t_float)
+            numpy.greater(t_float, 0.0, out=t_int)
+            t_set = numpy.nonzero(t_int)[0]
+            num_t = t_set.size
+            if num_t > 0:
+                sd_out_end_t[j] = numpy.amax(t_set) + 1
+                t_viol = [t for t in range(sd_out_end_t[j]) if sd_t_u_min[j][t] > 0]
+                if len(t_viol) > 0:
+                    forced_on_before_min_downtime_viols.append((sd_uid[j], max(t_viol)))
+
+    if len(forced_off_before_min_uptime_viols) + len(forced_on_before_min_downtime_viols) > 0:
+        msg = "fails u max/min allows meeting min up/down time given initial status. failures (device uid, index of latest violating interval), forced off before meeting minimum uptime: {}, forced on before meeting minimum downtime: {}".format(forced_off_before_min_uptime_viols, forced_on_before_min_downtime_viols)
         raise ModelError(msg)
 
 def sd_t_get_earliest_startup_after_shutdown(t_shutdown, min_downtime, num_t, t_a_start, config):
