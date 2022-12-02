@@ -36,13 +36,16 @@ def write_json(data, file_name, sort_keys=False):
     with open(file_name, 'w') as f:
         json.dump(data, f, sort_keys=sort_keys)
 
-def read_config(default_config_file_name, config_file_name=None):
+def read_config(default_config_file_name, config_file_name=None, parameters_str=None):
 
-    default_config = read_json(default_config_file_name)
+    config = read_json(default_config_file_name)
     if config_file_name is not None:
-        config = read_json(config_file_name)
-        default_config.update(config)
-    return default_config
+        override_config = read_json(config_file_name)
+        config.update(override_config)
+    if parameters_str is not None:
+        override_config = json.loads(parameters_str)
+        config.update(override_config)
+    return config
 
 def get_p_q_linking_geometry(data, config):
 
@@ -322,7 +325,7 @@ def compute_max_min_p_from_max_min_p_q_and_linking(p_max, p_min, q_max, q_min, l
 
     # if we have not returned yet, there is a problem
 
-def scrub_data(problem_file, default_config_file, config_file, scrubbed_problem_file):
+def scrub_data(problem_file, default_config_file, config_file, parameters_str, scrubbed_problem_file):
     '''
     change some data in a standard way
     rewrite to a new file
@@ -339,7 +342,7 @@ def scrub_data(problem_file, default_config_file, config_file, scrubbed_problem_
     print('scrub problem data and rewrite to new file')
 
     # read config
-    config = read_config(default_config_file, config_file)
+    config = read_config(default_config_file, config_file, parameters_str)
 
     # data file
     print('problem data file: {}\n'.format(problem_file))
@@ -618,10 +621,10 @@ def remove_optional_fields(problem_data, config, use_pydantic=False):
         ]:
             i.pop(k, None)
 
-def check_data(problem_file, solution_file, default_config_file, config_file, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
+def check_data(problem_file, solution_file, default_config_file, config_file, parameters_str, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
 
     # read config
-    config = read_config(default_config_file, config_file)
+    config = read_config(default_config_file, config_file, parameters_str)
 
     # open files
     for fn in [summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file]:
