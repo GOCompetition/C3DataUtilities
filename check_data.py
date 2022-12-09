@@ -23,6 +23,7 @@ summary_json_file = 'summary.json'
 data_errors_file = 'data_errors.txt'
 ignored_errors_file = 'ignored_errors.txt'
 solution_errors_file = 'solution_errors.txt'
+pop_sol_file = 'pop_solution.json'
 
 if __name__ == '__main__':
 
@@ -56,6 +57,7 @@ if __name__ == '__main__':
     parser.add_argument("--data_errors", default=data_errors_file, help="Data errors output file")
     parser.add_argument("--ignored_errors", default=ignored_errors_file, help="Ignored errors output file")
     parser.add_argument("--solution_errors", default=solution_errors_file, help="Solution errors output file")
+    parser.add_argument("--pop_solution", default=pop_sol_file, help="Prior Operating Point (POP) solution file")
                         # metavar='KEY=VALUE',
                         # nargs='+',
                         # help=(
@@ -82,4 +84,4 @@ if __name__ == '__main__':
         if args.scrubbed_problem is not None: # if scrubbing, ignore other arguments
             validation.scrub_data(problem, default_config, args.configuration, args.parameters, args.scrubbed_problem)
         else:
-            validation.check_data(problem, args.solution, default_config, args.configuration, args.parameters, args.summary_csv, args.summary_json, args.data_errors, args.ignored_errors, args.solution_errors)
+            validation.check_data(problem, args.solution, default_config, args.configuration, args.parameters, args.summary_csv, args.summary_json, args.data_errors, args.ignored_errors, args.solution_errors, args.pop_solution)

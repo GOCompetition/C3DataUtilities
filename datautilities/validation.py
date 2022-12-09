@@ -621,7 +621,7 @@ def remove_optional_fields(problem_data, config, use_pydantic=False):
         ]:
             i.pop(k, None)
 
-def check_data(problem_file, solution_file, default_config_file, config_file, parameters_str, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file):
+def check_data(problem_file, solution_file, default_config_file, config_file, parameters_str, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file, pop_sol_file_name):
 
     # read config
     config = read_config(default_config_file, config_file, parameters_str)
@@ -768,8 +768,8 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         end_time = time.time()
         print('dispatch feasibility under computed feasible commitment schedule time: {}'.format(end_time - start_time))
 
-        # todo
         # write prior operating point solution
+        write_pop_solution(data_model, feas_comm_sched, feas_dispatch, config, pop_sol_file_name)
 
     # summary
     problem_summary = get_summary(data_model)
@@ -2601,6 +2601,95 @@ def check_p_q_linking_ramping_feas(
                 if not feas_scalar:
                     debug = False
 
+"""
+#### todo - do not use yet
+def dispatch_feasible_given_comm_single_sd(
+        # float t-arrays
+        d, # interval duration
+        p_max, p_min, q_max, q_min, # max/min p/q (input)
+        y_max, y_min, # max and min real power (output)
+        # bool t-arrays
+        comm, # commitment schedule
+        feas, # feasibility (output)
+        # dicts
+        p_q_linking_geometry=None,
+        ramping_info=None,
+        debug=False,
+):
+    # todo
+    # this needs to return a dispatch somehow,
+    # either in return values or in some array arguments
+    # specifically, p_on and q
+
+    if debug:
+        print('d: ', d)
+        print('p_max: ', p_max)
+        print('p_min: ', p_min)
+        print('q_max: ', q_max)
+        print('q_min: ', q_min)
+        print('y_max: ', y_max)
+        print('y_min: ', y_min)
+        print('feas: ', feas)
+        print('p_q_linking_geometry: ', p_q_linking_geometry)
+        print('ramping_info: ', ramping_info)
+
+    feas[:] = False
+    y_max[:] = 0.0
+    y_min[:] = 0.0
+    feas_scalar = False
+    feas_scalar_2 = False
+    y_max_scalar = 0.0
+    y_min_scalar = 0.0
+    num_t = p_max.size
+
+    y_max[:] = p_max
+    y_min[:] = p_min
+    numpy.less_equal(y_min, y_max, out=feas)
+
+    if p_q_linking_geometry is not None or ramping_info is not None:
+        if ramping_info is not None:
+            y_max_scalar = ramping_info['p0']
+            y_min_scalar = ramping_info['p0']
+            if debug:
+                print('y_max_scalar: ', y_max_scalar)
+                print('y_min_scalar: ', y_min_scalar)
+        for i in range(num_t):
+            if debug:
+                print('t: ', i)
+            if ramping_info is not None:
+                y_max_scalar = y_max_scalar + d[i] * ramping_info['pru']
+                y_min_scalar = y_min_scalar - d[i] * ramping_info['prd']
+                y_max_scalar = min(y_max_scalar, p_max[i])
+                y_min_scalar = max(y_min_scalar, p_min[i])
+            else:
+                y_max_scalar = p_max[i]
+                y_min_scalar = p_min[i]
+            feas_scalar = (y_min_scalar <= y_max_scalar)
+            if debug:
+                print('t: ', i)
+                print('y_max_scalar: ', y_max_scalar)
+                print('y_min_scalar: ', y_min_scalar)
+                print('feas_scalar: ', feas_scalar)
+            if p_q_linking_geometry is not None:
+                feas_scalar_2, y_max_scalar, y_min_scalar = compute_max_min_p_from_max_min_p_q_and_linking(
+                    y_max_scalar, y_min_scalar, q_max[i], q_min[i], p_q_linking_geometry)
+                feas_scalar = (feas_scalar and feas_scalar_2)
+                if debug:
+                    print('y_max_scalar: ', y_max_scalar)
+                    print('y_min_scalar: ', y_min_scalar)
+                    print('feas_scalar: ', feas_scalar)
+                    print('feas_scalar_2: ', feas_scalar_2)
+            y_max[i] = y_max_scalar
+            y_min[i] = y_min_scalar
+            feas[i] = feas_scalar
+            if debug:
+                print('y_max: ', y_max)
+                print('y_min: ', y_min)
+                print('feas: ', feas)
+                if not feas_scalar:
+                    debug = False
+"""
+
 def ts_sd_p_q_linking_feas(data, config):
     '''
     check that the intersection of the p/q max/min rectangle and the p/q linking constraints is nonempty
@@ -3124,17 +3213,84 @@ def commitment_scheduling_feasible(data_model, config):
     else:
         msg = 'fails commitment scheduling model solvable. model info: {}'.format(sol)
         raise ModelError(msg)
-    # todo
-    return None
+    # todo - what should we return here?
+    # what does dispatch_feasible_given_commitment want?
+    # what does write_pop_solution want?
+    sol_u_on = numpy.array(numpy.around(numpy.array(sol['j_t_u_on'])), dtype=int) # todo - round in get_feas_comm
+    return sol_u_on
 
 def dispatch_feasible_given_commitment(data_model, feas_comm_sched, config):
     '''
     feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
     raises ModelError if infeasible
+
+    given commitment schedule feas_comm_sched - numpy int array of shape (num_sd, num_t
+
+    note: see ts_sd_p_q_linking_ramping_feas,
+    which does not use commitment schedule but instead assumes
+    initial status is maintained for the whole model horizon
     '''
 
-    # todo
+    """
+    ### todo - do not use yet
+    idx_err = []
+    uid_sd_ts_map = {c.uid:c for c in data.time_series_input.simple_dispatchable_device}
+    num_t = len(data.time_series_input.general.interval_duration)
+    num_sd = len(data.time_series_input.simple_dispatchable_device)
+    d = numpy.array(data.time_series_input.general.interval_duration, dtype=float)
+    pmax = numpy.zeros(shape=(num_t, ), dtype=float)
+    pmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    qmax = numpy.zeros(shape=(num_t, ), dtype=float)
+    qmin = numpy.zeros(shape=(num_t, ), dtype=float)
+    ymax = numpy.zeros(shape=(num_t, ), dtype=float)
+    ymin = numpy.zeros(shape=(num_t, ), dtype=float)
+    feas = numpy.zeros(shape=(num_t, ), dtype=bool)
+    bool1 = numpy.zeros(shape=(num_t, ), dtype=bool)
+    comm = numpy.zeros(shape=(num_t, ), dtype=bool)
+    sd_p_q_linking_geometry = get_p_q_linking_geometry(data, config)
+    found_err = False
+    first_err = None
+    for j in range(num_sd):
+        sd = data.network.simple_dispatchable_device[j]
+        sd_ts = uid_sd_ts_map[sd.uid]
+        pmax[:] = sd_ts.p_ub
+        pmin[:] = sd_ts.p_lb
+        qmax[:] = sd_ts.q_ub
+        qmin[:] = sd_ts.q_lb
+        feas[:] = False
+        ymax[:] = 0.0
+        ymin[:] = 0.0
+        numpy.greater(feas_comm_sched[j, :], 0, out=comm)
+        if sd.q_bound_cap == 1 or sd.q_linear_cap == 1:
+            p_q_linking_geometry = sd_p_q_linking_geometry[sd.uid]
+        else:
+            p_q_linking_geometry = None
+        dispatch_feasible_given_comm_single_sd(
+            d, pmax, pmin, qmax, qmin, ymax, ymin, comm,
+            feas,
+            p_q_linking_geometry=p_q_linking_geometry,
+            ramping_info={'p0': sd.initial_status.p, 'pru': sd.p_ramp_up_ub, 'prd': sd.p_ramp_down_ub})
+        numpy.logical_not(feas, out=bool1)
+        infeas_t = numpy.flatnonzero(bool1)
+        if infeas_t.size > 0:
+            t = infeas_t[0]
+            idx_err.append(
+                (sd.uid, t, sd.initial_status.on_status, feas_comm_sched[j, 0:(t+1)].tolist(), d[0:(t+1)].tolist(),
+                 sd_ts.p_ub[0:(t+1)], sd_ts.p_lb[0:(t+1)], sd_ts.q_ub[0:(t+1)], sd_ts.q_lb[0:(t+1)],
+                 sd.q_linear_cap, sd.q_bound_cap, sd.q_0, sd.q_0_ub, sd.q_0_lb,
+                 sd.beta, sd.beta_ub, sd.beta_lb,
+                 sd.initial_status.p, sd.p_ramp_up_ub, sd.p_ramp_down_ub,
+                 ymax[0:(t+1)].tolist(), ymin[0:(t+1)].tolist()))
+    if len(idx_err) > 0:
+        msg = "fails simple_dispatchable_device dispatch feasible given commitment schedule u, p/q max/min time series constraints, p/q linking constraints, and p ramping constraints. failures (device uid, interval index - first interval per device, u_init, u, d, pmax, pmin, qmax, qmin, q_linear_cap, q_bound_cap, q_0, q_0_ub, q_0_lb, beta, beta_ub, beta_lb, p_init, pru, prd, pmax_implied, pmin_implied): {}".format(idx_err)
+        raise ModelError(msg)    
+    """
+
+    # todo - what are we returning?
+    # dispatch p_on, q
+    # where do these come from?
     return None
+
 
 def write_pop_solution(data_model, comm_sched, dispatch, config, file_name):
     '''

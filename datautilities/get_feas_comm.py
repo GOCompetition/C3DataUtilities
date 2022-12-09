@@ -1,6 +1,101 @@
 import gurobipy
 import numpy
 
+'''
+        todo - refine this so that ties are broken in an unambiguous and easily described fashion
+        e.g., hierarchically maximize time until first state change, then time until second state change, etc.
+        
+        Consider the following hierarchical optimization problem:
+        
+          (1)
+          (1.1) maximize time until first state change, then
+          (1.2) maximize time until second state change subject to (1.1), then
+          (1.3) maximize time until third state change subject to (1.2), then
+          ...
+        
+        First, note that, if the commitment scheduling problem is feasible, then this hierarchical optimization
+        problem is also feasible, and there is only one solution
+        
+        The hierarchical optimization problem can be described analytically as a single MIP problem.
+        Begin by representing the commitment scheduling feasibility problem as
+        
+          (2)
+          min 0
+          st u^on_t, u^su_t, u^sd_t \in {0, 1}
+              u^on_t - (t > t^start) * u^on_{t-1} - (t = t^start) * u^{on,0} = u^su_t - u^sd_t
+              min uptime and downtime constraints
+              must run and planned outage constraints
+        
+        Then add a binary variable u^susd_t and objective coefficients c^susd_t and a constraint defining u^susd_t
+        
+          (3)
+          min sum_t c^susd_t u^susd_t
+          st  u^on_t, u^su_t, u^sd_t, u^susd_t \in {0, 1}
+              u^susd_t = u^su_t + u^sd_t
+              u^on_t - (t > t^start) * u^on_{t-1} - (t = t^start) * u^{on,0} = u^su_t - u^sd_t
+              min uptime and downtime constraints
+              must run and planned outage constraints
+        
+        The constraint u^susd_t = u^su_t + u^sd_t defines u^susd_t as an indicator of a state transition,
+        either startup or shutdown, in interval t.
+        The objective coefficients are c^susd_t = 2^{t^start - t}
+        i.e. 1, 1/2, 1/4, ..., 1/2^(|T| - 1).
+        With this objective, term t takes a value of either 0 (if u^susd_t = 0)
+        or c^susd_t (if u^susd_t = 1), and the difference between these values is greater than the difference between
+        the maximum and minimum possible values of the sum of all the subsequent terms.
+        Therefore an exact solution of (3) is a solution of (1).
+        The problem is that the objective coefficients can get to be too small to make a difference in a MIP solver
+        with a practical finite optimality tolerance if |T| is large enough.
+        To handle this, add another binary variable u^susdge1_t as an indicator that u^susd_{t'} = 1 for some t' <= t.
+        Add constraints enforcing this definition, and replace the objective with sum_t u^susdge1_t and you have a model
+        whose solution maximizes the time until first state transition:
+        
+          (4)
+          min sum_t u^susdge1_t
+          st  u^on_t, u^su_t, u^sd_t, u^susd_t, u^susdge1_t \in {0, 1}
+              u^susdge1_t >= (t > t^start) * u^susdge1_{t-1}
+              u^susdge1_t >= u^susd_t
+              u^susd_t = u^su_t + u^sd_t
+              u^on_t - (t > t^start) * u^on_{t-1} - (t = t^start) * u^{on,0} = u^su_t - u^sd_t
+              min uptime and downtime constraints
+              must run and planned outage constraints
+        
+        Now suppose that u^on_t is fixed, say to u^{on,fx}_t, for t <= t^fx.
+        If we remove the constraint u^susdge1_t >= u^susd_t for t <= t^fx, then we obtain a model whose solution
+        maximizes the time until the first transition after t^fx:
+        
+          (5)
+          min sum_t u^susdge1_t
+          st  u^on_t, u^su_t, u^sd_t, u^susd_t, u^susdge1_t \in {0, 1}
+              u^on_t = u^{on,fx}_t for t <= t^fx
+              u^susdge1_t >= (t > t^start) * u^susdge1_{t-1}
+              u^susdge1_t >= (t > t^fx) * u^susd_t
+              u^susd_t = u^su_t + u^sd_t
+              u^on_t - (t > t^start) * u^on_{t-1} - (t = t^start) * u^{on,0} = u^su_t - u^sd_t
+              min uptime and downtime constraints
+              must run and planned outage constraints
+        
+        Finally, solve a sequence of models of the form of (5) to solve (1):
+        
+          (6)
+          u^{on,fx}_t := 0 for t in t^start, ..., t^end
+          t^fx = t^start - 1
+          while t^fx < t^end:
+            construct and solve (4) with solution u^on_t, u^susdge1_t.
+            if {t : u^susdge1_t > 0 } = {}
+              t^fx = t^end
+            else:
+              t^fx := min{t : u^susdge1_t > 0}
+            u^{on,fx}_t := u^on_t for t <= t^fx
+        
+        Algorithm (6) terminates, and at termination u^{on,fx}_t is the solution of (1).
+        
+        Model (5) can be reformulated such that in each step of algorithm (6), instead of removing or loosening constraints,
+        we are adding constraints. With that modification, it is then possible to implement (6) as a single call to a
+        MIP solver, with the necessary constraints added as lazy constraints in a callback.
+        This may or may not be more efficient. Probably it will not be necessary for this application.
+'''
+
 def get_feas_comm(data):
 
     output = {}
@@ -359,6 +454,7 @@ class Model(object):
     def get_sol_j_t_u_on(self):
 
         self.sol_j_t_u_on = [[self.j_t_u_on[j][t].x for t in range(self.num_t)] for j in range(self.num_j)]
+        # todo - convert this to integers?
 
     def get_sol_j_t_up_time_min_viol(self):
 
