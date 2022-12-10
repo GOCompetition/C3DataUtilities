@@ -109,8 +109,18 @@ def get_feas_comm(data):
         output['success'] = True
         m.get_sol()
         m.get_viols()
-        output['j_t_u_on'] = m.sol_j_t_u_on
-        output['viols'] = m.viols
+        m.round_u()
+        m.fix_u()
+        m.opt_model.optimize()
+        output['model_status'] = m.opt_model.status
+        if m.opt_model.status == gurobipy.GRB.OPTIMAL:
+            m.get_sol()
+            m.round_u()
+            m.get_viols()
+            output['j_t_u_on'] = m.sol_j_t_u_on
+            output['viols'] = m.viols
+        else:
+            output['success'] = False
     else:
         output['success'] = False
     return(output)
@@ -454,7 +464,21 @@ class Model(object):
     def get_sol_j_t_u_on(self):
 
         self.sol_j_t_u_on = [[self.j_t_u_on[j][t].x for t in range(self.num_t)] for j in range(self.num_j)]
-        # todo - convert this to integers?
+
+    def round_u(self):
+
+        self.sol_j_t_u_on = [
+            [int(round(self.sol_j_t_u_on[j][t])) for t in range(self.num_t)] for j in range(self.num_j)]
+
+    def fix_u(self):
+        
+        for j in range(self.num_j):
+            for t in range(self.num_t):
+                self.j_t_u_on[j][t].ub = self.sol_j_t_u_on[j][t]
+                self.j_t_u_on[j][t].lb = self.sol_j_t_u_on[j][t]
+                self.j_t_u_on[j][t].vtype = gurobipy.GRB.CONTINUOUS
+                self.j_t_u_su[j][t].vtype = gurobipy.GRB.CONTINUOUS
+                self.j_t_u_sd[j][t].vtype = gurobipy.GRB.CONTINUOUS
 
     def get_sol_j_t_up_time_min_viol(self):
 
@@ -487,3 +511,4 @@ class Model(object):
             for j in range(self.num_j) for w in range(self.j_num_w[j])
             if self.sol_j_w_startups_max_viol[j][w] > 0.0}
         self.viols = viol_nonzero
+        self.num_viols = sum(len(v) for k,v in self.viols.items())

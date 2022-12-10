@@ -14,6 +14,7 @@ from datautilities.errors import ModelError, GitError
 opt_solves_import_error = None
 try:
     from datautilities.get_feas_comm import get_feas_comm
+    from datautilities.get_feas_dispatch import get_feas_dispatch
 except Exception as e:
     opt_solves_import_error = e
 
@@ -769,7 +770,9 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         print('dispatch feasibility under computed feasible commitment schedule time: {}'.format(end_time - start_time))
 
         # write prior operating point solution
-        write_pop_solution(data_model, feas_comm_sched, feas_dispatch, config, pop_sol_file_name)
+        feas_dispatch_p = feas_dispatch[0]
+        feas_dispatch_q = feas_dispatch[1]
+        write_pop_solution(data_model, feas_comm_sched, feas_dispatch_p, feas_dispatch_q, config, pop_sol_file_name)
 
     # summary
     problem_summary = get_summary(data_model)
@@ -3213,10 +3216,8 @@ def commitment_scheduling_feasible(data_model, config):
     else:
         msg = 'fails commitment scheduling model solvable. model info: {}'.format(sol)
         raise ModelError(msg)
-    # todo - what should we return here?
-    # what does dispatch_feasible_given_commitment want?
-    # what does write_pop_solution want?
-    sol_u_on = numpy.array(numpy.around(numpy.array(sol['j_t_u_on'])), dtype=int) # todo - round in get_feas_comm
+    sol_u_on = sol['j_t_u_on']
+    print('sol_u_on: {}'.format(sol_u_on))
     return sol_u_on
 
 def dispatch_feasible_given_commitment(data_model, feas_comm_sched, config):
@@ -3224,12 +3225,69 @@ def dispatch_feasible_given_commitment(data_model, feas_comm_sched, config):
     feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
     raises ModelError if infeasible
 
-    given commitment schedule feas_comm_sched - numpy int array of shape (num_sd, num_t
+    given commitment schedule feas_comm_sched - num_sd-by-num_t
 
     note: see ts_sd_p_q_linking_ramping_feas,
     which does not use commitment schedule but instead assumes
     initial status is maintained for the whole model horizon
     '''
+
+
+    data = {}
+    data['time_eq_tol'] = config['time_eq_tol']
+    data['t_d'] = [i for i in data_model.time_series_input.general.interval_duration]
+    data['j_uid'] = [i.uid for i in data_model.network.simple_dispatchable_device]
+    uid_ts_map = {i.uid:i for i in data_model.time_series_input.simple_dispatchable_device}
+    data['j_u_on_init'] = [i.initial_status.on_status for i in data_model.network.simple_dispatchable_device]
+    data['j_p_init'] = [i.initial_status.p for i in data_model.network.simple_dispatchable_device]
+    data['j_q_init'] = [i.initial_status.q for i in data_model.network.simple_dispatchable_device]
+    data['j_p_ru_max'] = [i.p_ramp_up_ub for i in data_model.network.simple_dispatchable_device]
+    data['j_p_rd_max'] = [i.p_ramp_down_ub for i in data_model.network.simple_dispatchable_device]
+    data['j_p_su_ru_max'] = [i.p_startup_ramp_ub for i in data_model.network.simple_dispatchable_device]
+    data['j_p_sd_rd_max'] = [i.p_shutdown_ramp_ub for i in data_model.network.simple_dispatchable_device]
+    data['j_t_u_on'] = feas_comm_sched
+    data['j_t_p_on_max'] = [uid_ts_map[i.uid].p_ub for i in data_model.network.simple_dispatchable_device]
+    data['j_t_p_on_min'] = [uid_ts_map[i.uid].p_lb for i in data_model.network.simple_dispatchable_device]
+    data['j_t_q_max'] = [uid_ts_map[i.uid].q_ub for i in data_model.network.simple_dispatchable_device]
+    data['j_t_q_min'] = [uid_ts_map[i.uid].q_lb for i in data_model.network.simple_dispatchable_device]
+    data['j_t_supc'] = get_supc(data_model, config, check_ambiguous=False)
+    data['j_t_sdpc'] = get_sdpc(data_model, config, check_ambiguous=False)
+    data['j_p_q_ineq'] = [i.q_bound_cap for i in data_model.network.simple_dispatchable_device]
+    data['j_p_q_eq'] = [i.q_linear_cap for i in data_model.network.simple_dispatchable_device]
+    data['j_b'] = [(i.beta if i.q_linear_cap == 1 else None) for i in data_model.network.simple_dispatchable_device]
+    data['j_bmax'] = [(i.beta_ub if i.q_bound_cap == 1 else None) for i in data_model.network.simple_dispatchable_device]
+    data['j_bmin'] = [(i.beta_lb if i.q_bound_cap == 1 else None) for i in data_model.network.simple_dispatchable_device]
+    data['j_q0'] = [(i.q_0 if i.q_linear_cap == 1 else None) for i in data_model.network.simple_dispatchable_device]
+    data['j_qmax0'] = [(i.q_0_ub if i.q_bound_cap == 1 else None) for i in data_model.network.simple_dispatchable_device]
+    data['j_qmin0'] = [(i.q_0_lb if i.q_bound_cap == 1 else None) for i in data_model.network.simple_dispatchable_device]
+    sol = get_feas_dispatch(data)
+    if sol['success']:
+        num_viols = sum([len(v) for k,v in sol['viols'].items()])
+        if num_viols > 0:
+            #viols = {(k1,k):v for k,v in sol['viols'].items() for k1,v1 in v.items()}
+            print('dispatch schedule feasibility check violations: {}'.format(sol['viols']))
+            viols = [
+                {'j': data_model.network.simple_dispatchable_device[k1[0]].uid, 'type': k, 'index': k1, 'value': v1}
+                for k,v in sol['viols'].items() for k1,v1 in v.items()]
+            j_has_viols = sorted(list(set([v['j'] for v in viols])))
+            j_viols = {j:[] for j in j_has_viols}
+            for v in viols:
+                j_viols[v['j']].append(v)
+            print('j_viols: {}'.format(j_viols))
+            msg = 'fails dispatch scheduling feasible. device_violations (dict with keys in device UIDs and value[k] is the list of violations for device with UID == k): {}'.format(j_viols)
+            raise ModelError(msg)
+    else:
+        msg = 'fails dispatch scheduling model solvable. model info: {}'.format(sol)
+        raise ModelError(msg)
+    sol_p_on = sol['j_t_p_on']
+    sol_q = sol['j_t_q']
+    print('sol_p_on: {}'.format(sol_p_on))
+    print('sol_q: {}'.format(sol_q))
+    return sol_p_on, sol_q
+
+def check_dispatch_feasibility_given_comm():
+
+    # todo - do we need this?
 
     """
     ### todo - do not use yet
@@ -3286,15 +3344,9 @@ def dispatch_feasible_given_commitment(data_model, feas_comm_sched, config):
         raise ModelError(msg)    
     """
 
-    # todo - what are we returning?
-    # dispatch p_on, q
-    # where do these come from?
-    return None
-
-
-def write_pop_solution(data_model, comm_sched, dispatch, config, file_name):
+def write_pop_solution(data_model, commitment, dispatch_p, dispatch_q, config, file_name):
     '''
-    write_pop_solution(data_model, comm_sched, dispatch, config, file_name)
+    write_pop_solution(data_model, commitment, dispatch_p, dispatch_q, config, file_name)
     '''
 
     # todo
