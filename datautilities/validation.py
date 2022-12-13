@@ -3347,9 +3347,96 @@ def check_dispatch_feasibility_given_comm():
 def write_pop_solution(data_model, commitment, dispatch_p, dispatch_q, config, file_name):
     '''
     write_pop_solution(data_model, commitment, dispatch_p, dispatch_q, config, file_name)
+
+    commitment, dispatch_p, and dispatch_q are all list of lists of shape num_sd-by-num_t
     '''
 
-    # todo
+    # todo - write a dict, then json dump
+
+    # sol = {
+    #     'time_series_output':{
+    #         'ac_line': [
+    #             {'uid': '',
+    #              'on_status': []}],
+    #         'simple_dispatchable_device': [
+    #             {'uid': '',
+    #              'on_status': [],
+    #              'p_on': [],
+    #              'q': [],
+    #              'p_reg_res_up': [],
+    #              'p_reg_res_down': [],
+    #              'p_syn_res': [],
+    #              'p_nsyn_res': [],
+    #              'p_ramp_res_up_online': [],
+    #              'p_ramp_res_down_online': [],
+    #              'p_ramp_res_up_offline': [],
+    #              'p_ramp_res_down_offline': [],
+    #              'q_res_up': [],
+    #              'q_res_down': []}],
+    #         'two_winding_transformer': [
+    #             {'uid': '',
+    #              'on_status': [],
+    #              'ta': [],
+    #              'tm': []}],
+    #         'shunt': [
+    #             {'uid': '',
+    #              'step': []}],
+    #         'dc_line': [
+    #             {'uid': '',
+    #              'pdc_fr': [],
+    #              'qdc_fr': [],
+    #              'qdc_to': []}],
+    #         'bus': [
+    #             {'uid': '',
+    #              'va': [],
+    #              'vm': []}]}}
+    num_t = len(data_model.time_series_input.general.interval_duration)
+    num_sd = len(data_model.network.simple_dispatchable_device)
+    sol = {
+        'time_series_output':{
+            'ac_line': [
+                {'uid': i.uid,
+                 'on_status': [i.initial_status.on_status for t in range(num_t)]}
+                for i in data_model.network.ac_line],
+            'simple_dispatchable_device': [
+                {'uid': data_model.network.simple_dispatchable_device[j].uid,
+                 'on_status': commitment[j],
+                 'p_on': dispatch_p[j],
+                 'q': dispatch_q[j],
+                 'p_reg_res_up': [0.0 for t in range(num_t)],
+                 'p_reg_res_down': [0.0 for t in range(num_t)],
+                 'p_syn_res': [0.0 for t in range(num_t)],
+                 'p_nsyn_res': [0.0 for t in range(num_t)],
+                 'p_ramp_res_up_online': [0.0 for t in range(num_t)],
+                 'p_ramp_res_down_online': [0.0 for t in range(num_t)],
+                 'p_ramp_res_up_offline': [0.0 for t in range(num_t)],
+                 'p_ramp_res_down_offline': [0.0 for t in range(num_t)],
+                 'q_res_up': [0.0 for t in range(num_t)],
+                 'q_res_down': [0.0 for t in range(num_t)]}
+                for j in range(num_sd)],
+            'two_winding_transformer': [
+                {'uid': i.uid,
+                 'on_status': [i.initial_status.on_status for t in range(num_t)],
+                 'ta': [i.initial_status.ta for t in range(num_t)],
+                 'tm': [i.initial_status.tm for t in range(num_t)]}
+                for i in data_model.network.two_winding_transformer],
+            'shunt': [
+                {'uid': i.uid,
+                 'step': [i.initial_status.step for t in range(num_t)]}
+                for i in data_model.network.shunt],
+            'dc_line': [
+                {'uid': i.uid,
+                 'pdc_fr': [i.initial_status.pdc_fr for t in range(num_t)],
+                 'qdc_fr': [i.initial_status.qdc_fr for t in range(num_t)],
+                 'qdc_to': [i.initial_status.qdc_to for t in range(num_t)]}
+                for i in data_model.network.dc_line],
+            'bus': [
+                {'uid': i.uid,
+                 'va': [i.initial_status.va for t in range(num_t)],
+                 'vm': [i.initial_status.vm for t in range(num_t)]}
+                for i in data_model.network.bus]}}
+    with open(file_name, 'w') as sol_file:
+        json.dump(sol, sol_file)
 
 def get_buses_branches_ctgs_on_in_service_ac_network(data):
     '''

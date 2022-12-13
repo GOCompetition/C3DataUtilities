@@ -321,7 +321,7 @@ class Model(object):
                 lhs=self.j_t_q[j][t],
                 sense=gurobipy.GRB.LESS_EQUAL,
                 rhs=(
-                    (self.j_qmax0[j] if self.j_t_ususdpc[j][t] == 1 else 0.0) +
+                    (self.j_qmax0[j] if self.j_t_u_onsusdpc[j][t] == 1 else 0.0) +
                     self.j_bmax[j] * (self.j_t_p_on[j][t] + self.j_t_p_su[j,t] + self.j_t_p_sd[j,t]) +
                     (self.j_t_q_over_viol[j][t] if self.params['min_infeasibility'] else 0.0)),
                 name='j_t_q_leq_constr[{},{}]'.format(j,t))
@@ -338,7 +338,7 @@ class Model(object):
                 lhs=self.j_t_q[j][t],
                 sense=gurobipy.GRB.GREATER_EQUAL,
                 rhs=(
-                    (self.j_qmin0[j] if self.j_t_ususdpc[j][t] == 1 else 0.0) +
+                    (self.j_qmin0[j] if self.j_t_u_onsusdpc[j][t] == 1 else 0.0) +
                     self.j_bmin[j] * (self.j_t_p_on[j][t] + self.j_t_p_su[j,t] + self.j_t_p_sd[j,t]) -
                     (self.j_t_q_under_viol[j][t] if self.params['min_infeasibility'] else 0.0)),
                 name='j_t_q_geq_constr[{},{}]'.format(j,t))
@@ -355,7 +355,7 @@ class Model(object):
                 lhs=self.j_t_q[j][t],
                 sense=gurobipy.GRB.EQUAL,
                 rhs=(
-                    (self.j_q0[j] if self.j_t_ususdpc[j][t] == 1 else 0.0) +
+                    (self.j_q0[j] if self.j_t_u_onsusdpc[j][t] == 1 else 0.0) +
                     self.j_b[j] * (self.j_t_p_on[j][t] + self.j_t_p_su[j,t] + self.j_t_p_sd[j,t]) +
                     (self.j_t_q_over_viol[j][t] if self.params['min_infeasibility'] else 0.0) -
                     (self.j_t_q_under_viol[j][t] if self.params['min_infeasibility'] else 0.0)),

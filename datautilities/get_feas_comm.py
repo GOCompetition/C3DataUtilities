@@ -26,51 +26,51 @@ import numpy
               min uptime and downtime constraints
               must run and planned outage constraints
         
-        Then add a binary variable u^susd_t and objective coefficients c^susd_t and a constraint defining u^susd_t
+        Then add a binary variable u^tr_t and objective coefficients c^tr_t and a constraint defining u^tr_t
         
           (3)
-          min sum_t c^susd_t u^susd_t
-          st  u^on_t, u^su_t, u^sd_t, u^susd_t \in {0, 1}
-              u^susd_t = u^su_t + u^sd_t
+          min sum_t c^tr_t u^tr_t
+          st  u^on_t, u^su_t, u^sd_t, u^tr_t \in {0, 1}
+              u^tr_t = u^su_t + u^sd_t
               u^on_t - (t > t^start) * u^on_{t-1} - (t = t^start) * u^{on,0} = u^su_t - u^sd_t
               min uptime and downtime constraints
               must run and planned outage constraints
         
-        The constraint u^susd_t = u^su_t + u^sd_t defines u^susd_t as an indicator of a state transition,
+        The constraint u^tr_t = u^su_t + u^sd_t defines u^tr_t as an indicator of a state transition,
         either startup or shutdown, in interval t.
-        The objective coefficients are c^susd_t = 2^{t^start - t}
+        The objective coefficients are c^tr_t = 2^{t^start - t}
         i.e. 1, 1/2, 1/4, ..., 1/2^(|T| - 1).
-        With this objective, term t takes a value of either 0 (if u^susd_t = 0)
-        or c^susd_t (if u^susd_t = 1), and the difference between these values is greater than the difference between
+        With this objective, term t takes a value of either 0 (if u^tr_t = 0)
+        or c^tr_t (if u^tr_t = 1), and the difference between these values is greater than the difference between
         the maximum and minimum possible values of the sum of all the subsequent terms.
         Therefore an exact solution of (3) is a solution of (1).
         The problem is that the objective coefficients can get to be too small to make a difference in a MIP solver
         with a practical finite optimality tolerance if |T| is large enough.
-        To handle this, add another binary variable u^susdge1_t as an indicator that u^susd_{t'} = 1 for some t' <= t.
-        Add constraints enforcing this definition, and replace the objective with sum_t u^susdge1_t and you have a model
+        To handle this, add another binary variable u^tr1_t as an indicator that u^tr_{t'} = 1 for some t' <= t.
+        Add constraints enforcing this definition, and replace the objective with sum_t u^tr1_t and you have a model
         whose solution maximizes the time until first state transition:
         
           (4)
-          min sum_t u^susdge1_t
-          st  u^on_t, u^su_t, u^sd_t, u^susd_t, u^susdge1_t \in {0, 1}
-              u^susdge1_t >= (t > t^start) * u^susdge1_{t-1}
-              u^susdge1_t >= u^susd_t
-              u^susd_t = u^su_t + u^sd_t
+          min sum_t u^tr1_t
+          st  u^on_t, u^su_t, u^sd_t, u^tr_t, u^tr1_t \in {0, 1}
+              u^tr1_t >= (t > t^start) * u^tr1_{t-1}
+              u^tr1_t >= u^tr_t
+              u^tr_t = u^su_t + u^sd_t
               u^on_t - (t > t^start) * u^on_{t-1} - (t = t^start) * u^{on,0} = u^su_t - u^sd_t
               min uptime and downtime constraints
               must run and planned outage constraints
         
         Now suppose that u^on_t is fixed, say to u^{on,fx}_t, for t <= t^fx.
-        If we remove the constraint u^susdge1_t >= u^susd_t for t <= t^fx, then we obtain a model whose solution
+        If we remove the constraint u^tr1_t >= u^tr_t for t <= t^fx, then we obtain a model whose solution
         maximizes the time until the first transition after t^fx:
         
           (5)
-          min sum_t u^susdge1_t
-          st  u^on_t, u^su_t, u^sd_t, u^susd_t, u^susdge1_t \in {0, 1}
+          min sum_t u^tr1_t
+          st  u^on_t, u^su_t, u^sd_t, u^tr_t, u^tr1_t \in {0, 1}
               u^on_t = u^{on,fx}_t for t <= t^fx
-              u^susdge1_t >= (t > t^start) * u^susdge1_{t-1}
-              u^susdge1_t >= (t > t^fx) * u^susd_t
-              u^susd_t = u^su_t + u^sd_t
+              u^tr1_t >= (t > t^start) * u^tr1_{t-1}
+              u^tr1_t >= (t > t^fx) * u^tr_t
+              u^tr_t = u^su_t + u^sd_t
               u^on_t - (t > t^start) * u^on_{t-1} - (t = t^start) * u^{on,0} = u^su_t - u^sd_t
               min uptime and downtime constraints
               must run and planned outage constraints
@@ -81,11 +81,11 @@ import numpy
           u^{on,fx}_t := 0 for t in t^start, ..., t^end
           t^fx = t^start - 1
           while t^fx < t^end:
-            construct and solve (4) with solution u^on_t, u^susdge1_t.
-            if {t : u^susdge1_t > 0 } = {}
+            construct and solve (4) with solution u^on_t, u^tr1_t.
+            if {t : u^tr1_t > 0 } = {}
               t^fx = t^end
             else:
-              t^fx := min{t : u^susdge1_t > 0}
+              t^fx := min{t : u^tr1_t > 0}
             u^{on,fx}_t := u^on_t for t <= t^fx
         
         Algorithm (6) terminates, and at termination u^{on,fx}_t is the solution of (1).
@@ -117,6 +117,39 @@ def get_feas_comm(data):
             m.get_sol()
             m.round_u()
             m.get_viols()
+            output['j_t_u_on'] = m.sol_j_t_u_on
+            output['viols'] = m.viols
+        else:
+            output['success'] = False
+    else:
+        output['success'] = False
+    return(output)
+
+def get_pop_comm(data):
+
+    output = {}
+    m = Model()
+    m.set_env()
+    m.set_data(data)
+    m.make_opt_model()
+    m.opt_model.optimize()
+    output['model_status'] = m.opt_model.status
+    if m.opt_model.status == gurobipy.GRB.OPTIMAL:
+        output['success'] = True
+        output['model_obj'] = m.opt_model.objval
+        m.get_sol()
+        m.get_viols()
+        m.round_u()
+        output['j_t_u_on'] = m.sol_j_t_u_on
+        output['viols'] = m.viols
+        m.fix_u()
+        m.opt_model.optimize()
+        output['model_status'] = m.opt_model.status
+        if m.opt_model.status == gurobipy.GRB.OPTIMAL:
+            output['model_obj'] = m.opt_model.objval
+            m.get_sol()
+            m.get_viols()
+            m.round_u()
             output['j_t_u_on'] = m.sol_j_t_u_on
             output['viols'] = m.viols
         else:
@@ -320,6 +353,8 @@ class Model(object):
         self.add_j_t_u_on()
         self.add_j_t_u_su()
         self.add_j_t_u_sd()
+        self.add_j_t_u_tr()
+        self.add_j_t_u_tr1()
         self.add_j_t_up_time_min_viol()
         self.add_j_t_down_time_min_viol()
         self.add_j_w_startups_max_viol()
@@ -330,6 +365,9 @@ class Model(object):
 
         self.add_j_t_su_sd_def()
         self.add_j_t_su_sd_le_1()
+        self.add_j_t_tr_def()
+        self.add_j_t_tr1_ge_tr1_lag()
+        self.add_j_t_tr1_ge_tr()
         self.add_j_t_up_time_min_constr()
         self.add_j_t_down_time_min_constr()
         self.add_j_w_startups_max_constr()
@@ -376,6 +414,26 @@ class Model(object):
              for t in range(self.num_t)]
             for j in range(self.num_j)]
 
+    def add_j_t_u_tr(self):
+        '''
+        transition either from off to on (su) or from on to off (sd) in interval t
+        '''
+
+        self.j_t_u_tr = [
+            [self.opt_model.addVar(vtype=gurobipy.GRB.BINARY, name='j_t_u_tr[{},{}]'.format(j,t))
+             for t in range(self.num_t)]
+            for j in range(self.num_j)]
+
+    def add_j_t_u_tr1(self):
+        '''
+        at least one transition has already happened in some interval t' <= t
+        '''
+
+        self.j_t_u_tr1 = [
+            [self.opt_model.addVar(vtype=gurobipy.GRB.BINARY, name='j_t_u_tr1[{},{}]'.format(j,t))
+             for t in range(self.num_t)]
+            for j in range(self.num_j)]
+
     def add_j_t_up_time_min_viol(self):
 
         self.j_t_up_time_min_viol = [
@@ -416,6 +474,42 @@ class Model(object):
             [self.opt_model.addConstr(
                 lhs=(self.j_t_u_su[j][t] + self.j_t_u_sd[j][t] - 1.0),
                 sense=gurobipy.GRB.LESS_EQUAL, rhs=0.0, name='j_t_su_sd_le_1[{},{}]'.format(j,t))
+             for t in range(self.num_t)]
+            for j in range(self.num_j)]
+
+    def add_j_t_tr_def(self):
+
+        self.j_t_tr_def = [
+            [self.opt_model.addConstr(
+                lhs=(self.j_t_u_su[j][t] + self.j_t_u_sd[j][t]),
+                sense=gurobipy.GRB.EQUAL, rhs=self.j_t_u_tr[j][t], name='j_t_tr_def[{},{}]'.format(j,t))
+             for t in range(self.num_t)]
+            for j in range(self.num_j)]
+
+    def add_j_t_tr1_ge_tr1_lag(self):
+        '''
+        '''
+
+        self.j_t_tr1_ge_tr1_lag = [
+            [self.opt_model.addConstr(
+                lhs=(
+                    self.j_t_u_tr1[j][t]
+                    - (self.j_t_u_tr1[j][t-1] if t > 0 else 0.0)),
+                sense=gurobipy.GRB.GREATER_EQUAL, rhs=0.0, name='j_t_tr1_ge_tr1_lag[{},{}]'.format(j,t))
+             for t in range(self.num_t)]
+            for j in range(self.num_j)]
+
+    def add_j_t_tr1_ge_tr(self):
+        '''
+        '''
+
+        self.j_t_tr1_ge_tr = [
+            [self.opt_model.addConstr(
+                lhs=(
+                    self.j_t_u_tr1[j][t]
+                    #- (self.j_t_u_tr[j][t] if t > 0 else 0.0)),
+                    - self.j_t_u_tr[j][t]),
+                sense=gurobipy.GRB.GREATER_EQUAL, rhs=0.0, name='j_t_tr1_ge_tr[{},{}]'.format(j,t))
              for t in range(self.num_t)]
             for j in range(self.num_j)]
 
