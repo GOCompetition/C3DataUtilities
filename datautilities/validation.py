@@ -3217,7 +3217,7 @@ def commitment_scheduling_feasible(data_model, config):
         msg = 'fails commitment scheduling model solvable. model info: {}'.format(sol)
         raise ModelError(msg)
     sol_u_on = sol['j_t_u_on']
-    print('sol_u_on: {}'.format(sol_u_on))
+    #print('sol_u_on: {}'.format(sol_u_on))
     return sol_u_on
 
 def dispatch_feasible_given_commitment(data_model, feas_comm_sched, config):
@@ -3281,8 +3281,8 @@ def dispatch_feasible_given_commitment(data_model, feas_comm_sched, config):
         raise ModelError(msg)
     sol_p_on = sol['j_t_p_on']
     sol_q = sol['j_t_q']
-    print('sol_p_on: {}'.format(sol_p_on))
-    print('sol_q: {}'.format(sol_q))
+    #print('sol_p_on: {}'.format(sol_p_on))
+    #print('sol_q: {}'.format(sol_q))
     return sol_p_on, sol_q
 
 def check_dispatch_feasibility_given_comm():

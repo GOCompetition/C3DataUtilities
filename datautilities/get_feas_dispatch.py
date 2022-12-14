@@ -201,6 +201,11 @@ class Model(object):
         
         self.get_sol_j_t_p_on()
         self.get_sol_j_t_q()
+        if self.params['min_infeasibility']:
+            self.get_sol_j_t_p_ru_viol()
+            self.get_sol_j_t_p_rd_viol()
+            self.get_sol_j_t_q_over_viol()
+            self.get_sol_j_t_q_under_viol()
 
     def add_j_t_p_on(self):
 
@@ -256,7 +261,7 @@ class Model(object):
                 for t in range(self.num_t)]
             for j in range(self.num_j)
             if (self.j_p_q_ineq[j] == 1 or self.j_p_q_eq[j] == 1)}
-                
+    
     def add_j_t_q(self):
 
         self.j_t_q = [
@@ -409,8 +414,47 @@ class Model(object):
 
         self.sol_j_t_q = [[self.j_t_q[j][t].x for t in range(self.num_t)] for j in range(self.num_j)]
 
+    def get_sol_j_t_p_ru_viol(self):
+
+        self.sol_j_t_p_ru_viol = [[self.j_t_p_ru_viol[j][t].x for t in range(self.num_t)] for j in range(self.num_j)]
+
+    def get_sol_j_t_p_rd_viol(self):
+
+        self.sol_j_t_p_rd_viol = [[self.j_t_p_rd_viol[j][t].x for t in range(self.num_t)] for j in range(self.num_j)]
+
+    def get_sol_j_t_q_over_viol(self):
+
+        self.sol_j_t_q_over_viol = {
+            j: [self.j_t_q_over_viol[j][t] for t in range(self.num_t)]
+            for j in range(self.num_j)
+            if (self.j_p_q_ineq[j] == 1 or self.j_p_q_eq[j] == 1)}
+
+    def get_sol_j_t_q_under_viol(self):
+
+        self.sol_j_t_q_under_viol = {
+            j: [self.j_t_q_under_viol[j][t] for t in range(self.num_t)]
+            for j in range(self.num_j)
+            if (self.j_p_q_ineq[j] == 1 or self.j_p_q_eq[j] == 1)}
+    
     def get_viols(self):
 
         viol_nonzero = {}
+        if self.params['min_infeasibility']:
+            viol_nonzero['j_t_p_ru'] = {
+                (j,t): self.sol_j_t_p_ru_viol[j][t]
+                for j in range(self.num_j) for t in range(self.num_t)
+                if self.sol_j_t_p_ru_viol[j][t] > 0.0}
+            viol_nonzero['j_t_p_rd'] = {
+                (j,t): self.sol_j_t_p_rd_viol[j][t]
+                for j in range(self.num_j) for t in range(self.num_t)
+                if self.sol_j_t_p_rd_viol[j][t] > 0.0}
+            viol_nonzero['j_t_q_over'] = {
+                (j,t): self.sol_j_t_q_over_viol[j][t]
+                for j in range(self.num_j) if (self.j_p_q_ineq[j] == 1 or self.j_p_q_eq[j] == 1)
+                for t in range(self.num_t) if self.sol_j_t_q_over_viol[j][t] > 0.0}
+            viol_nonzero['j_t_q_under'] = {
+                (j,t): self.sol_j_t_q_under_viol[j][t]
+                for j in range(self.num_j) if (self.j_p_q_ineq[j] == 1 or self.j_p_q_eq[j] == 1)
+                for t in range(self.num_t) if self.sol_j_t_q_under_viol[j][t] > 0.0}
         self.viols = viol_nonzero
         self.num_viols = sum(len(v) for k,v in self.viols.items())

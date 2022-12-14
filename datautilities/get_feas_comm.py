@@ -60,16 +60,16 @@ import numpy
               min uptime and downtime constraints
               must run and planned outage constraints
         
-        Now suppose that u^on_t is fixed, say to u^{on,fx}_t, for t <= t^fx.
-        If we remove the constraint u^tr1_t >= u^tr_t for t <= t^fx, then we obtain a model whose solution
-        maximizes the time until the first transition after t^fx:
+        Now suppose that u^on_t is fixed, say to u^{on,fx}_t, for t < num_t_fx.
+        If we remove the constraint u^tr1_t >= u^tr_t for t < num_t_fx, then we obtain a model whose solution
+        maximizes the time until the first transition in an interval t >= num_t_fx:
         
           (5)
           min sum_t u^tr1_t
           st  u^on_t, u^su_t, u^sd_t, u^tr_t, u^tr1_t \in {0, 1}
-              u^on_t = u^{on,fx}_t for t <= t^fx
-              u^tr1_t >= (t > t^start) * u^tr1_{t-1}
-              u^tr1_t >= (t > t^fx) * u^tr_t
+              u^on_t = u^{on,fx}_t for t < num_t_fx
+              u^tr1_t >= (t > 0) * u^tr1_{t-1}
+              u^tr1_t >= (t >= num_t_fx) * u^tr_t
               u^tr_t = u^su_t + u^sd_t
               u^on_t - (t > t^start) * u^on_{t-1} - (t = t^start) * u^{on,0} = u^su_t - u^sd_t
               min uptime and downtime constraints
@@ -78,15 +78,15 @@ import numpy
         Finally, solve a sequence of models of the form of (5) to solve (1):
         
           (6)
-          u^{on,fx}_t := 0 for t in t^start, ..., t^end
-          t^fx = t^start - 1
-          while t^fx < t^end:
+          u^{on,fx}_t := 0 for t in 0, 1, ..., num_t - 1
+          num_t_fx := 0
+          while num_t_fx < num_t:
             construct and solve (4) with solution u^on_t, u^tr1_t.
             if {t : u^tr1_t > 0 } = {}
-              t^fx = t^end
+              num_t_fx := num_t
             else:
-              t^fx := min{t : u^tr1_t > 0}
-            u^{on,fx}_t := u^on_t for t <= t^fx
+              num_t_fx := min{t : u^tr1_t > 0} + 1
+            u^{on,fx}_t := u^on_t for t < num_t_fx
         
         Algorithm (6) terminates, and at termination u^{on,fx}_t is the solution of (1).
         
@@ -104,6 +104,7 @@ def get_feas_comm(data):
     m.set_data(data)
     m.params['min_infeasibility'] = True
     m.params['min_time_after_first_avoidable_transition'] = False
+    m.set_num_t_fix()
     m.make_opt_model()
     m.opt_model.optimize()
     output['model_status'] = m.opt_model.status
@@ -119,22 +120,47 @@ def get_feas_comm(data):
             # then find a persistence solution
             # todo need to repeat this, fixing up to the first avoidable transition for each device,
             # until every device has its whole schedule fixed
-            m.params['min_infeasibility'] = True
-            m.params['min_time_after_first_avoidable_transition'] = False
-            m.make_opt_model()
-            print('solving persistence model')
-            m.opt_model.optimize()
-            output['model_status'] = m.opt_model.status
-            if m.opt_model.status == gurobipy.GRB.OPTIMAL:
-                output['success'] = True
-                output['model_obj'] = m.opt_model.objval
-                m.get_sol()
-                m.get_viols()
-                m.round_u()
-                output['j_t_u_on'] = m.sol_j_t_u_on
-                output['viols'] = m.viols
+            m.params['min_infeasibility'] = False
+            m.params['min_time_after_first_avoidable_transition'] = True
+            done = False
+            while not done:
+                m.make_opt_model()
+                m.fix_u()
+                j_num_t_fix_old = list(m.j_num_t_fix)
+                #print('solving persistence model - j_num_t_fix: {}'.format(m.j_num_t_fix))
+                m.opt_model.optimize()
+                output['model_status'] = m.opt_model.status
+                if m.opt_model.status == gurobipy.GRB.OPTIMAL:
+                    output['success'] = True
+                    output['model_obj'] = m.opt_model.objval
+                    m.get_sol()
+                    m.get_viols()
+                    m.round_u()
+                    m.get_num_t_fix()
+                    # print('solved persistence model')
+                    # print('old j_num_t_fix: {}'.format(m.j_num_t_fix))
+                    # print('new j_num_t_fix: {}'.format(m.j_num_t_fix))
+                    # print('sol_j_t_u_on: {}'.format(m.sol_j_t_u_on))
+                    # print('sol_j_t_u_tr1: {}'.format(m.sol_j_t_u_tr1))
+                    if all([t >= m.num_t for t in m.j_num_t_fix]):
+                        done = True
+                        output['success'] = True
+                    elif any([m.j_num_t_fix[i] <= j_num_t_fix_old[i] and m.j_num_t_fix[i] < m.num_t for i in range(m.num_j)]):
+                        done = True
+                        output['success'] = False
+                        output['persistence monotonicity failed'] = True
+                    output['j_t_u_on'] = m.sol_j_t_u_on
+                    output['viols'] = m.viols
+                else:
+                    done = True
+                    output['success'] = False
+                    output['failed to solve persistence model'] = True
+    else:
+        output['success'] = False
+        output['failed to solve minimum infeasibility problem']
+    if output['success']:
         # finally, find a solution with u fixed to rounded values
-        m.fix_u()
+        m.fix_u(num_t=m.num_t)
         m.opt_model.optimize()
         output['model_status'] = m.opt_model.status
         if m.opt_model.status == gurobipy.GRB.OPTIMAL:
@@ -146,8 +172,7 @@ def get_feas_comm(data):
             output['viols'] = m.viols
         else:
             output['success'] = False
-    else:
-        output['success'] = False
+            output['failed to solve minimum infeasibility with fixed u']
     return(output)
 
 class Model(object):
@@ -378,6 +403,7 @@ class Model(object):
     def get_sol(self):
         
         self.get_sol_j_t_u_on()
+        self.get_sol_j_t_u_tr1()
         if self.params['min_infeasibility']:
             self.get_sol_j_t_up_time_min_viol()
             self.get_sol_j_t_down_time_min_viol()
@@ -498,7 +524,7 @@ class Model(object):
             [self.opt_model.addConstr(
                 lhs=(
                     self.j_t_u_tr1[j][t]
-                    - (self.j_t_u_tr1[j][t-1] if t > 0 else 0.0)),
+                    - (self.j_t_u_tr1[j][t-1] if (t >= self.j_num_t_fix[j] and t > 0) else 0.0)),
                 sense=gurobipy.GRB.GREATER_EQUAL, rhs=0.0, name='j_t_tr1_ge_tr1_lag[{},{}]'.format(j,t))
              for t in range(self.num_t)]
             for j in range(self.num_j)]
@@ -511,8 +537,8 @@ class Model(object):
             [self.opt_model.addConstr(
                 lhs=(
                     self.j_t_u_tr1[j][t]
-                    #- (self.j_t_u_tr[j][t] if t > 0 else 0.0)),
-                    - self.j_t_u_tr[j][t]),
+                    - (self.j_t_u_tr[j][t] if (t >= self.j_num_t_fix[j]) else 0.0)),
+                    #- self.j_t_u_tr[j][t]),
                 sense=gurobipy.GRB.GREATER_EQUAL, rhs=0.0, name='j_t_tr1_ge_tr[{},{}]'.format(j,t))
              for t in range(self.num_t)]
             for j in range(self.num_j)]
@@ -584,21 +610,48 @@ class Model(object):
         obj += gurobipy.LinExpr(
             [1.0 for j in range(self.num_j) for t in range(self.num_t)],
             [self.j_t_u_tr1[j][t] for j in range(self.num_j) for t in range(self.num_t)])
-        self.opt_model.SetObjective(obj)
+        self.opt_model.setObjective(obj)
 
     def get_sol_j_t_u_on(self):
 
         self.sol_j_t_u_on = [[self.j_t_u_on[j][t].x for t in range(self.num_t)] for j in range(self.num_j)]
 
+    def get_sol_j_t_u_tr1(self):
+
+        self.sol_j_t_u_tr1 = [[self.j_t_u_tr1[j][t].x for t in range(self.num_t)] for j in range(self.num_j)]
+
     def round_u(self):
 
         self.sol_j_t_u_on = [
             [int(round(self.sol_j_t_u_on[j][t])) for t in range(self.num_t)] for j in range(self.num_j)]
+        self.sol_j_t_u_tr1 = [
+            [int(round(self.sol_j_t_u_tr1[j][t])) for t in range(self.num_t)] for j in range(self.num_j)]
 
-    def fix_u(self):
-        
+    def set_num_t_fix(self):
+
+        self.j_num_t_fix = [0 for j in range(self.num_j)]
+
+    def get_num_t_fix(self):
+        '''
+        given self.sol_j_t_u_on
+        '''
+
         for j in range(self.num_j):
-            for t in range(self.num_t):
+            t_set = [t for t in range(self.num_t) if self.sol_j_t_u_tr1[j][t] == 1]
+            if len(t_set) == 0:
+                self.j_num_t_fix[j] = self.num_t
+            else:
+                self.j_num_t_fix[j] = min(t_set) + 1
+
+    def fix_u(self, num_t=None):
+
+        if num_t is None:
+            num_t_to_fix = self.j_num_t_fix
+        else:
+            num_t_to_fix = [num_t for j in range(self.num_j)]
+
+        for j in range(self.num_j):
+            for t in range(num_t_to_fix[j]):
                 self.j_t_u_on[j][t].ub = self.sol_j_t_u_on[j][t]
                 self.j_t_u_on[j][t].lb = self.sol_j_t_u_on[j][t]
                 self.j_t_u_on[j][t].vtype = gurobipy.GRB.CONTINUOUS
