@@ -26,8 +26,8 @@ def get_feas_dispatch(data):
             m.opt_model.optimize()
             output['model_status'] = m.opt_model.status
             if m.opt_model.status == gurobipy.GRB.OPTIMAL:
-                m.get_sol()
-                m.get_viols()
+                m.get_sol() # todo this needs to be different if viol variables are excluded
+                m.get_viols() # todo this is nothing right now
                 output['j_t_p_on'] = m.sol_j_t_p_on
                 output['j_t_q'] = m.sol_j_t_q
                 output['viols'] = m.viols

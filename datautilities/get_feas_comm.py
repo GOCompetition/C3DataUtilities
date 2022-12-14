@@ -102,35 +102,8 @@ def get_feas_comm(data):
     m = Model()
     m.set_env()
     m.set_data(data)
-    m.make_opt_model()
-    m.opt_model.optimize()
-    output['model_status'] = m.opt_model.status
-    if m.opt_model.status == gurobipy.GRB.OPTIMAL:
-        output['success'] = True
-        m.get_sol()
-        m.get_viols()
-        m.round_u()
-        m.fix_u()
-        m.opt_model.optimize()
-        output['model_status'] = m.opt_model.status
-        if m.opt_model.status == gurobipy.GRB.OPTIMAL:
-            m.get_sol()
-            m.round_u()
-            m.get_viols()
-            output['j_t_u_on'] = m.sol_j_t_u_on
-            output['viols'] = m.viols
-        else:
-            output['success'] = False
-    else:
-        output['success'] = False
-    return(output)
-
-def get_pop_comm(data):
-
-    output = {}
-    m = Model()
-    m.set_env()
-    m.set_data(data)
+    m.params['min_infeasibility'] = True
+    m.params['min_time_after_first_avoidable_transition'] = False
     m.make_opt_model()
     m.opt_model.optimize()
     output['model_status'] = m.opt_model.status
@@ -142,6 +115,25 @@ def get_pop_comm(data):
         m.round_u()
         output['j_t_u_on'] = m.sol_j_t_u_on
         output['viols'] = m.viols
+        if m.num_viols == 0:
+            # then find a persistence solution
+            # todo need to repeat this, fixing up to the first avoidable transition for each device,
+            # until every device has its whole schedule fixed
+            m.params['min_infeasibility'] = True
+            m.params['min_time_after_first_avoidable_transition'] = False
+            m.make_opt_model()
+            print('solving persistence model')
+            m.opt_model.optimize()
+            output['model_status'] = m.opt_model.status
+            if m.opt_model.status == gurobipy.GRB.OPTIMAL:
+                output['success'] = True
+                output['model_obj'] = m.opt_model.objval
+                m.get_sol()
+                m.get_viols()
+                m.round_u()
+                output['j_t_u_on'] = m.sol_j_t_u_on
+                output['viols'] = m.viols
+        # finally, find a solution with u fixed to rounded values
         m.fix_u()
         m.opt_model.optimize()
         output['model_status'] = m.opt_model.status
@@ -162,7 +154,9 @@ class Model(object):
 
     def __init__(self):
 
-        pass
+        self.params = {
+            'min_infeasibility': True,
+            'min_time_after_first_avoidable_transition': False}
 
     def set_env(self, env=None):
 
@@ -347,6 +341,7 @@ class Model(object):
         self.opt_model = gurobipy.Model()
         self.add_vars()
         self.add_constrs()
+        self.add_obj()
 
     def add_vars(self):
 
@@ -355,9 +350,10 @@ class Model(object):
         self.add_j_t_u_sd()
         self.add_j_t_u_tr()
         self.add_j_t_u_tr1()
-        self.add_j_t_up_time_min_viol()
-        self.add_j_t_down_time_min_viol()
-        self.add_j_w_startups_max_viol()
+        if self.params['min_infeasibility']:
+            self.add_j_t_up_time_min_viol()
+            self.add_j_t_down_time_min_viol()
+            self.add_j_w_startups_max_viol()
     
     def add_constrs(self):
         '''
@@ -371,13 +367,21 @@ class Model(object):
         self.add_j_t_up_time_min_constr()
         self.add_j_t_down_time_min_constr()
         self.add_j_w_startups_max_constr()
+        
+    def add_obj(self):
+
+        if self.params['min_infeasibility']:
+            self.add_infeas_obj()
+        if self.params['min_time_after_first_avoidable_transition']:
+            self.add_persistence_obj()
 
     def get_sol(self):
         
         self.get_sol_j_t_u_on()
-        self.get_sol_j_t_up_time_min_viol()
-        self.get_sol_j_t_down_time_min_viol()
-        self.get_sol_j_w_startups_max_viol()
+        if self.params['min_infeasibility']:
+            self.get_sol_j_t_up_time_min_viol()
+            self.get_sol_j_t_down_time_min_viol()
+            self.get_sol_j_w_startups_max_viol()
 
     def add_j_t_u_on(self):
 
@@ -437,21 +441,21 @@ class Model(object):
     def add_j_t_up_time_min_viol(self):
 
         self.j_t_up_time_min_viol = [
-            [self.opt_model.addVar(obj=1.0, name='j_t_up_time_min_viol[{},{}]'.format(j,t))
+            [self.opt_model.addVar(name='j_t_up_time_min_viol[{},{}]'.format(j,t))
              for t in range(self.num_t)]
             for j in range(self.num_j)]
 
     def add_j_t_down_time_min_viol(self):
 
         self.j_t_down_time_min_viol = [
-            [self.opt_model.addVar(obj=1.0, name='j_t_down_time_min_viol[{},{}]'.format(j,t))
+            [self.opt_model.addVar(name='j_t_down_time_min_viol[{},{}]'.format(j,t))
              for t in range(self.num_t)]
             for j in range(self.num_j)]
 
     def add_j_w_startups_max_viol(self):
 
         self.j_w_startups_max_viol = [
-            [self.opt_model.addVar(obj=1.0, name='j_w_startups_max_viol[{},{}]'.format(j,w))
+            [self.opt_model.addVar(name='j_w_startups_max_viol[{},{}]'.format(j,w))
              for w in range(self.j_num_w[j])]
             for j in range(self.num_j)]
 
@@ -521,7 +525,7 @@ class Model(object):
                     self.j_t_u_sd[j][t]
                     + gurobipy.quicksum(
                         self.j_t_u_su[j][t1] for t1 in range(self.j_t_up_time_min_start_t[j][t], t))
-                    - self.j_t_up_time_min_viol[j][t] - 1.0),
+                    - (self.j_t_up_time_min_viol[j][t] if self.params['min_infeasibility'] else 0.0) - 1.0),
                 sense=gurobipy.GRB.LESS_EQUAL, rhs=0.0, name='j_t_up_time_min_constr[{},{}]'.format(j,t))
              for t in range(self.num_t)]
             for j in range(self.num_j)]
@@ -534,7 +538,7 @@ class Model(object):
                     self.j_t_u_su[j][t]
                     + gurobipy.quicksum(
                         self.j_t_u_sd[j][t1] for t1 in range(self.j_t_down_time_min_start_t[j][t], t))
-                    - self.j_t_down_time_min_viol[j][t] - 1.0),
+                    - (self.j_t_down_time_min_viol[j][t] if self.params['min_infeasibility'] else 0.0) - 1.0),
                 sense=gurobipy.GRB.LESS_EQUAL, rhs=0.0, name='j_t_up_time_min_constr[{},{}]'.format(j,t))
              for t in range(self.num_t)]
             for j in range(self.num_j)]
@@ -550,10 +554,37 @@ class Model(object):
                 lhs=(
                     gurobipy.quicksum(
                         self.j_t_u_su[j][t1] for t1 in range(self.j_w_start_t[j][w], self.j_w_end_t[j][w]))
-                    - self.j_w_startups_max_viol[j][w] - self.j_w_startups_max[j][w]),
+                    - (self.j_w_startups_max_viol[j][w] if self.params['min_infeasibility'] else 0.0)
+                    - self.j_w_startups_max[j][w]),
                 sense=gurobipy.GRB.LESS_EQUAL, rhs=0.0, name='j_w_startups_max_constr[{},{}]'.format(j,w))
              for w in range(self.j_num_w[j])]
             for j in range(self.num_j)]
+
+    def add_infeas_obj(self):
+        '''
+        '''
+
+        obj = gurobipy.LinExpr()
+        obj += gurobipy.LinExpr(
+            [1.0 for j in range(self.num_j) for t in range(self.num_t)],
+            [self.j_t_up_time_min_viol[j][t] for j in range(self.num_j) for t in range(self.num_t)])
+        obj += gurobipy.LinExpr(
+            [1.0 for j in range(self.num_j) for t in range(self.num_t)],
+            [self.j_t_down_time_min_viol[j][t] for j in range(self.num_j) for t in range(self.num_t)])
+        obj += gurobipy.LinExpr(
+            [1.0 for j in range(self.num_j) for w in range(self.j_num_w[j])],
+            [self.j_w_startups_max_viol[j][w] for j in range(self.num_j) for w in range(self.j_num_w[j])])
+        self.opt_model.setObjective(obj)
+
+    def add_persistence_obj(self):
+        '''
+        '''
+
+        obj = gurobipy.LinExpr()
+        obj += gurobipy.LinExpr(
+            [1.0 for j in range(self.num_j) for t in range(self.num_t)],
+            [self.j_t_u_tr1[j][t] for j in range(self.num_j) for t in range(self.num_t)])
+        self.opt_model.SetObjective(obj)
 
     def get_sol_j_t_u_on(self):
 
@@ -592,17 +623,18 @@ class Model(object):
     def get_viols(self):
 
         viol_nonzero = {}
-        viol_nonzero['j_t_up_time_min'] = {
-            (j,t): self.sol_j_t_up_time_min_viol[j][t]
-            for j in range(self.num_j) for t in range(self.num_t)
-            if self.sol_j_t_up_time_min_viol[j][t] > 0.0}
-        viol_nonzero['j_t_down_time_min'] = {
-            (j,t): self.sol_j_t_down_time_min_viol[j][t]
-            for j in range(self.num_j) for t in range(self.num_t)
-            if self.sol_j_t_down_time_min_viol[j][t] > 0.0}
-        viol_nonzero['j_w_startups_max'] = {
-            (j,w): self.sol_j_w_startups_max_viol[j][w]
-            for j in range(self.num_j) for w in range(self.j_num_w[j])
-            if self.sol_j_w_startups_max_viol[j][w] > 0.0}
+        if self.params['min_infeasibility']:
+            viol_nonzero['j_t_up_time_min'] = {
+                (j,t): self.sol_j_t_up_time_min_viol[j][t]
+                for j in range(self.num_j) for t in range(self.num_t)
+                if self.sol_j_t_up_time_min_viol[j][t] > 0.0}
+            viol_nonzero['j_t_down_time_min'] = {
+                (j,t): self.sol_j_t_down_time_min_viol[j][t]
+                for j in range(self.num_j) for t in range(self.num_t)
+                if self.sol_j_t_down_time_min_viol[j][t] > 0.0}
+            viol_nonzero['j_w_startups_max'] = {
+                (j,w): self.sol_j_w_startups_max_viol[j][w]
+                for j in range(self.num_j) for w in range(self.j_num_w[j])
+                if self.sol_j_w_startups_max_viol[j][w] > 0.0}
         self.viols = viol_nonzero
         self.num_viols = sum(len(v) for k,v in self.viols.items())
