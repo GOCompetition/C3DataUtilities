@@ -756,23 +756,23 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         
         # dispatch feasibility check under computed feasible commitment schedule
         start_time = time.time()
-        try:
-            feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
-        except ModelError as e:
-            summary['problem']['pass'] = 0
-            write_summary(summary, summary_csv_file, summary_json_file)
-            print('model error - dispatch feasibility under computed feasible commitment schedule\n')
-            with open(problem_errors_file, 'a') as f:
-                f.write(traceback.format_exc())
-            raise e
+        # try:
+        #     feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
+        # except ModelError as e:
+        #     summary['problem']['pass'] = 0
+        #     write_summary(summary, summary_csv_file, summary_json_file)
+        #     print('model error - dispatch feasibility under computed feasible commitment schedule\n')
+        #     with open(problem_errors_file, 'a') as f:
+        #         f.write(traceback.format_exc())
+        #     raise e
         print('after checking dispatch feasibility under computed feasible commitment schedule, memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
         print('dispatch feasibility under computed feasible commitment schedule time: {}'.format(end_time - start_time))
 
         # write prior operating point solution
-        feas_dispatch_p = feas_dispatch[0]
-        feas_dispatch_q = feas_dispatch[1]
-        write_pop_solution(data_model, feas_comm_sched, feas_dispatch_p, feas_dispatch_q, config, pop_sol_file_name)
+        # feas_dispatch_p = feas_dispatch[0]
+        # feas_dispatch_q = feas_dispatch[1]
+        # write_pop_solution(data_model, feas_comm_sched, feas_dispatch_p, feas_dispatch_q, config, pop_sol_file_name)
 
     # summary
     problem_summary = get_summary(data_model)
