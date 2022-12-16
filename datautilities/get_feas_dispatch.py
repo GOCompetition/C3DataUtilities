@@ -425,14 +425,14 @@ class Model(object):
     def get_sol_j_t_q_over_viol(self):
 
         self.sol_j_t_q_over_viol = {
-            j: [self.j_t_q_over_viol[j][t] for t in range(self.num_t)]
+            j: [self.j_t_q_over_viol[j][t].x for t in range(self.num_t)]
             for j in range(self.num_j)
             if (self.j_p_q_ineq[j] == 1 or self.j_p_q_eq[j] == 1)}
 
     def get_sol_j_t_q_under_viol(self):
 
         self.sol_j_t_q_under_viol = {
-            j: [self.j_t_q_under_viol[j][t] for t in range(self.num_t)]
+            j: [self.j_t_q_under_viol[j][t].x for t in range(self.num_t)]
             for j in range(self.num_j)
             if (self.j_p_q_ineq[j] == 1 or self.j_p_q_eq[j] == 1)}
     
