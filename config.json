@@ -1,5 +1,5 @@
 {
-    "timestamp_start_required": true,
+    "timestamp_start_required": false,
     "timestamp_stop_required": false,
     "timestamp_min": "2012-01-01T00:00:00",
     "timestamp_max": "2013-01-01T00:00:00",
