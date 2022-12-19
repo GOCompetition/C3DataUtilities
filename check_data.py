@@ -23,7 +23,6 @@ summary_json_file = 'summary.json'
 data_errors_file = 'data_errors.txt'
 ignored_errors_file = 'ignored_errors.txt'
 solution_errors_file = 'solution_errors.txt'
-pop_sol_file = 'pop_solution.json'
 
 if __name__ == '__main__':
 
@@ -44,8 +43,7 @@ if __name__ == '__main__':
         "problem_opt", nargs="?",
         help="The problem file that we are checking - optional positional argument for backward compatibility, do not use with -p")
     problem_group.add_argument("-p", "--problem", help="The problem file that we are checking", default=None)
-    parser.add_argument("-s", "--solution", help="The solution file that we are checking", default=None)
-    parser.add_argument("-r", "--scrubbed_problem", default=None, help="File path name to write scrubbed problem file")
+    parser.add_argument("-s", "--solution", help="The solution file that we are checking. If this argument is supplied, then the solution will be evaluated. Minimal validation will be performed on the problem data in the process of loading it, to save time, since this validation should have been done previously.", default=None)
 
     # long arguments - these all have defaults and will not be needed as often as the short parameters
     # and therefore do not have short names
@@ -57,7 +55,8 @@ if __name__ == '__main__':
     parser.add_argument("--data_errors", default=data_errors_file, help="Data errors output file")
     parser.add_argument("--ignored_errors", default=ignored_errors_file, help="Ignored errors output file")
     parser.add_argument("--solution_errors", default=solution_errors_file, help="Solution errors output file")
-    parser.add_argument("--pop_solution", default=pop_sol_file, help="Prior Operating Point (POP) solution file")
+    parser.add_argument("--pop_solution", default=None, help="Prior Operating Point (POP) solution file. If this argument is supplied, then the problem data will be read and validated thoroughly, then a POP solution will be created and written to a solution file.")
+    parser.add_argument("--scrubbed_problem", default=None, help="File path name to write scrubbed problem file. If this argument is supplied, then the problem data will be loaded, scrubbed, and rewritten. Scrubbing involves anonymizing the UIDs and removing optional data fields. Limited validation is performed on the original data in the process of reading the original data file.")
                         # metavar='KEY=VALUE',
                         # nargs='+',
                         # help=(

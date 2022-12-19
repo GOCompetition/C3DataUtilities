@@ -622,7 +622,7 @@ def remove_optional_fields(problem_data, config, use_pydantic=False):
         ]:
             i.pop(k, None)
 
-def check_data(problem_file, solution_file, default_config_file, config_file, parameters_str, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file, pop_sol_file_name):
+def check_data(problem_file, solution_file, default_config_file, config_file, parameters_str, summary_csv_file, summary_json_file, problem_errors_file, ignored_errors_file, solution_errors_file, pop_sol_file):
 
     # read config
     config = read_config(default_config_file, config_file, parameters_str)
@@ -643,6 +643,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
 
     # data files
     print('problem data file: {}\n'.format(problem_file))
+    print('pop solution data file: {}\n'.format(pop_sol_file))
     print('solution data file: {}\n'.format(solution_file))
 
     # git info
@@ -698,81 +699,85 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
     end_time = time.time()
     print('load time: {}'.format(end_time - start_time))
 
-    # independent data model checks
-    start_time = time.time()
-    try:
-        model_checks(data_model, config)
-    except ModelError as e:
-        summary['problem']['pass'] = 0
-        write_summary(summary, summary_csv_file, summary_json_file)
-        print('model error - independent checks\n')
-        with open(problem_errors_file, 'a') as f:
-            f.write(traceback.format_exc())
-        raise e
-    print('after problem model checks, memory info: {}'.format(utils.get_memory_info()))
-    end_time = time.time()
-    print('model_checks time: {}'.format(end_time - start_time))
+    # can skip further problem checks, POP solution, etc., if evaluating a solution
+    if solution_file is None:
 
-    # connectedness check
-    start_time = time.time()
-    try:
-        connected(data_model, config)
-    except ModelError as e:
-        summary['problem']['pass'] = 0
-        write_summary(summary, summary_csv_file, summary_json_file)
-        print('model error - connectedness\n')
-        with open(problem_errors_file, 'a') as f:
-            f.write(traceback.format_exc())
-        raise e
-    print('after checking problem connectedness, memory info: {}'.format(utils.get_memory_info()))
-    end_time = time.time()
-    print('connected time: {}'.format(end_time - start_time))
-
-    if config['do_opt_solves']:
-
-        if opt_solves_import_error is not None:
-            summary['problem']['pass'] = 0
-            write_summary(summary, summary_csv_file, summary_json_file)
-            print('model error - import error prevents running optimization checks required by config file\n')
-            #print(traceback.format_exception(opt_solves_import_error))
-            #with open(problem_errors_file, 'a') as f:
-            #    f.write(traceback.format_exception(opt_solves_import_error)) # todo - how do we get the message?
-            raise ModelError(opt_solves_import_error)
-
-        # commitment scheduling feasibility check
+        # independent data model checks
         start_time = time.time()
         try:
-            feas_comm_sched = commitment_scheduling_feasible(data_model, config)
+            model_checks(data_model, config)
         except ModelError as e:
             summary['problem']['pass'] = 0
             write_summary(summary, summary_csv_file, summary_json_file)
-            print('model error - commitment scheduling feasibility\n')
+            print('model error - independent checks\n')
             with open(problem_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
-        print('after checking commitment scheduling feasibility, memory info: {}'.format(utils.get_memory_info()))
+        print('after problem model checks, memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
-        print('commitment scheduling feasibility time: {}'.format(end_time - start_time))
-        
-        # dispatch feasibility check under computed feasible commitment schedule
+        print('model_checks time: {}'.format(end_time - start_time))
+
+        # connectedness check
         start_time = time.time()
         try:
-            feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
+            connected(data_model, config)
         except ModelError as e:
             summary['problem']['pass'] = 0
             write_summary(summary, summary_csv_file, summary_json_file)
-            print('model error - dispatch feasibility under computed feasible commitment schedule\n')
+            print('model error - connectedness\n')
             with open(problem_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
             raise e
-        print('after checking dispatch feasibility under computed feasible commitment schedule, memory info: {}'.format(utils.get_memory_info()))
+        print('after checking problem connectedness, memory info: {}'.format(utils.get_memory_info()))
         end_time = time.time()
-        print('dispatch feasibility under computed feasible commitment schedule time: {}'.format(end_time - start_time))
+        print('connected time: {}'.format(end_time - start_time))
 
-        # write prior operating point solution
-        feas_dispatch_p = feas_dispatch[0]
-        feas_dispatch_q = feas_dispatch[1]
-        write_pop_solution(data_model, feas_comm_sched, feas_dispatch_p, feas_dispatch_q, config, pop_sol_file_name)
+        if config['do_opt_solves']:
+
+            if opt_solves_import_error is not None:
+                summary['problem']['pass'] = 0
+                write_summary(summary, summary_csv_file, summary_json_file)
+                print('model error - import error prevents running optimization checks required by config file\n')
+                #print(traceback.format_exception(opt_solves_import_error))
+                #with open(problem_errors_file, 'a') as f:
+                #    f.write(traceback.format_exception(opt_solves_import_error)) # todo - how do we get the message?
+                raise ModelError(opt_solves_import_error)
+
+            # commitment scheduling feasibility check
+            start_time = time.time()
+            try:
+                feas_comm_sched = commitment_scheduling_feasible(data_model, config)
+            except ModelError as e:
+                summary['problem']['pass'] = 0
+                write_summary(summary, summary_csv_file, summary_json_file)
+                print('model error - commitment scheduling feasibility\n')
+                with open(problem_errors_file, 'a') as f:
+                    f.write(traceback.format_exc())
+                raise e
+            print('after checking commitment scheduling feasibility, memory info: {}'.format(utils.get_memory_info()))
+            end_time = time.time()
+            print('commitment scheduling feasibility time: {}'.format(end_time - start_time))
+            
+            # dispatch feasibility check under computed feasible commitment schedule
+            start_time = time.time()
+            try:
+                feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
+            except ModelError as e:
+                summary['problem']['pass'] = 0
+                write_summary(summary, summary_csv_file, summary_json_file)
+                print('model error - dispatch feasibility under computed feasible commitment schedule\n')
+                with open(problem_errors_file, 'a') as f:
+                    f.write(traceback.format_exc())
+                raise e
+            print('after checking dispatch feasibility under computed feasible commitment schedule, memory info: {}'.format(utils.get_memory_info()))
+            end_time = time.time()
+            print('dispatch feasibility under computed feasible commitment schedule time: {}'.format(end_time - start_time))
+
+            # write prior operating point solution
+            if pop_sol_file is not None:
+                feas_dispatch_p = feas_dispatch[0]
+                feas_dispatch_q = feas_dispatch[1]
+                write_pop_solution(data_model, feas_comm_sched, feas_dispatch_p, feas_dispatch_q, config, pop_sol_file)
 
     # summary
     problem_summary = get_summary(data_model)
