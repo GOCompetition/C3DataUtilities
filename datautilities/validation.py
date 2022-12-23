@@ -894,6 +894,8 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
 
     print('end of check_data(), memory info: {}'.format(utils.get_memory_info()))
 
+    return summary
+
 def write_summary(summary, summary_csv_file=None, summary_json_file=None):
 
     if summary_csv_file is not None:
