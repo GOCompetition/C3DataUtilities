@@ -26,6 +26,8 @@ C3DataUtilities uses GO-3-data-model, which is another package that was develope
 and can be obtained from PyPI (https://pypi.org/project/GO-3-data-model/) or GitHub (https://github.com/Smart-DS/GO-3-data-model).
 The C3DataUtilities pip command obtains GO-3-data-model from PyPI.
 
+The packages required by setup.py do not currently have version requirements specified. We are aware of an error that arises when using Python 3.6 and scipy 1.5.4. This error does not arise with Python 3.8.13 and scipy 1.9.1, as we are currently using in development of this code.
+
 # Checking problem data formatting and properties
 
 Once Bid-DS-data-model is installed, one can do:

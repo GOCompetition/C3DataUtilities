@@ -1,8 +1,8 @@
 {
     "timestamp_start_required": false,
     "timestamp_stop_required": false,
-    "timestamp_min": "2012-01-01T00:00:00",
-    "timestamp_max": "2013-01-01T00:00:00",
+    "timestamp_min": "1900-01-01T00:00:00",
+    "timestamp_max": "2100-12-31T23:59:59",
     "timestamp_pattern_str": "\\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\Z",
     "acl_switch_up_allowed": true,
     "acl_switch_dn_allowed": true,
