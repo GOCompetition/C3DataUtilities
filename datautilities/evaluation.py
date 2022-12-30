@@ -194,6 +194,9 @@ class SolutionEvaluator(object):
         self.eval_t_z()
         self.eval_z_max_energy()
         self.eval_z_min_energy()
+        self.eval_z_value()
+        self.eval_z_cost()
+        self.eval_z_penalty()
         self.eval_z_base()
         self.eval_z_k_worst_case()
         self.eval_z_k_average_case()
@@ -720,6 +723,18 @@ class SolutionEvaluator(object):
              'val_type': float,
              'tol': None,
              'num_indices': 0},
+            {'key': 'z_value',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'z_cost',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'z_penalty',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
             {'key': 'z_k_worst_case',
              'val_type': float,
              'tol': None,
@@ -1019,6 +1034,53 @@ class SolutionEvaluator(object):
 
         self.z_min_energy = numpy.sum(self.sd_z_min_energy)
 
+    def eval_z_value(self):
+
+        self.z_value = self.sum_cs_t_z_p
+
+    def eval_z_cost(self):
+
+        self.z_cost = (
+            self.sum_sd_t_z_on +
+            self.sum_sd_t_z_su + 
+            self.sum_sd_t_z_sd + 
+            self.sum_sd_t_z_sus + 
+            self.sum_acl_t_z_su + 
+            self.sum_acl_t_z_sd + 
+            self.sum_xfr_t_z_su + 
+            self.sum_xfr_t_z_sd + 
+            self.sum_pr_t_z_p + 
+            self.sum_sd_t_z_rgu + 
+            self.sum_sd_t_z_rgd + 
+            self.sum_sd_t_z_scr + 
+            self.sum_sd_t_z_nsc + 
+            self.sum_sd_t_z_rru_on + 
+            self.sum_sd_t_z_rrd_on + 
+            self.sum_sd_t_z_rru_off + 
+            self.sum_sd_t_z_rrd_off + 
+            self.sum_sd_t_z_qru + 
+            self.sum_sd_t_z_qrd
+        )
+
+    def eval_z_penalty(self):
+
+        self.z_penalty = (
+            self.sum_prz_t_z_rgu + 
+            self.sum_prz_t_z_rgd + 
+            self.sum_prz_t_z_scr + 
+            self.sum_prz_t_z_nsc + 
+            self.sum_prz_t_z_rru + 
+            self.sum_prz_t_z_rrd + 
+            self.sum_qrz_t_z_qru + 
+            self.sum_qrz_t_z_qrd + 
+            self.sum_acl_t_z_s + 
+            self.sum_xfr_t_z_s + 
+            self.sum_bus_t_z_p + 
+            self.sum_bus_t_z_q + 
+            self.z_max_energy + 
+            self.z_min_energy
+        )
+ 
     def eval_z_base(self):
 
         self.z_base = (
