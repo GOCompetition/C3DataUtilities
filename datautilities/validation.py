@@ -1054,21 +1054,21 @@ def model_checks(data, config):
         sd_w_a_su_max_end_discrete,
         supc_not_ambiguous,
         sdpc_not_ambiguous,
-        ts_sd_cost_function_covers_p_max,
-        sd_p_q_linking_set_nonempty,
+        ts_sd_cost_function_covers_p_max, #
+        sd_p_q_linking_set_nonempty, #
         sd_p_q_beta_not_too_small,
         sd_p_q_beta_max_not_too_small,
         sd_p_q_beta_min_not_too_small,
         sd_p_q_beta_diff_not_too_small,
-        ts_sd_p_q_linking_feas,
-        ts_sd_p_q_ramping_feas,
-        ts_sd_p_q_linking_ramping_feas,
-        sd_t_cost_function_covers_supc,
-        sd_t_cost_function_covers_sdpc,
-        sd_t_q_max_min_p_q_linking_supc_feasible,
-        sd_t_q_max_min_p_q_linking_sdpc_feasible,
-        sd_t_supc_sdpc_no_overlap,
-        sd_mr_out_min_up_down_time_consistent,
+        ts_sd_p_q_linking_feas, #
+        ts_sd_p_q_ramping_feas, #
+        ts_sd_p_q_linking_ramping_feas, #
+        sd_t_cost_function_covers_supc, #
+        sd_t_cost_function_covers_sdpc, #
+        sd_t_q_max_min_p_q_linking_supc_feasible, #
+        sd_t_q_max_min_p_q_linking_sdpc_feasible, #
+        sd_t_supc_sdpc_no_overlap, #
+        sd_mr_out_min_up_down_time_consistent, #
         ]
     errors = []
     # try:
@@ -2119,7 +2119,7 @@ def sd_t_supc_sdpc_no_overlap(data, config):
                         (sd_uid[i], t1, t2, sd_min_downtime[i], sd_shutdown_ramp[i], sd_startup_ramp[i],
                          sdpc[i][t1], supc[i][t2]))
     if len(idx_err) > 0:
-        msg = 'fails no overlap of shutdown and earliest subsequent startup trajectories. failures (device uid, shutdown interval, startup interval, minimum downtime, shutdown ramp rate, startup ramp rate, shutdown trajectory, startup trajectory): {}'.format(idx_err)
+        msg = 'fails no overlap of shutdown and earliest subsequent startup trajectories, including empty trajectories. failures (device uid, shutdown interval, startup interval, minimum downtime, shutdown ramp rate, startup ramp rate, shutdown trajectory, startup trajectory): {}'.format(idx_err)
         raise ModelError(msg)
 
 def sd_mr_out_min_up_down_time_consistent(data, config):
