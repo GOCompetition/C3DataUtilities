@@ -792,7 +792,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         start_time = time.time()
         try:
             solution_data_dict = read_json(solution_file)
-        except Error as e:
+        except Exception as e:
             summary['solution']['pass'] = 0
             write_summary(summary, summary_csv_file, summary_json_file)
             print('solution read error - read without validation')
