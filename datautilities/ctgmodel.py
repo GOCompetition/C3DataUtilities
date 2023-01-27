@@ -451,16 +451,29 @@ def eval_post_contingency_model(sol_eval):
         # if this step ever fails, we have some work to do.
         # todo catch this and ensure that it is not treated as a competitor error
         # and that it raises an issue for debugging.
-        v_acl_k_inv = 1.0 / v_acl_k
+        # todo ctg-bug
+        # fix xfr as well
+        # v_acl_k has some 0 entries.
+        # apparently only when ac_u is also 0
+        # we later zero that out, so maybe we can just do that
+        print('v_acl_k: {}'.format(v_acl_k))
+        print('acl_u[acl_delta_k]: {}'.format(acl_u[acl_delta_k]))
+        #v_acl_k_inv = 1.0 / v_acl_k
         v_acl_k = v_acl_k * acl_u[acl_delta_k] # zero out v_acl_k from base case - this is not necessary
+        # for now only do the division on nonzero entries
+        v_acl_k_inv = numpy.zeros(shape=(num_acl_delta_k, ), dtype=float)
+        v_acl_k_inv[numpy.nonzero(acl_u[acl_delta_k])[0]] = 1.0 / v_acl_k[numpy.nonzero(acl_u[acl_delta_k])[0]]
         # zero out v_acl_k_inv for any branches that are out of service due to pre-contingency state
         # this will zero out the delta contribution to the solved theta,
         # so the solved theta is that of the base case, as it should be
-        v_acl_k_inv = v_acl_k_inv * acl_u[acl_delta_k]
+        #v_acl_k_inv = v_acl_k_inv * acl_u[acl_delta_k]
         v_xfr_k = (1.0 / xfr_b[xfr_delta_k]) + numpy.einsum('ij,ij->j', m_xfr_k, w_xfr_k)
-        v_xfr_k_inv = 1.0 / v_xfr_k
+        #v_xfr_k_inv = 1.0 / v_xfr_k
         v_xfr_k = v_xfr_k * xfr_u[xfr_delta_k]
-        v_xfr_k_inv = v_xfr_k_inv * xfr_u[xfr_delta_k]
+        #v_xfr_k_inv = v_xfr_k_inv * xfr_u[xfr_delta_k]
+        # for now only do the division on nonzero entries
+        v_xfr_k_inv = numpy.zeros(shape=(num_xfr_delta_k, ), dtype=float)
+        v_xfr_k_inv[numpy.nonzero(xfr_u[xfr_delta_k])[0]] = 1.0 / v_xfr_k[numpy.nonzero(xfr_u[xfr_delta_k])[0]]
         end_time = time.time()
         compute_v_time += (end_time - start_time)
 

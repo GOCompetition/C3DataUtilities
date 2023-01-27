@@ -822,6 +822,9 @@ class SolutionEvaluator(object):
         self.xfr_t_q_fr = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
         self.xfr_t_q_to = numpy.zeros(shape=(self.problem.num_xfr, self.problem.num_t), dtype=float)
 
+        # extras/output
+        self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float)
+
     @utils.timeit
     def set_work_zero(self):
         '''
@@ -1143,8 +1146,8 @@ class SolutionEvaluator(object):
 
     def eval_t_k_z(self):
 
-        #self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float)
-        self.t_min_t_k_z = [utils.get_min(self.t_k_z[t, :].flatten(), idx_lists=[self.problem.k_uid]) for t in range(self.problem.num_t)]
+        self.t_min_t_k_z = [
+            utils.get_min(self.t_k_z[t, :].flatten(), idx_lists=[self.problem.k_uid]) for t in range(self.problem.num_t)]
 
     def eval_t_z_k_worst_case(self):
 
@@ -1290,7 +1293,7 @@ class SolutionEvaluator(object):
         '''
         '''
 
-        self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float) # update this
+        #self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float) # this is done earlier
         # skip post-contingency evaluation if not connected - might as well skip if infeasible so far - todo
         if self.viol_t_connected_base['val'] == 0 and self.viol_t_connected_ctg['val'] == 0:
             ctgmodel.eval_post_contingency_model(self)
