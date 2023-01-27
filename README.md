@@ -1,7 +1,9 @@
 # C3DataUtilities
 
+This repository contains code to handle problem and solution data for the GO Competition Challenge 3. The main functionality includes:
 * Read problem data
 * Check problem data formatting and properties
+* Scrub problem data to remove unnecessary fields and anonymize string values
 * Read solution data
 * Check solution data formatting and properties
 * Evaluate solution to problem, i.e. constraint feasibility, objective value, properties of interest
@@ -34,10 +36,22 @@ Once Bid-DS-data-model is installed, one can do:
 
 ```
 cd C3DataUtilities
-python check_data.py <problem_data_file_name>
+python check_data.py --problem <PROBLEM_DATA_FILE_NAME>
 ```
 
-This will read a problem data file, check it against properties specified in the data format document and problem formulation document, and print out some information about the problem dimensions. If the data fails any of the required properties, an exception will be raised to report this. It is not guaranteed that all failed properties will be reported. If there is at least one failure, then it is guaranteed that at least one failure will be reported. Data errors, other kinds of errors, and summary output are written to files. A complete description of the outputs and other ways of calling ```check_data.py``` can be found in the help:
+This will read a problem data file, check it against properties specified in the data format document and problem formulation document, and print out some information about the problem dimensions. If the data fails any of the required properties, an exception will be raised to report this. It is not guaranteed that all failed properties will be reported. If there is at least one failure, then it is guaranteed that at least one failure will be reported. Data errors, other kinds of errors, and summary output are written to files.
+
+# Evaluating a solution
+
+To evaluate a solution to a problem, do:
+
+```
+python check_data.py --problem <PROBLEM_DATA_FILE_NAME> --solution <SOLUTION_DATA_FILE_NAME>
+```
+
+# Documentation
+
+Full usage of ```check_data.py``` with a complete description of the outputs and other ways of calling it can be found in the help:
 
 ```
 python check_data.py --help
