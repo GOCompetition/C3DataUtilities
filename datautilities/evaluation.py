@@ -195,6 +195,7 @@ class SolutionEvaluator(object):
         self.eval_z_max_energy()
         self.eval_z_min_energy()
         self.eval_z_value()
+        self.eval_switches()
         self.eval_z_cost()
         self.eval_z_penalty()
         self.eval_z_base()
@@ -727,6 +728,10 @@ class SolutionEvaluator(object):
              'val_type': float,
              'tol': None,
              'num_indices': 0},
+            {'key': 'total_switches',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
             {'key': 'z_cost',
              'val_type': float,
              'tol': None,
@@ -1040,6 +1045,10 @@ class SolutionEvaluator(object):
     def eval_z_value(self):
 
         self.z_value = self.sum_cs_t_z_p
+
+    def eval_switches(self):
+
+        self.total_switches = self.sum_acl_t_u_su + self.sum_acl_t_u_sd + self.sum_xfr_t_u_su + self.sum_xfr_t_u_sd
 
     def eval_z_cost(self):
 
