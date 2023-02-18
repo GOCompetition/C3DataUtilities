@@ -687,7 +687,6 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
     # (i.e. 5 on D1 which could translate to 10 to 20 sec on D2)
     # not sure yet about larger cases or solution data check or solution eval
     # have not yet implemented more expensive problem data checks - initial AC feas, independent device feas
-    # have not yet implemented scrubber - i.e. UID anonymization
     start_time = time.time()
     try:
         data_model = InputDataFile.load(problem_file)
