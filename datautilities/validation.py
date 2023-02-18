@@ -48,6 +48,29 @@ def read_config(default_config_file_name, config_file_name=None, parameters_str=
         config.update(override_config)
     return config
 
+def json_dumps_int64(data):
+    '''
+    json.dumps for data containing int64 entries
+    '''
+
+    #return_val = str(data)
+    #return_val = json.dumps(data)
+    return_val = json.dumps(data, cls=NpEncoder)
+
+    return return_val
+
+# thanks to Jie Yang, online at
+# https://stackoverflow.com/questions/50916422/python-typeerror-object-of-type-int64-is-not-json-serializable
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, numpy.integer):
+            return int(obj)
+        if isinstance(obj, numpy.floating):
+            return float(obj)
+        if isinstance(obj, numpy.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
 def get_p_q_linking_geometry(data, config):
 
     info = {
@@ -640,6 +663,8 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         'problem': {},
         'solution': {},
         'evaluation': {}}
+    summary['problem']['error_diagnostics'] = None
+    summary['solution']['error_diagnostics'] = None
 
     # data files
     print('problem data file: {}\n'.format(problem_file))
@@ -667,6 +692,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         problem_data_dict = read_json(problem_file)
     except Exception as e:
         summary['problem']['pass'] = 0
+        summary['problem']['error_diagnostics'] = 'data read error - read without validation\n' + traceback.format_exc()
         write_summary(summary, summary_csv_file, summary_json_file)
         print('data read error - read without validation\n')
         with open(problem_errors_file, 'a') as f:
@@ -690,6 +716,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         data_model = InputDataFile.load(problem_file)
     except ValidationError as e:
         summary['problem']['pass'] = 0
+        summary['problem']['error_diagnostics'] = 'data read error - pydantic validation\n' + traceback.format_exc()
         write_summary(summary, summary_csv_file, summary_json_file)
         print('data read error - pydantic validation\n')
         with open(problem_errors_file, 'a') as f:
@@ -708,6 +735,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             model_checks(data_model, config)
         except ModelError as e:
             summary['problem']['pass'] = 0
+            summary['problem']['error_diagnostics'] = 'model error - independent checks\n' + traceback.format_exc()
             write_summary(summary, summary_csv_file, summary_json_file)
             print('model error - independent checks\n')
             with open(problem_errors_file, 'a') as f:
@@ -723,6 +751,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             connected(data_model, config)
         except ModelError as e:
             summary['problem']['pass'] = 0
+            summary['problem']['error_diagnostics'] = 'model error - connectedness\n' + traceback.format_exc()
             write_summary(summary, summary_csv_file, summary_json_file)
             print('model error - connectedness\n')
             with open(problem_errors_file, 'a') as f:
@@ -736,6 +765,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
 
             if opt_solves_import_error is not None:
                 summary['problem']['pass'] = 0
+                summary['problem']['error_diagnostics'] = 'model error - import error prevents running optimization checks required by config file' # + traceback.format_exc() # todo get the exception in
                 write_summary(summary, summary_csv_file, summary_json_file)
                 print('model error - import error prevents running optimization checks required by config file\n')
                 #print(traceback.format_exception(opt_solves_import_error))
@@ -749,6 +779,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
                 feas_comm_sched = commitment_scheduling_feasible(data_model, config)
             except ModelError as e:
                 summary['problem']['pass'] = 0
+                summary['problem']['error_diagnostics'] = 'model error - commitment scheduling feasibility\n' + traceback.format_exc()
                 write_summary(summary, summary_csv_file, summary_json_file)
                 print('model error - commitment scheduling feasibility\n')
                 with open(problem_errors_file, 'a') as f:
@@ -764,6 +795,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
                 feas_dispatch = dispatch_feasible_given_commitment(data_model, feas_comm_sched, config)
             except ModelError as e:
                 summary['problem']['pass'] = 0
+                summary['problem']['error_diagnostics'] = 'model error - dispatch feasibility under computed feasible commitment schedule\n' + traceback.format_exc()
                 write_summary(summary, summary_csv_file, summary_json_file)
                 print('model error - dispatch feasibility under computed feasible commitment schedule\n')
                 with open(problem_errors_file, 'a') as f:
@@ -781,6 +813,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
 
     # summary
     problem_summary = get_summary(data_model)
+    problem_summary['error_diagnostics'] = None
     pp = pprint.PrettyPrinter()
     pp.pprint(problem_summary)
     summary['problem'] = problem_summary
@@ -794,6 +827,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             solution_data_dict = read_json(solution_file)
         except Exception as e:
             summary['solution']['pass'] = 0
+            summary['solution']['error_diagnostics'] = 'solution read error - read without validation\n' + traceback.format_exc()
             write_summary(summary, summary_csv_file, summary_json_file)
             print('solution read error - read without validation')
             with open(solution_errors_file, 'a') as f:
@@ -810,6 +844,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             solution_data_model = OutputDataFile.load(solution_file)
         except ValidationError as e:
             summary['solution']['pass'] = 0
+            summary['solution']['error_diagnostics'] = 'solution read error - pydantic validation\n' + traceback.format_exc()
             write_summary(summary, summary_csv_file, summary_json_file)
             print('solution read error - pydantic validation')
             with open(solution_errors_file, 'a') as f:
@@ -825,6 +860,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             solution_model_checks(data_model, solution_data_model, config)
         except ModelError as e:
             summary['solution']['pass'] = 0
+            summary['solution']['error_diagnostics'] = 'solution model error - independent checks\n' + traceback.format_exc()
             write_summary(summary, summary_csv_file, summary_json_file)
             print('solution model error - independent checks\n')
             with open(solution_errors_file, 'a') as f:
@@ -836,6 +872,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
 
         # summary
         solution_summary = get_solution_summary(data_model, solution_data_model)
+        solution_summary['error_diagnostics'] = None
         pp = pprint.PrettyPrinter()
         pp.pprint(solution_summary)
         summary['solution'] = solution_summary
@@ -884,6 +921,9 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         print('feas: {}'.format(feas))
         print('obj: {}'.format(obj))
         summary['evaluation'] = evaluation_summary
+        #summary['evaluation']['infeas_diagnostics'] = str(infeas_summary)
+        #summary['evaluation']['infeas_diagnostics'] = json.dumps(infeas_summary)
+        summary['evaluation']['infeas_diagnostics'] = json_dumps_int64(infeas_summary)
         end_time = time.time()
         print('evaluate solution time: {}'.format(end_time - start_time))
 
