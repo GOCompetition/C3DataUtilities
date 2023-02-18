@@ -2,7 +2,7 @@
 
 '''
 
-import numpy, networkx, traceback, pprint, json, re, pandas, time
+import numpy, networkx, traceback, pprint, json, re, pandas, time, copy
 from pydantic.error_wrappers import ValidationError
 from datamodel.input.data import InputDataFile
 from datamodel.output.data import OutputDataFile
@@ -47,29 +47,6 @@ def read_config(default_config_file_name, config_file_name=None, parameters_str=
         override_config = json.loads(parameters_str)
         config.update(override_config)
     return config
-
-def json_dumps_int64(data):
-    '''
-    json.dumps for data containing int64 entries
-    '''
-
-    #return_val = str(data)
-    #return_val = json.dumps(data)
-    return_val = json.dumps(data, cls=NpEncoder)
-
-    return return_val
-
-# thanks to Jie Yang, online at
-# https://stackoverflow.com/questions/50916422/python-typeerror-object-of-type-int64-is-not-json-serializable
-class NpEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, numpy.integer):
-            return int(obj)
-        if isinstance(obj, numpy.floating):
-            return float(obj)
-        if isinstance(obj, numpy.ndarray):
-            return obj.tolist()
-        return super(NpEncoder, self).default(obj)
 
 def get_p_q_linking_geometry(data, config):
 
@@ -921,9 +898,13 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         print('feas: {}'.format(feas))
         print('obj: {}'.format(obj))
         summary['evaluation'] = evaluation_summary
+
+        summary['evaluation']['infeas_diagnostics'] = infeas_summary
         #summary['evaluation']['infeas_diagnostics'] = str(infeas_summary)
         #summary['evaluation']['infeas_diagnostics'] = json.dumps(infeas_summary)
-        summary['evaluation']['infeas_diagnostics'] = json_dumps_int64(infeas_summary)
+        #summary['evaluation']['infeas_diagnostics'] = json.dumps(infeas_summary, cls=utils.NpEncoder)
+        #summary['evaluation']['infeas_diagnostics'] = json_dumps_int64(infeas_summary)
+
         end_time = time.time()
         print('evaluate solution time: {}'.format(end_time - start_time))
 
@@ -947,11 +928,19 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
 def write_summary(summary, summary_csv_file=None, summary_json_file=None):
 
     if summary_csv_file is not None:
-        summary_table = pandas.json_normalize(summary)
-        summary_table.to_csv(summary_csv_file, index=False)
+        write_summary_csv(summary, summary_csv_file)
     if summary_json_file is not None:
         with open(summary_json_file, 'w') as f:
             json.dump(summary, f, indent=4, cls=utils.NpEncoder)
+
+def write_summary_csv(summary, summary_csv_file):
+
+    summary_for_csv = copy.deepcopy(summary)
+    summary_for_csv['evaluation']['infeas_diagnostics'] = json.dumps(summary_for_csv['evaluation']['infeas_diagnostics'], cls=utils.NpEncoder)
+    print('summary evaluation infeas_diagnostics:')
+    print(summary_for_csv['evaluation']['infeas_diagnostics'])
+    summary_table = pandas.json_normalize(summary_for_csv)
+    summary_table.to_csv(summary_csv_file, index=False)
 
 def get_summary(data):
 
