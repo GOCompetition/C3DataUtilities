@@ -640,9 +640,9 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         'problem': {},
         'solution': {},
         'evaluation': {}}
-    summary['problem']['error_diagnostics'] = None
-    summary['solution']['error_diagnostics'] = None
-    summary['evaluation']['error_diagnostics'] = None
+    summary['problem']['error_diagnostics'] = ''
+    summary['solution']['error_diagnostics'] = ''
+    summary['evaluation']['error_diagnostics'] = ''
     summary['evaluation']['infeas_diagnostics'] = {}
 
     # data files
@@ -717,7 +717,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             err_msg = 'model error - independent checks'
             summary['problem']['pass'] = 0
             summary['problem']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-            write_summary(summary, summary_csv_file, summary_json_file)
+            write_summary(summary, summary_csv_file, summary_json_file, config)
             print(err_msg + '\n')
             with open(problem_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -734,7 +734,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             err_msg = 'model error - connectedness'
             summary['problem']['pass'] = 0
             summary['problem']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-            write_summary(summary, summary_csv_file, summary_json_file)
+            write_summary(summary, summary_csv_file, summary_json_file, config)
             print(err_msg + '\n')
             with open(problem_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -749,7 +749,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
                 err_msg = 'model error - import error prevents running optimization checks required by config file'
                 summary['problem']['pass'] = 0
                 summary['problem']['error_diagnostics'] = err_msg # + '\n' + traceback.format_exc() # todo get the exception in
-                write_summary(summary, summary_csv_file, summary_json_file)
+                write_summary(summary, summary_csv_file, summary_json_file, config)
                 print(err_msg + '\n')
                 #print(traceback.format_exception(opt_solves_import_error))
                 #with open(problem_errors_file, 'a') as f:
@@ -764,7 +764,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
                 err_msg = 'model error - commitment scheduling feasibility'
                 summary['problem']['pass'] = 0
                 summary['problem']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-                write_summary(summary, summary_csv_file, summary_json_file)
+                write_summary(summary, summary_csv_file, summary_json_file, config)
                 print(err_msg + '\n')
                 with open(problem_errors_file, 'a') as f:
                     f.write(traceback.format_exc())
@@ -781,7 +781,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
                 err_msg = 'model error - dispatch feasibility under computed feasible commitment schedule'
                 summary['problem']['pass'] = 0
                 summary['problem']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-                write_summary(summary, summary_csv_file, summary_json_file)
+                write_summary(summary, summary_csv_file, summary_json_file, config)
                 print(err_msg + '\n')
                 with open(problem_errors_file, 'a') as f:
                     f.write(traceback.format_exc())
@@ -799,7 +799,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
     # summary
     # if we got to this point there are no error diagnostics to report
     problem_summary = get_summary(data_model)
-    problem_summary['error_diagnostics'] = None
+    problem_summary['error_diagnostics'] = ''
     pp = pprint.PrettyPrinter()
     pp.pprint(problem_summary)
     summary['problem'] = problem_summary
@@ -815,7 +815,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             err_msg = 'solution read error - read without validation'
             summary['solution']['pass'] = 0
             summary['solution']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-            write_summary(summary, summary_csv_file, summary_json_file)
+            write_summary(summary, summary_csv_file, summary_json_file, config)
             print(err_msg + '\n')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -833,7 +833,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             err_msg = 'solution read error - pydantic validation'
             summary['solution']['pass'] = 0
             summary['solution']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-            write_summary(summary, summary_csv_file, summary_json_file)
+            write_summary(summary, summary_csv_file, summary_json_file, config)
             print(err_msg + '\n')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -850,7 +850,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             err_msg = 'solution model error - independent checks'
             summary['solution']['pass'] = 0
             summary['solution']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-            write_summary(summary, summary_csv_file, summary_json_file)
+            write_summary(summary, summary_csv_file, summary_json_file, config)
             print(err_msg + '\n')
             with open(solution_errors_file, 'a') as f:
                 f.write(traceback.format_exc())
@@ -862,7 +862,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         # summary
         # if we got to this point there are no error diagnostics to report
         solution_summary = get_solution_summary(data_model, solution_data_model)
-        solution_summary['error_diagnostics'] = None
+        solution_summary['error_diagnostics'] = ''
         pp = pprint.PrettyPrinter()
         pp.pprint(solution_summary)
         summary['solution'] = solution_summary
@@ -877,7 +877,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             err_msg = 'evaluation error in converting problem data model to numpy arrays - unexpected'
             summary['evaluation']['pass'] = 0
             summary['evaluation']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-            write_summary(summary, summary_csv_file, summary_json_file)
+            write_summary(summary, summary_csv_file, summary_json_file, config)
             print(err_msg + '\n')
             # with open(solution_errors_file, 'a') as f: # this just goes to standard error
             #     f.write(traceback.format_exc())
@@ -895,7 +895,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             err_msg = 'evaluation error in converting solution data model to numpy arrays - unexpected'
             summary['evaluation']['pass'] = 0
             summary['evaluation']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-            write_summary(summary, summary_csv_file, summary_json_file)
+            write_summary(summary, summary_csv_file, summary_json_file, config)
             print(err_msg + '\n')
             # with open(solution_errors_file, 'a') as f: # just goes to standard error
             #     f.write(traceback.format_exc())
@@ -923,7 +923,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
             err_msg = 'evaluation error in evaluating solution - unexpected'
             summary['evaluation']['pass'] = 0
             summary['evaluation']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-            write_summary(summary, summary_csv_file, summary_json_file)
+            write_summary(summary, summary_csv_file, summary_json_file, config)
             print(err_msg + '\n')
             with open(solution_errors_file, 'a') as f: # todo where to put this?
                 f.write(traceback.format_exc())
@@ -942,7 +942,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         print('obj: {}'.format(obj))
         summary['evaluation'] = evaluation_summary
         summary['evaluation']['pass'] = 1
-        summary['evaluation']['error_diagnostics'] = None
+        summary['evaluation']['error_diagnostics'] = ''
 
         summary['evaluation']['infeas_diagnostics'] = infeas_summary
         #summary['evaluation']['infeas_diagnostics'] = str(infeas_summary)
@@ -963,26 +963,30 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         #             else:
         #                 print('    {}: {}'.format(k, v))            
 
-    write_summary(summary, summary_csv_file, summary_json_file)
+    write_summary(summary, summary_csv_file, summary_json_file, config)
 
     print('end of check_data(), memory info: {}'.format(utils.get_memory_info()))
 
     return summary
 
-def write_summary(summary, summary_csv_file=None, summary_json_file=None):
+def write_summary(summary, summary_csv_file, summary_json_file, config):
 
     if summary_csv_file is not None:
-        write_summary_csv(summary, summary_csv_file)
+        write_summary_csv(summary, summary_csv_file, config)
     if summary_json_file is not None:
         with open(summary_json_file, 'w') as f:
             json.dump(summary, f, indent=4, cls=utils.NpEncoder)
 
-def write_summary_csv(summary, summary_csv_file):
+def write_summary_csv(summary, summary_csv_file, config):
 
+    max_field_len = config['summary_field_str_len_max']
     summary_for_csv = copy.deepcopy(summary)
     summary_for_csv['evaluation']['infeas_diagnostics'] = json.dumps(summary_for_csv['evaluation']['infeas_diagnostics'], cls=utils.NpEncoder)
-    print('summary evaluation infeas_diagnostics:')
-    print(summary_for_csv['evaluation']['infeas_diagnostics'])
+    summary_for_csv['problem']['error_diagnostics'] = summary_for_csv['problem']['error_diagnostics'][:max_field_len]
+    summary_for_csv['solution']['error_diagnostics'] = summary_for_csv['solution']['error_diagnostics'][:max_field_len]
+    summary_for_csv['evaluation']['error_diagnostics'] = summary_for_csv['evaluation']['error_diagnostics'][:max_field_len]
+    # print('summary evaluation infeas_diagnostics:')
+    # print(summary_for_csv['evaluation']['infeas_diagnostics'])
     summary_table = pandas.json_normalize(summary_for_csv)
     summary_table.to_csv(summary_csv_file, index=False)
 
