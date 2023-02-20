@@ -49,6 +49,12 @@ To evaluate a solution to a problem, do:
 python check_data.py --problem <PROBLEM_DATA_FILE_NAME> --solution <SOLUTION_DATA_FILE_NAME>
 ```
 
+By default, this allows topology switching. To prohibit switching, do:
+
+```
+python check_data.py --problem <PROBLEM_DATA_FILE_NAME> --solution <SOLUTION_DATA_FILE_NAME> --parameters '{"acl_switch_up_allowed": false, "acl_switch_dn_allowed": false, "xfr_switch_up_allowed": false, "xfr_switch_dn_allowed": false}'
+```
+
 # Documentation
 
 Full usage of ```check_data.py``` with a complete description of the outputs and other ways of calling it can be found in the help:
