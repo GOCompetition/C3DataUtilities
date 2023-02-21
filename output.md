@@ -17,19 +17,19 @@ summary
 * evaluation: information about the solution evaluation, including feasibility of constraints, objective terms, and errors
 
 problem
-* general
-* "violation costs"
-* "num buses":
-* "num ac lines":
-* "num dc lines":
-* "num transformers":
-* "num shunts":
+* general: General information about the problem
+* "violation costs": Soft constraint violation penalty coefficients
+* "num buses": Number of buses
+* "num ac lines": Number of AC lines
+* "num dc lines": Number of DC lines
+* "num transformers": Number of transformers
+* "num shunts": Number of shunts
 
 "violation costs"
-* "p_bus_vio_cost":
-* "q_bus_vio_cost":
-* "s_vio_cost":
-* "e_vio_cost":
+* "p_bus_vio_cost": Penalty coefficient on bus real power imbalance
+* "q_bus_vio_cost": Penalty coefficient on bus reactive power imbalance
+* "s_vio_cost": Penalty coefficient on branch overload
+* "e_vio_cost": Penalty coefficient on multi-interval energy constraints
 
 solution
 *
