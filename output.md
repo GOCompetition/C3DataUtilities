@@ -192,7 +192,7 @@ evaluation
 "infeas_diagnostics": A dictionary of constraint violations resulting in infeasibility. An empty dictionary if no such constraint violations are detected.
 * "viol_\*": The value corresponding to a "viol_\*" entry of "evaluation" with "val" > 0.
 
-"viol_\*": Information the constraint violation of a particular type of constraints. The type is indicated in the "\*" text.
+"viol_\*": Information the constraint violation of a particular type of constraints. The type is indicated in the "\*" text, where possible referencing specific equations from the formulation.
 * "val": The violation value of the most violated individual constraint of this type. Equal to max(0, f(x)) for a constraint of the form f(x) <= 0. Equal to None if the constraint array is empty.
 * "idx": The multi-dimensional index of the most violated individual constraint of this type. Equal to None if the constraint array is empty.
 
