@@ -673,7 +673,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         err_msg = 'data read error - read without validation'
         summary['problem']['pass'] = 0
         summary['problem']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-        write_summary(summary, summary_csv_file, summary_json_file)
+        write_summary(summary, summary_csv_file, summary_json_file, config)
         print('err_msg' + '\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
@@ -697,7 +697,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         err_msg = 'data read error - pydantic validation'
         summary['problem']['pass'] = 0
         summary['problem']['error_diagnostics'] = err_msg + '\n' + traceback.format_exc()
-        write_summary(summary, summary_csv_file, summary_json_file)
+        write_summary(summary, summary_csv_file, summary_json_file, config)
         print(err_msg + '\n')
         with open(problem_errors_file, 'a') as f:
             f.write(traceback.format_exc())
