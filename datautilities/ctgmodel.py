@@ -863,19 +863,20 @@ def eval_post_contingency_model(sol_eval):
         get_max_br_xfr_delta_k_s_over_time += (end_time - start_time)
 
         # compute AC branch flow penalties
+        # t_d[t] * c_s * viol
         start_time = time.time()
         # acl out
         numpy.sum(br_acl_delta_k_float, axis=0, out=acl_delta_k_float,
             where=(numpy.reshape(br_bool_1, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
-        numpy.multiply(sol_eval.problem.c_s, acl_delta_k_float, out=acl_delta_k_float)
+        numpy.multiply(sol_eval.problem.t_d[t] * sol_eval.problem.c_s, acl_delta_k_float, out=acl_delta_k_float)
         # dcl out
         numpy.sum(br_dcl_delta_k_float, axis=0, out=dcl_delta_k_float,
             where=(numpy.reshape(br_bool_2, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
-        numpy.multiply(sol_eval.problem.c_s, dcl_delta_k_float, out=dcl_delta_k_float)
+        numpy.multiply(sol_eval.problem.t_d[t] * sol_eval.problem.c_s, dcl_delta_k_float, out=dcl_delta_k_float)
         # xfr out
         numpy.sum(br_xfr_delta_k_float, axis=0, out=xfr_delta_k_float,
             where=(numpy.reshape(br_bool_3, newshape=(num_br, 1)) if br_filter_by_worst_ctg else True))
-        numpy.multiply(sol_eval.problem.c_s, xfr_delta_k_float, out=xfr_delta_k_float)
+        numpy.multiply(sol_eval.problem.t_d[t] * sol_eval.problem.c_s, xfr_delta_k_float, out=xfr_delta_k_float)
         end_time = time.time()
         compute_br_k_z_time += (end_time - start_time)
 
