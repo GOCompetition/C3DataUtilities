@@ -3,7 +3,7 @@ Evaluation of solutions to the GO Competition Challenge 3 problem.
 '''
 
 import time
-import numpy, scipy, scipy.sparse, scipy.sparse.linalg
+import numpy, scipy, scipy.sparse, scipy.sparse.linalg, time
 from datautilities import arraydata, utils, ctgmodel
 
 class SolutionEvaluator(object):
@@ -22,6 +22,7 @@ class SolutionEvaluator(object):
     @utils.timeit
     def run(self):
 
+        start_time = time.time()
         # todo performance - which functions are expensive here and elsewhere - how bad does it get for larger data
 
         # todo add projections
@@ -205,6 +206,9 @@ class SolutionEvaluator(object):
 
         # feasibility determination
         self.eval_infeas()
+        
+        end_time = time.time()
+        self.time_run = end_time - start_time
 
     @utils.timeit
     def set_summary(self):
@@ -756,6 +760,18 @@ class SolutionEvaluator(object):
              'val_type': int,
              'tol': None,
              'num_indices': 0},
+            {'key': 'time_run',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'time_connectedness',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'time_post_contingency',
+             'val_type': float,
+             'tol': None,
+             'num_indices': 0},
         ]
 
         # set up the summary items based on the structure
@@ -1196,6 +1212,8 @@ class SolutionEvaluator(object):
 
         '''
 
+        start_time = time.time()
+
         vertices = list(range(self.problem.num_bus))
         # acl_edges = [(self.problem.acl_fbus[i], self.problem.acl_tbus[i]) for i in range(self.problem.num_acl)]
         # xfr_edges = [(self.problem.xfr_fbus[i], self.problem.xfr_tbus[i]) for i in range(self.problem.num_xfr)]
@@ -1295,6 +1313,9 @@ class SolutionEvaluator(object):
             self.info_i_i_k_t_disconnected_ctg['idx'][2] = ctg_violation_k
             self.info_i_i_k_t_disconnected_ctg['idx'][3] = ctg_violation_t
 
+        end_time = time.time()
+        self.time_connectedness = end_time - start_time
+
         print('end of eval_connectedness(), memory info: {}'.format(utils.get_memory_info()))
 
     @utils.timeit
@@ -1302,10 +1323,13 @@ class SolutionEvaluator(object):
         '''
         '''
 
+        start_time = time.time()
         #self.t_k_z = numpy.zeros(shape=(self.problem.num_t, self.problem.num_k), dtype=float) # this is done earlier
         # skip post-contingency evaluation if not connected - might as well skip if infeasible so far - todo
         if self.viol_t_connected_base['val'] == 0 and self.viol_t_connected_ctg['val'] == 0:
             ctgmodel.eval_post_contingency_model(self)
+        end_time = time.time()
+        self.time_post_contingency = end_time - start_time
 
     @utils.timeit
     def eval_sd_t_z_p(self):

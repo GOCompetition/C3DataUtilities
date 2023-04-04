@@ -510,7 +510,7 @@ class InputData(object):
         data_map = {x.uid:x for x in data.time_series_input.active_zonal_reserve}
         self.prz_t_p_rru_min = numpy.reshape(
             numpy.array([data_map[i].RAMPING_RESERVE_UP for i in self.prz_uid], dtype=float),
-            newshape=(self.num_qrz, self.num_t))
+            newshape=(self.num_prz, self.num_t))
         self.prz_t_p_rrd_min = numpy.reshape(
             numpy.array([data_map[i].RAMPING_RESERVE_DOWN for i in self.prz_uid], dtype=float),
             newshape=(self.num_prz, self.num_t))
