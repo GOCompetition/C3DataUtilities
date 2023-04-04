@@ -502,3 +502,228 @@ def eval_convex_cost_function(num_block, p_max, c, p):
             z_so_far += c[i] * p_remaining
             break
     return z_so_far
+
+def eval_market(
+        fixed_quantity=None, fixed_price=None,
+        supply_block_quantity=None, supply_block_price=None,
+        demand_block_quantity=None, demand_block_price=None):
+    '''
+    (quantity_max, quantity_min, price_max, price_min) = eval_market(
+        fixed_quantity, fixed_price, supply_block_quantity, supply_block_price, demand_block_quantity, demand_block_price)
+
+    evaluates the market outcome given an appropriate combination of inputs.
+
+    The inputs are either:
+    a supply curve and a demand curve
+    a supply curve and a fixed quantity
+    a supply curve and a fixed price
+    a demand curve and a fixed quantity
+    a demand curve and a fixed price
+
+    A supply or demand curve is represented by a set of blocks each parameterized by
+    a nonnegative quantity and a price
+
+    The market outcome is conceptually a quantity and price representing a market equilibrium.
+    Since the supply and demand curves are represented by step functions,
+    the set of equilibria is typically a line segment with either
+    constant quantity and price varying between a minimum and a maximum value or
+    constant price and quantity varying between a minimum and a maximum value.
+
+    Input arguments:
+    fixed_quantity None or float
+    fixed_price None or float
+    supply_block_quantity None or 1-d array of floats
+    supply_block_price None or 1-d array of floats
+    demand_block_quantity None or 1-d array of floats
+    demand_block_price None or 1-d array of floats
+
+    Output arguments:
+    quantity_max float
+    quantity_min float
+    price_max float
+    price_min float
+
+    The outputs will satisfy
+      (quantity_max == quantity_min) or (price_max == price_min)
+    unless there is an error
+    '''
+
+    quantity_max = float('inf')
+    quantity_min = -float('inf')
+    price_max = float('inf')
+    price_min = -float('inf')
+    
+    do_eval_x_p_from_s_d = (
+        (fixed_quantity is None) and (fixed_price is None)
+        and (supply_block_quantity is not None) and (supply_block_price is not None)
+        and (demand_block_quantity is not None) and (demand_block_price is not None))
+    do_eval_x_from_p_s = (
+        (fixed_quantity is None) and (fixed_price is not None)
+        and (supply_block_quantity is not None) and (supply_block_price is not None)
+        and (demand_block_quantity is None) and (demand_block_price is None))
+    do_eval_x_from_p_d = (
+        (fixed_quantity is None) and (fixed_price is not None)
+        and (supply_block_quantity is None) and (supply_block_price is None)
+        and (demand_block_quantity is not None) and (demand_block_price is not None))
+    do_eval_p_from_x_s = (
+        (fixed_quantity is not None) and (fixed_price is None)
+        and (supply_block_quantity is not None) and (supply_block_price is not None)
+        and (demand_block_quantity is None) and (demand_block_price is None))
+    do_eval_p_from_x_d = (
+        (fixed_quantity is not None) and (fixed_price is None)
+        and (supply_block_quantity is None) and (supply_block_price is None)
+        and (demand_block_quantity is not None) and (demand_block_price is not None))
+    
+    assert(do_eval_x_p_from_s_d or do_eval_x_from_p_s or do_eval_x_from_p_d or do_eval_p_from_x_s or do_eval_p_from_x_d)
+
+    s_exists = (do_eval_x_p_from_s_d or do_eval_x_from_p_s or do_eval_p_from_x_s)
+    d_exists = (do_eval_x_p_from_s_d or do_eval_x_from_p_d or do_eval_p_from_x_d)
+
+    if s_exists:
+        assert(supply_block_quantity.size == supply_block_price.size)
+        assert(numpy.count_nonzero(numpy.less(supply_block_quantity, 0.0)) == 0)
+    if d_exists:
+        assert(demand_block_quantity.size == demand_block_price.size)
+        assert(numpy.count_nonzero(numpy.less(demand_block_quantity, 0.0)) == 0)
+
+    if do_eval_x_p_from_s_d:
+        return eval_x_p_from_s_d(
+            supply_block_quantity, supply_block_price,
+            demand_block_quantity, demand_block_price)
+    if do_eval_x_from_p_s:
+        return eval_x_from_p_s(
+            fixed_price,
+            supply_block_quantity, supply_block_price)
+    if do_eval_x_from_p_d:
+        return eval_x_from_p_d(
+            fixed_price,
+            demand_block_quantity, demand_block_price)
+    if do_eval_p_from_x_s:
+        return eval_p_from_x_s(
+            fixed_quantity,
+            supply_block_quantity, supply_block_price)
+    if do_eval_p_from_x_d:
+        return eval_p_from_x_d(
+            fixed_quantity,
+            demand_block_quantity, demand_block_price)
+
+def eval_x_p_from_s_d(sx, sp, dx, dp):
+
+    x_max = float('inf')
+    x_min = -float('inf')
+    p_max = float('inf')
+    p_min = -float('inf')
+
+    num_s = sx.size
+    num_d = dx.size
+
+    # remove zero-x blocks and sort by p
+    # could also combine equal-p blocks
+    s = (sx, sp)
+    s = remove_zero_quantity_blocks_from_curve(s[0], s[1])
+    s = sort_supply_curve(s[0], s[1])
+    sx = s[0]
+    sp = s[1]
+    sxc = numpy.cumsum(sx)
+    d = (dx, dp)
+    d = remove_zero_quantity_blocks_from_curve(d[0], d[1])
+    d = sort_demand_curve(d[0], d[1])
+    dx = d[0]
+    dp = d[1]
+    dxc = numpy.cumsum(dx)
+
+    if num_s == 0:
+        if num_d == 0:
+            x_max = 0.0
+            x_min = 0.0
+        else: # at least one d block, and it has positive x
+            x_max = 0.0
+            x_min = 0.0
+            p_min = dxp[0]
+    else: # at least one s block, and it has positive x
+        if num_d == 0:
+            x_max = 0.0
+            x_min = 0.0
+            p_max = sxp[0]
+        else: # each curve has at least one block, and both have positive x, so x and p both cannot be infinite
+            pass
+            # todo
+            # i = 0
+            # j = 0
+            # x_cleared = 0.0
+            # done = False
+            # while not done:
+            #     if
+
+    return (x_max, x_min, p_max, p_min)
+
+def remove_zero_quantity_blocks_from_curve(x, p):
+
+    if x.size > 0:
+        nonzero_blocks = numpy.flatnonzero(x)
+        return (x[nonzero_blocks], p[nonzero_blocks])
+    else:
+        return (x, p)
+
+def eval_x_from_p_s(p0, sx, sp):
+
+    x_max = float('inf')
+    x_min = -float('inf')
+    p_max = float('inf')
+    p_min = -float('inf')
+
+    # todo
+
+    return (x_max, x_min, p_max, p_min)
+
+def eval_x_from_p_d(p0, dx, dp):
+
+    x_max = float('inf')
+    x_min = -float('inf')
+    p_max = float('inf')
+    p_min = -float('inf')
+
+    # todo
+
+    return (x_max, x_min, p_max, p_min)
+
+def eval_p_from_x_s(x0, sx, sp):
+
+    x_max = float('inf')
+    x_min = -float('inf')
+    p_max = float('inf')
+    p_min = -float('inf')
+
+    # todo
+
+    return (x_max, x_min, p_max, p_min)
+
+def eval_p_from_x_d(x0, dx, dp):
+
+    x_max = float('inf')
+    x_min = -float('inf')
+    p_max = float('inf')
+    p_min = -float('inf')
+
+    # todo
+
+    return (x_max, x_min, p_max, p_min)
+
+def sort_supply_curve(block_quantity, block_price):
+
+    return sort_curve(block_quantity, block_price, 'supply')
+
+def sort_demand_curve(block_quantity, block_price):
+
+    return sort_curve(block_quantity, block_price, 'demand')
+
+def sort_curve(block_quantity, block_price, supply_demand):
+
+    coef = (1 if supply_demand == 'supply' else -1)
+    num_blocks = block_quantity.size
+    assert(block_price.size == num_blocks)
+    sorted_blocks = numpy.argsort(coef * block_price)
+    sorted_block_quantity = block_quantity[sorted_blocks]
+    sorted_block_price = block_price[sorted_blocks]
+    return (sorted_block_quantity, sorted_block_price)
+
