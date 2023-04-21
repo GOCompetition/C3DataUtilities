@@ -1129,6 +1129,7 @@ def model_checks(data, config):
         sd_w_a_en_min_end_discrete,
         sd_w_a_su_max_start_discrete,
         sd_w_a_su_max_end_discrete,
+        prz_c_rgu_pos, # todo20230421
         supc_not_ambiguous,
         sdpc_not_ambiguous,
         ts_sd_cost_function_covers_p_max, #
@@ -3064,6 +3065,19 @@ def sd_sus_d_dn_max_discrete(data, config):
     if len(idx_err) > 0:
         msg = "fails network simple_dispatchable_device startup_states max_down_time d / TU within TOL of an integer. TU: {}, TOL: {}, failures (sd uid, state num, d): {}".format(tu, te, idx_err)
         raise ModelError(msg)
+
+def prz_c_rgu_pos(data, config):
+    '''
+    '''
+    # todo20230421
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        idx_err = [
+            (i.uid, i.REG_UP_vio_cost)
+            for i in data.network.active_zonal_reserve
+            if i.REG_UP_vio_cost <= 0.0]
+        if len(idx_err) > 0:
+            msg = 'fails network active_zonal_reserve REG_UP_vio_cost > 0.0. failures (prz uid, c): {}'.format(idx_err)
+            raise ModelError(msg)
 
 def sd_w_a_en_max_start_discrete(data, config):
     '''
