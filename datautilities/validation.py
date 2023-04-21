@@ -1129,11 +1129,18 @@ def model_checks(data, config):
         sd_w_a_en_min_end_discrete,
         sd_w_a_su_max_start_discrete,
         sd_w_a_su_max_end_discrete,
-        prz_c_rgu_pos, # todo20230421
+        prz_c_rgu_pos,
+        prz_c_rgd_pos,
+        prz_c_scr_pos,
+        prz_c_nsc_pos,
+        prz_c_rur_pos,
+        prz_c_rdr_pos,
+        qrz_c_qru_pos,
+        qrz_c_qrd_pos,
         supc_not_ambiguous,
         sdpc_not_ambiguous,
-        ts_sd_cost_function_covers_p_max, #
-        sd_p_q_linking_set_nonempty, #
+        ts_sd_cost_function_covers_p_max,
+        sd_p_q_linking_set_nonempty,
         sd_p_q_beta_not_too_small,
         sd_p_q_beta_max_not_too_small,
         sd_p_q_beta_min_not_too_small,
@@ -3069,7 +3076,6 @@ def sd_sus_d_dn_max_discrete(data, config):
 def prz_c_rgu_pos(data, config):
     '''
     '''
-    # todo20230421
     if config["require_reserve_shortage_cost_coeffs_pos"]:
         idx_err = [
             (i.uid, i.REG_UP_vio_cost)
@@ -3077,6 +3083,90 @@ def prz_c_rgu_pos(data, config):
             if i.REG_UP_vio_cost <= 0.0]
         if len(idx_err) > 0:
             msg = 'fails network active_zonal_reserve REG_UP_vio_cost > 0.0. failures (prz uid, c): {}'.format(idx_err)
+            raise ModelError(msg)
+
+def prz_c_rgd_pos(data, config):
+    '''
+    '''
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        idx_err = [
+            (i.uid, i.REG_DOWN_vio_cost)
+            for i in data.network.active_zonal_reserve
+            if i.REG_DOWN_vio_cost <= 0.0]
+        if len(idx_err) > 0:
+            msg = 'fails network active_zonal_reserve REG_DOWN_vio_cost > 0.0. failures (prz uid, c): {}'.format(idx_err)
+            raise ModelError(msg)
+
+def prz_c_scr_pos(data, config):
+    '''
+    '''
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        idx_err = [
+            (i.uid, i.SYN_vio_cost)
+            for i in data.network.active_zonal_reserve
+            if i.SYN_vio_cost <= 0.0]
+        if len(idx_err) > 0:
+            msg = 'fails network active_zonal_reserve SYN_vio_cost > 0.0. failures (prz uid, c): {}'.format(idx_err)
+            raise ModelError(msg)
+
+def prz_c_nsc_pos(data, config):
+    '''
+    '''
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        idx_err = [
+            (i.uid, i.NSYN_vio_cost)
+            for i in data.network.active_zonal_reserve
+            if i.NSYN_vio_cost <= 0.0]
+        if len(idx_err) > 0:
+            msg = 'fails network active_zonal_reserve NSYN_vio_cost > 0.0. failures (prz uid, c): {}'.format(idx_err)
+            raise ModelError(msg)
+
+def prz_c_rur_pos(data, config):
+    '''
+    '''
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        idx_err = [
+            (i.uid, i.RAMPING_RESERVE_UP_vio_cost)
+            for i in data.network.active_zonal_reserve
+            if i.RAMPING_RESERVE_UP_vio_cost <= 0.0]
+        if len(idx_err) > 0:
+            msg = 'fails network active_zonal_reserve RAMPING_RESERVE_UP_vio_cost > 0.0. failures (prz uid, c): {}'.format(idx_err)
+            raise ModelError(msg)
+
+def prz_c_rdr_pos(data, config):
+    '''
+    '''
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        idx_err = [
+            (i.uid, i.RAMPING_RESERVE_DOWN_vio_cost)
+            for i in data.network.active_zonal_reserve
+            if i.RAMPING_RESERVE_DOWN_vio_cost <= 0.0]
+        if len(idx_err) > 0:
+            msg = 'fails network active_zonal_reserve RAMPING_RESERVE_DOWN_vio_cost > 0.0. failures (prz uid, c): {}'.format(idx_err)
+            raise ModelError(msg)
+
+def qrz_c_qru_pos(data, config):
+    '''
+    '''
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        idx_err = [
+            (i.uid, i.REACT_UP_vio_cost)
+            for i in data.network.reactive_zonal_reserve
+            if i.REACT_UP_vio_cost <= 0.0]
+        if len(idx_err) > 0:
+            msg = 'fails network reactive_zonal_reserve REACT_UP_vio_cost > 0.0. failures (qrz uid, c): {}'.format(idx_err)
+            raise ModelError(msg)
+
+def qrz_c_qrd_pos(data, config):
+    '''
+    '''
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        idx_err = [
+            (i.uid, i.REACT_DOWN_vio_cost)
+            for i in data.network.reactive_zonal_reserve
+            if i.REACT_DOWN_vio_cost <= 0.0]
+        if len(idx_err) > 0:
+            msg = 'fails network reactive_zonal_reserve REACT_DOWN_vio_cost > 0.0. failures (qrz uid, c): {}'.format(idx_err)
             raise ModelError(msg)
 
 def sd_w_a_en_max_start_discrete(data, config):
