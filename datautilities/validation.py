@@ -368,6 +368,79 @@ def scrub_problem(problem_data, config, use_pydantic=False):
     # todo - others?
     anonymize_uids(problem_data, config, use_pydantic)
     remove_optional_fields(problem_data, config, use_pydantic)
+    ensure_pos_obj_coeffs(problem_data, config, use_pydantic)
+
+def ensure_pos_obj_coeffs(problem_data, config, use_pydantic=False):
+
+    ensure_pos_c_en(problem_data, config, use_pydantic)
+    ensure_pos_c_p(problem_data, config, use_pydantic)
+    ensure_pos_c_q(problem_data, config, use_pydantic)
+    ensure_pos_c_s(problem_data, config, use_pydantic)
+    ensure_pos_c_rgu(problem_data, config, use_pydantic)
+    ensure_pos_c_rgd(problem_data, config, use_pydantic)
+    ensure_pos_c_scr(problem_data, config, use_pydantic)
+    ensure_pos_c_nsc(problem_data, config, use_pydantic)
+    ensure_pos_c_rru(problem_data, config, use_pydantic)
+    ensure_pos_c_rrd(problem_data, config, use_pydantic)
+    ensure_pos_c_qru(problem_data, config, use_pydantic)
+    ensure_pos_c_qrd(problem_data, config, use_pydantic)
+
+def ensure_pos_c_en(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_p(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_q(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_s(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_rgu(problem_data, config, use_pydantic=False):
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_reserve_shortage_cost_coeffs_pos"]:
+        for i in problem_data['network']['active_zonal_reserve']:
+            if i['REG_UP_vio_cost'] <= 0.0:
+                msg = 'nonpositive REG_UP_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
+                    i['uid'], i['REG_UP_vio_cost'], default_value)
+                print(msg)
+                i['REG_UP_vio_cost'] = default_value
+
+def ensure_pos_c_rgd(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_scr(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_nsc(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_rru(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_rrd(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_qru(problem_data, config, use_pydantic=False):
+
+    pass
+
+def ensure_pos_c_qrd(problem_data, config, use_pydantic=False):
+
+    pass
 
 def anonymize_uids(problem_data, config, use_pydantic=False):
 
