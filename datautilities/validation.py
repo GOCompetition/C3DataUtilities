@@ -372,7 +372,7 @@ def scrub_problem(problem_data, config, use_pydantic=False):
 
 def ensure_pos_obj_coeffs(problem_data, config, use_pydantic=False):
 
-    ensure_pos_c_en(problem_data, config, use_pydantic)
+    ensure_pos_c_e(problem_data, config, use_pydantic)
     ensure_pos_c_p(problem_data, config, use_pydantic)
     ensure_pos_c_q(problem_data, config, use_pydantic)
     ensure_pos_c_s(problem_data, config, use_pydantic)
@@ -385,28 +385,60 @@ def ensure_pos_obj_coeffs(problem_data, config, use_pydantic=False):
     ensure_pos_c_qru(problem_data, config, use_pydantic)
     ensure_pos_c_qrd(problem_data, config, use_pydantic)
 
-def ensure_pos_c_en(problem_data, config, use_pydantic=False):
-
-    pass
+def ensure_pos_c_e(problem_data, config, use_pydantic=False):
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        if problem_data['network']['violation_cost']['e_vio_cost'] <= 0.0:
+            msg = 'nonpositive e_vio_cost, value: {}, replacing with value: {}'.format(
+                problem_data['network']['violation_cost']['e_vio_cost'], default_value)
+            print(msg)
+            problem_data['network']['violation_cost']['e_vio_cost'] = default_value
 
 def ensure_pos_c_p(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        if problem_data['network']['violation_cost']['p_bus_vio_cost'] <= 0.0:
+            msg = 'nonpositive p_bus_vio_cost, value: {}, replacing with value: {}'.format(
+                problem_data['network']['violation_cost']['p_bus_vio_cost'], default_value)
+            print(msg)
+            problem_data['network']['violation_cost']['p_bus_vio_cost'] = default_value
 
 def ensure_pos_c_q(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        if problem_data['network']['violation_cost']['q_bus_vio_cost'] <= 0.0:
+            msg = 'nonpositive q_bus_vio_cost, value: {}, replacing with value: {}'.format(
+                problem_data['network']['violation_cost']['q_bus_vio_cost'], default_value)
+            print(msg)
+            problem_data['network']['violation_cost']['q_bus_vio_cost'] = default_value
 
 def ensure_pos_c_s(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        if problem_data['network']['violation_cost']['s_vio_cost'] <= 0.0:
+            msg = 'nonpositive s_vio_cost, value: {}, replacing with value: {}'.format(
+                problem_data['network']['violation_cost']['s_vio_cost'], default_value)
+            print(msg)
+            problem_data['network']['violation_cost']['s_vio_cost'] = default_value
 
 def ensure_pos_c_rgu(problem_data, config, use_pydantic=False):
     '''
     '''
     
     default_value = 1.0
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         for i in problem_data['network']['active_zonal_reserve']:
             if i['REG_UP_vio_cost'] <= 0.0:
                 msg = 'nonpositive REG_UP_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
@@ -415,32 +447,95 @@ def ensure_pos_c_rgu(problem_data, config, use_pydantic=False):
                 i['REG_UP_vio_cost'] = default_value
 
 def ensure_pos_c_rgd(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        for i in problem_data['network']['active_zonal_reserve']:
+            if i['REG_DOWN_vio_cost'] <= 0.0:
+                msg = 'nonpositive REG_DOWN_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
+                    i['uid'], i['REG_DOWN_vio_cost'], default_value)
+                print(msg)
+                i['REG_DOWN_vio_cost'] = default_value
 
 def ensure_pos_c_scr(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        for i in problem_data['network']['active_zonal_reserve']:
+            if i['SYN_vio_cost'] <= 0.0:
+                msg = 'nonpositive SYN_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
+                    i['uid'], i['SYN_vio_cost'], default_value)
+                print(msg)
+                i['SYN_vio_cost'] = default_value
 
 def ensure_pos_c_nsc(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        for i in problem_data['network']['active_zonal_reserve']:
+            if i['NSYN_vio_cost'] <= 0.0:
+                msg = 'nonpositive NSYN_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
+                    i['uid'], i['NSYN_vio_cost'], default_value)
+                print(msg)
+                i['NSYN_vio_cost'] = default_value
 
 def ensure_pos_c_rru(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        for i in problem_data['network']['active_zonal_reserve']:
+            if i['RAMPING_RESERVE_UP_vio_cost'] <= 0.0:
+                msg = 'nonpositive RAMPING_RESERVE_UP_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
+                    i['uid'], i['RAMPING_RESERVE_UP_vio_cost'], default_value)
+                print(msg)
+                i['RAMPING_RESERVE_UP_vio_cost'] = default_value
 
 def ensure_pos_c_rrd(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        for i in problem_data['network']['active_zonal_reserve']:
+            if i['RAMPING_RESERVE_DOWN_vio_cost'] <= 0.0:
+                msg = 'nonpositive RAMPING_RESERVE_DOWN_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
+                    i['uid'], i['RAMPING_RESERVE_DOWN_vio_cost'], default_value)
+                print(msg)
+                i['RAMPING_RESERVE_DOWN_vio_cost'] = default_value
 
 def ensure_pos_c_qru(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        for i in problem_data['network']['reactive_zonal_reserve']:
+            if i['REACT_UP_vio_cost'] <= 0.0:
+                msg = 'nonpositive REACT_UP_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
+                    i['uid'], i['REACT_UP_vio_cost'], default_value)
+                print(msg)
+                i['REACT_UP_vio_cost'] = default_value
 
 def ensure_pos_c_qrd(problem_data, config, use_pydantic=False):
-
-    pass
+    '''
+    '''
+    
+    default_value = 1.0
+    if config["require_obj_coeffs_pos"]:
+        for i in problem_data['network']['reactive_zonal_reserve']:
+            if i['REACT_DOWN_vio_cost'] <= 0.0:
+                msg = 'nonpositive REACT_DOWN_vio_cost, zone uid: {}, value: {}, replacing with value: {}'.format(
+                    i['uid'], i['REACT_DOWN_vio_cost'], default_value)
+                print(msg)
+                i['REACT_DOWN_vio_cost'] = default_value
 
 def anonymize_uids(problem_data, config, use_pydantic=False):
 
@@ -1202,6 +1297,10 @@ def model_checks(data, config):
         sd_w_a_en_min_end_discrete,
         sd_w_a_su_max_start_discrete,
         sd_w_a_su_max_end_discrete,
+        c_e_pos,
+        c_p_pos,
+        c_q_pos,
+        c_s_pos,
         prz_c_rgu_pos,
         prz_c_rgd_pos,
         prz_c_scr_pos,
@@ -3146,10 +3245,50 @@ def sd_sus_d_dn_max_discrete(data, config):
         msg = "fails network simple_dispatchable_device startup_states max_down_time d / TU within TOL of an integer. TU: {}, TOL: {}, failures (sd uid, state num, d): {}".format(tu, te, idx_err)
         raise ModelError(msg)
 
+def c_e_pos(data, config):
+    '''
+    '''
+
+    if config["require_obj_coeffs_pos"]:
+        if data.network.violation_cost.e_vio_cost <= 0.0:
+            msg = 'fails data -> network -> violation_cost -> e_vio_cost > 0.0. value: {}'.format(
+                data.network.violation_cost.e_vio_cost)
+            raise ModelError(msg)
+
+def c_p_pos(data, config):
+    '''
+    '''
+
+    if config["require_obj_coeffs_pos"]:
+        if data.network.violation_cost.p_bus_vio_cost <= 0.0:
+            msg = 'fails data -> network -> violation_cost -> p_bus_vio_cost > 0.0. value: {}'.format(
+                data.network.violation_cost.p_bus_vio_cost)
+            raise ModelError(msg)
+
+def c_q_pos(data, config):
+    '''
+    '''
+
+    if config["require_obj_coeffs_pos"]:
+        if data.network.violation_cost.q_bus_vio_cost <= 0.0:
+            msg = 'fails data -> network -> violation_cost -> q_bus_vio_cost > 0.0. value: {}'.format(
+                data.network.violation_cost.q_bus_vio_cost)
+            raise ModelError(msg)
+
+def c_s_pos(data, config):
+    '''
+    '''
+
+    if config["require_obj_coeffs_pos"]:
+        if data.network.violation_cost.s_vio_cost <= 0.0:
+            msg = 'fails data -> network -> violation_cost -> s_vio_cost > 0.0. value: {}'.format(
+                data.network.violation_cost.s_vio_cost)
+            raise ModelError(msg)
+
 def prz_c_rgu_pos(data, config):
     '''
     '''
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         idx_err = [
             (i.uid, i.REG_UP_vio_cost)
             for i in data.network.active_zonal_reserve
@@ -3161,7 +3300,7 @@ def prz_c_rgu_pos(data, config):
 def prz_c_rgd_pos(data, config):
     '''
     '''
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         idx_err = [
             (i.uid, i.REG_DOWN_vio_cost)
             for i in data.network.active_zonal_reserve
@@ -3173,7 +3312,7 @@ def prz_c_rgd_pos(data, config):
 def prz_c_scr_pos(data, config):
     '''
     '''
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         idx_err = [
             (i.uid, i.SYN_vio_cost)
             for i in data.network.active_zonal_reserve
@@ -3185,7 +3324,7 @@ def prz_c_scr_pos(data, config):
 def prz_c_nsc_pos(data, config):
     '''
     '''
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         idx_err = [
             (i.uid, i.NSYN_vio_cost)
             for i in data.network.active_zonal_reserve
@@ -3197,7 +3336,7 @@ def prz_c_nsc_pos(data, config):
 def prz_c_rur_pos(data, config):
     '''
     '''
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         idx_err = [
             (i.uid, i.RAMPING_RESERVE_UP_vio_cost)
             for i in data.network.active_zonal_reserve
@@ -3209,7 +3348,7 @@ def prz_c_rur_pos(data, config):
 def prz_c_rdr_pos(data, config):
     '''
     '''
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         idx_err = [
             (i.uid, i.RAMPING_RESERVE_DOWN_vio_cost)
             for i in data.network.active_zonal_reserve
@@ -3221,7 +3360,7 @@ def prz_c_rdr_pos(data, config):
 def qrz_c_qru_pos(data, config):
     '''
     '''
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         idx_err = [
             (i.uid, i.REACT_UP_vio_cost)
             for i in data.network.reactive_zonal_reserve
@@ -3233,7 +3372,7 @@ def qrz_c_qru_pos(data, config):
 def qrz_c_qrd_pos(data, config):
     '''
     '''
-    if config["require_reserve_shortage_cost_coeffs_pos"]:
+    if config["require_obj_coeffs_pos"]:
         idx_err = [
             (i.uid, i.REACT_DOWN_vio_cost)
             for i in data.network.reactive_zonal_reserve
