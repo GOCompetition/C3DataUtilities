@@ -752,6 +752,10 @@ class SolutionEvaluator(object):
              'val_type': float,
              'tol': None,
              'num_indices': 0},
+            {'key': 'phys_feas',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
             {'key': 'feas',
              'val_type': int,
              'tol': None,
@@ -980,6 +984,16 @@ class SolutionEvaluator(object):
         else:
             self.feas = 1
             self.infeas = 0
+        max_balance_viol = max(
+            abs(self.viol_bus_t_p_balance_max['val']),
+            abs(self.viol_bus_t_p_balance_min['val']),
+            abs(self.viol_bus_t_q_balance_max['val']),
+            abs(self.viol_bus_t_q_balance_min['val']))
+        self.phys_feas = 0
+        if (self.feas == 0 or max_balance_viol > self.config['hard_constr_tol']):
+            self.phys_feas = 0
+        else:
+            self.phys_feas = 1
 
     def get_feas(self):
         '''
