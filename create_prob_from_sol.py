@@ -1,4 +1,4 @@
-import json
+import json, argparse
 
 def read_json(file_name):
 
@@ -67,7 +67,23 @@ def main(prob_file_name, sol_file_name, new_prob_file_name):
 
 if __name__ == '__main__':
 
-    prob_file_name = '/people/holz501/gocomp/c3/data/duals/C3S0N00073D1_base_20230104.json'
-    sol_file_name =  '/people/holz501/gocomp/c3/data/duals/C3S0N00073D1_base_20230104_solution.json'
-    new_prob_file_name =  'new_problem.json'
-    main(prob_file_name, sol_file_name, new_prob_file_name)
+    msg = '\n'.join([
+            'create a problem file from a solution file.',
+            'input files',
+            '  problem json',
+            '  solution json',
+            'output files',
+            '  new problem json',
+            ])
+
+    parser = argparse.ArgumentParser(description=msg, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--problem", help="The problem file input", default=None)
+    parser.add_argument("--solution", help="The solution file input", default=None)
+    parser.add_argument("--new_problem", help="The new problem file output", default=None)
+
+    args = parser.parse_args()
+
+    print('args:')
+    print(args)
+
+    main(args.problem, args.solution, args.new_problem)
