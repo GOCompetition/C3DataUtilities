@@ -1317,6 +1317,7 @@ def model_checks(data, config):
         qrz_c_qrd_pos,
         supc_not_ambiguous,
         sdpc_not_ambiguous,
+        qrz_t_sufficient_capacity_for_reserve_requirements,
         ts_sd_cost_function_covers_p_max,
         sd_p_q_linking_set_nonempty,
         sd_p_q_beta_not_too_small,
@@ -2207,6 +2208,39 @@ def sdpc_not_ambiguous(data, config):
     if len(idx_err) > 0:
         errors = [(sd_uid[i[0]], i[1], sd_t_sdpc[i[0]][i[1]][0], sd_t_sdpc[i[0]][i[1]][1]) for i in idx_err]
         msg = 'fails shutdown trajectory unambiguous, i.e. p-value too close to 0.0. tolerance: {}. failures (device uid, shutdown interval index, shutdown trajectory list of (t, p), ambiguous (t, p)): {}'.format(config['su_sd_pc_zero_tol'], errors)
+        raise ModelError(msg)
+
+def qrz_t_sufficient_capacity_for_reserve_requirements(data, config):
+
+    tol = config['hard_constr_tol']
+    bus_uid = [i.uid for i in data.network.bus]
+    num_bus = len(bus_uid)
+    qrz_uid = [i.uid for i in data.network.reactive_zonal_reserve]
+    num_qrz = len(qrz_uid)
+    num_t = len(data.time_series_input.general.interval_duration)
+    sd_uid = [j.uid for j in data.network.simple_dispatchable_device]
+    num_sd = len(sd_uid)
+    qrz_t_qru_req = {i.uid:i.REACT_UP for i in data.time_series_input.reactive_zonal_reserve}
+    qrz_t_qrd_req = {i.uid:i.REACT_DOWN for i in data.time_series_input.reactive_zonal_reserve}
+    qrz_t_q_total_res_req = {i:[qrz_t_qru_req[i][t] + qrz_t_qrd_req[i][t] for t in range(num_t)] for i in qrz_uid}
+    sd_bus = {i.uid:i.bus for i in data.network.simple_dispatchable_device}
+    bus_qrz = {i.uid:i.reactive_reserve_uids for i in data.network.bus}
+    sd_qrz = {j:sorted(list(set([k for k in bus_qrz[sd_bus[j]]]))) for j in sd_uid}
+    qrz_sd = {i:[] for i in qrz_uid}
+    for i, k in sd_qrz.items():
+        for j in k:
+            qrz_sd[j].append(i)
+    sd_t_q_max = {i.uid:i.q_ub for i in data.time_series_input.simple_dispatchable_device}
+    sd_t_q_min = {i.uid:i.q_lb for i in data.time_series_input.simple_dispatchable_device}
+    sd_t_q_total_res_cap = {i:[sd_t_q_max[i][t] - sd_t_q_min[i][t] for t in range(num_t)] for i in sd_uid}
+    qrz_t_q_total_res_cap = {i:[sum(sd_t_q_total_res_cap[j][t] for j in qrz_sd[i]) for t in range(num_t)] for i in qrz_uid}
+
+    errors = [
+        (i, t, qrz_t_q_total_res_cap[i][t], qrz_t_q_total_res_req[i][t])
+        for i in qrz_uid for t in range(num_t)
+        if qrz_t_q_total_res_cap[i][t] < qrz_t_q_total_res_req[i][t] + tol]
+    if len(errors) > 0:
+        msg = "fails qrz t total q-reserve capacity (q_max - q_min over all contributing devices) >= total q-reserve requirement (qru + qrd) + TOL. TOL: {}, failures (qrz, t, total_q_res_cap, total_q_res_req): {}".format(tol, errors)
         raise ModelError(msg)
 
 def sd_t_cost_function_covers_supc(data, config):
