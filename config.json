@@ -5,6 +5,8 @@
     "timestamp_max": "2100-12-31T23:59:59",
     "timestamp_pattern_str": "\\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\Z",
     "require_obj_coeffs_pos": true,
+    "require_multi_interval_time_consistency": true,
+    "require_q_res_cap_exceeds_req": true,
     "acl_switch_up_allowed": true,
     "acl_switch_dn_allowed": true,
     "xfr_switch_up_allowed": true,

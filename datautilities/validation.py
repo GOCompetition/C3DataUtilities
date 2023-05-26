@@ -2239,7 +2239,7 @@ def qrz_t_sufficient_capacity_for_reserve_requirements(data, config):
         (i, t, qrz_t_q_total_res_cap[i][t], qrz_t_q_total_res_req[i][t])
         for i in qrz_uid for t in range(num_t)
         if qrz_t_q_total_res_cap[i][t] < qrz_t_q_total_res_req[i][t] + tol]
-    if len(errors) > 0:
+    if config['require_q_res_cap_exceeds_req'] and len(errors) > 0:
         msg = "fails qrz t total q-reserve capacity (q_max - q_min over all contributing devices) >= total q-reserve requirement (qru + qrd) + TOL. TOL: {}, failures (qrz, t, total_q_res_cap, total_q_res_req): {}".format(tol, errors)
         raise ModelError(msg)
 
@@ -3522,7 +3522,7 @@ def sd_w_a_en_max_end_le_horizon_end(data, config):
         for i in data.network.simple_dispatchable_device
         for j in range(len(i.energy_req_ub))
         if i.energy_req_ub[j][1] > horizon_end_time + tol]
-    if len(idx_err) > 0:
+    if config['require_multi_interval_time_consistency'] and len(idx_err) > 0:
         msg = "fails network simple_dispatchable_device energy_req_ub end_time (T) <= horizon end time (HET) + TOL. HET: {}, TOL: {}, failures (sd uid, constr num, T): {}".format(horizon_end_time, tol, idx_err)
         raise ModelError(msg)
 
@@ -3537,7 +3537,7 @@ def sd_w_a_en_min_end_le_horizon_end(data, config):
         for i in data.network.simple_dispatchable_device
         for j in range(len(i.energy_req_lb))
         if i.energy_req_lb[j][1] > horizon_end_time + tol]
-    if len(idx_err) > 0:
+    if config['require_multi_interval_time_consistency'] and len(idx_err) > 0:
         msg = "fails network simple_dispatchable_device energy_req_lb end_time (T) <= horizon end time (HET) + TOL. HET: {}, TOL: {}, failures (sd uid, constr num, T): {}".format(horizon_end_time, tol, idx_err)
         raise ModelError(msg)
 
@@ -3552,24 +3552,9 @@ def sd_w_a_su_max_end_le_horizon_end(data, config):
         for i in data.network.simple_dispatchable_device
         for j in range(len(i.startups_ub))
         if i.startups_ub[j][1] > horizon_end_time + tol]
-    if len(idx_err) > 0:
+    if config['require_multi_interval_time_consistency'] and len(idx_err) > 0:
         msg = "fails network simple_dispatchable_device startups_ub end_time (T) <= horizon end time (HET) + TOL. HET: {}, TOL: {}, failures (sd uid, constr num, T): {}".format(horizon_end_time, tol, idx_err)
         raise ModelError(msg)
-
-# def sd_w_a_su_max_end_le_horizon_end(data, config):
-#     '''
-#     '''
-
-#     tol = config['time_eq_tol']
-#     horizon_end_time = sum(data.time_series_input.general.interval_duration)
-#     idx_err = [
-#         (i.uid, j, i.startups_ub[j][1])
-#         for i in data.network.simple_dispatchable_device
-#         for j in range(len(i.startups_ub))
-#         if i.startups_ub[j][1] > horizon_end_time + tol]
-#     if len(idx_err) > 0:
-#         msg = "fails network simple_dispatchable_device startups_ub end_time (T) <= horizon end time (HET) + TOL. HET: {}, TOL: {}, failures (sd uid, constr num, T): {}".format(horizon_end_time, tol, idx_err)
-#         raise ModelError(msg)
 
 def sd_w_a_en_max_start_le_end(data, config):
 
@@ -3579,7 +3564,7 @@ def sd_w_a_en_max_start_le_end(data, config):
         for i in data.network.simple_dispatchable_device
         for j in range(len(i.energy_req_ub))
         if i.energy_req_ub[j][0] > i.energy_req_ub[j][1] + tol]
-    if len(idx_err) > 0:
+    if config['require_multi_interval_time_consistency'] and len(idx_err) > 0:
         msg = "fails network simple_dispatchable_device energy_req_ub start_time (ST) <= end time (ET) + TOL. TOL: {}, failures (sd uid, constr num, ST, ET): {}".format(horizon_end_time, tol, idx_err)
         raise ModelError(msg)
 
@@ -3591,7 +3576,7 @@ def sd_w_a_en_min_start_le_end(data, config):
         for i in data.network.simple_dispatchable_device
         for j in range(len(i.energy_req_lb))
         if i.energy_req_lb[j][0] > i.energy_req_lb[j][1] + tol]
-    if len(idx_err) > 0:
+    if config['require_multi_interval_time_consistency'] and len(idx_err) > 0:
         msg = "fails network simple_dispatchable_device energy_req_lb start_time (ST) <= end time (ET) + TOL. TOL: {}, failures (sd uid, constr num, ST, ET): {}".format(horizon_end_time, tol, idx_err)
         raise ModelError(msg)
 
@@ -3603,7 +3588,7 @@ def sd_w_a_su_max_start_le_end(data, config):
         for i in data.network.simple_dispatchable_device
         for j in range(len(i.startups_ub))
         if i.startups_ub[j][0] > i.startups_ub[j][1] + tol]
-    if len(idx_err) > 0:
+    if config['require_multi_interval_time_consistency'] and len(idx_err) > 0:
         msg = "fails network simple_dispatchable_device startups_ub start_time (ST) <= end time (ET) + TOL. TOL: {}, failures (sd uid, constr num, ST, ET): {}".format(horizon_end_time, tol, idx_err)
         raise ModelError(msg)
 
