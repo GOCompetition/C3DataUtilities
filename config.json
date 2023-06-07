@@ -19,6 +19,7 @@
     "beta_zero_tol": 0.000001,
     "su_sd_pc_zero_tol": 0.000001,
     "print_uid_maps": true,
+    "do_problem_supply_demand_plots": false,
     "summary_field_str_len_max": 10000,
     "interval_duration_schedules": [
         [

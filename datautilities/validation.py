@@ -8,6 +8,7 @@ from datamodel.input.data import InputDataFile
 from datamodel.output.data import OutputDataFile
 from datautilities import utils, arraydata, evaluation
 from datautilities.errors import ModelError, GitError
+from datautilities import supply_demand
 
 # import optimization modules
 # it is OK if this fails as long as config file specifies we do not need optimization solves
@@ -874,6 +875,11 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
     end_time = time.time()
     print('load time: {}'.format(end_time - start_time))
 
+    #summary['problem']['supply_demand_info'] = json.dumps(supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots']))
+    summary['problem']['supply_demand_info'] = supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots'])
+    # temp TODO remove this - no need to serialize with json.dumps()
+    #return
+
     # can skip further problem checks, POP solution, etc., if evaluating a solution
     if solution_file is None:
 
@@ -972,6 +978,10 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
     pp.pprint(problem_summary)
     summary['problem'] = problem_summary
     summary['problem']['pass'] = 1
+
+    # further information
+    #summary['problem']['supply_demand_info'] = json.dumps(supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots']))
+    # temp TODO uncomment this
 
     if solution_file is not None:
 
