@@ -78,6 +78,8 @@ def get_git_info(path): # todo get branch also
         'date': None,
         'query_return_code': None,
         'query_err': None,
+        'branch_return_code': None,
+        'branch_err': None,
         }
 
     repo['query_path'] = path
@@ -89,8 +91,8 @@ def get_git_info(path): # todo get branch also
     repo['query_out'] = results.stdout.decode(sys.stdout.encoding)
     repo['query_err'] = results.stderr.decode(sys.stderr.encoding)
     
-    keys = ['commit', 'date']
     if repo['query_return_code'] == 0:
+        keys = ['commit', 'date']
         lines = repo['query_out'].splitlines()
         for line in lines:
             line_lower = line.lower()
@@ -102,6 +104,15 @@ def get_git_info(path): # todo get branch also
         for k in keys:
             if repo[k] is None:
                 raise GitError('"{}" does not appear'.format(k))
+        branch_results = subprocess.run(['git', 'branch'], cwd=path, capture_output=True)
+        repo['branch_return_code'] = branch_results.returncode
+        repo['branch_out'] = branch_results.stdout.decode(sys.stdout.encoding)
+        repo['branch_err'] = branch_results.stderr.decode(sys.stderr.encoding)
+        if repo['branch_return_code'] == 0:
+            lines = repo['branch_out'].splitlines()
+            for line in lines:
+                if line.startswith('* '):
+                    repo['branch'] = line[2:]
 
     return repo
 
