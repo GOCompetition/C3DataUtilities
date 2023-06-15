@@ -2630,6 +2630,17 @@ class SolutionEvaluator(object):
             self.sd_t_float[i, :] = self.t_float
         # cost adjustment applies only when starting up
         numpy.multiply(self.sd_t_u_su, self.sd_t_float, out=self.sd_t_float)
+        #
+        # debugging
+        # print out individual values of sd_t_z_sus
+        #
+        # for i in range(self.problem.num_sd):
+        #     for j in range(self.problem.num_t):
+        #         if abs(self.sd_t_float[i,j]) > 0.0:
+        #             print('sd uid: {}, t: {}, z_sus: {}'.format(self.problem.sd_uid[i], j, self.sd_t_float[i,j]))
+        #
+        # end debugging
+        #
         self.sum_sd_t_z_sus = numpy.sum(self.sd_t_float)
         self.t_sum_sd_t_z_sus = numpy.sum(self.sd_t_float, axis=0)
 
