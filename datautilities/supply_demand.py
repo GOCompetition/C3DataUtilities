@@ -153,7 +153,7 @@ def add_p_max_cumul_to_t_blocks(data, t_blocks):
         #    p_max += b['p_max']
         #    b['p_max_cumul'] = p_max
 
-def plot_blocks_pr_cs_one_t(blocks_pr, blocks_cs, equilibrium, file_name):
+def plot_blocks_pr_cs_one_t(blocks_pr, blocks_cs, equilibrium, problem_file_name, t, file_name):
 
     x_pr = [b['p_max_cumul'] for b in blocks_pr for i in range(2)]
     x_pr = x_pr[0:-1]
@@ -164,10 +164,25 @@ def plot_blocks_pr_cs_one_t(blocks_pr, blocks_cs, equilibrium, file_name):
     x_cs = [0.0] + x_cs
     y_cs = [b['c'] for b in blocks_cs for i in range(2)]
 
+    info_str_format = '\n'.join(
+        [
+            #'problem: {}', 't: {}',
+            'p (pu): {:.2e}', 'lambda ($/pu-h): {:.2e}',
+            'surplus ($/h): {:.2e}', 'exchange ($/h): {:.2e}',
+            'cost_pr ($/h): {:.2e}', 'value_cs ($/h): {:.2e}',
+            'surplus_pr ($/h): {:.2e}', 'surplus_cs ($/h): {:.2e}'])
+    info_str = info_str_format.format(
+        #problem_file_name, t,
+        equilibrium['p_med'], equilibrium['lambda_med'],
+        equilibrium['surplus_total'], equilibrium['value_exchanged'],
+        equilibrium['cost_pr'], equilibrium['value_cs'],
+        equilibrium['surplus_pr'], equilibrium['value_cs'])
+
     fig,ax = plt.subplots()
     ax.plot(x_pr, y_pr, x_cs, y_cs)
     ax.set_yscale('log')
-    ax.set_title('p: {}, lambda: {}'.format(equilibrium['p_med'], equilibrium['lambda_med']))
+    ax.set_title('t = {}, {}'.format(t, problem_file_name))
+    ax.text(0.5, 0.5, info_str, transform=plt.gcf().transFigure)
     ax.legend(['supply', 'demand'])
     ax.set_xlabel('p (pu)')
     ax.set_ylabel('lambda ($/pu-h)')
@@ -429,6 +444,39 @@ def compute_equilibrium_flexible_demand(pr_block_max_p, pr_block_c, cs_block_max
         else:
             lambda_med = 0.5 * (lambda_min + lambda_max)
 
+    pr_block_indices_sorted = sorted(list(range(num_pr_block)), key=(lambda x: pr_block_c[x]))
+    cs_block_indices_sorted = sorted(list(range(num_cs_block)), key=(lambda x: -cs_block_c[x]))
+    pr_block_p_cumulative = np.cumsum([pr_block_max_p[i] for i in pr_block_indices_sorted])
+    cs_block_p_cumulative = np.cumsum([cs_block_max_p[i] for i in cs_block_indices_sorted])
+    pr_block_indices_in_money = np.flatnonzero(np.less_equal(pr_block_p_cumulative, p_med)).tolist()
+    cs_block_indices_in_money = np.flatnonzero(np.less_equal(cs_block_p_cumulative, p_med)).tolist()
+    num_pr_blocks_in_money = len(pr_block_indices_in_money)
+    num_cs_blocks_in_money = len(cs_block_indices_in_money)
+    cost_pr = sum(
+        [pr_block_c[pr_block_indices_sorted[i]] * pr_block_max_p[pr_block_indices_sorted[i]]
+         for i in range(num_pr_blocks_in_money)])
+    value_cs = sum(
+        [cs_block_c[cs_block_indices_sorted[i]] * cs_block_max_p[cs_block_indices_sorted[i]]
+         for i in range(num_cs_blocks_in_money)])
+    if num_pr_blocks_in_money < num_pr_block:
+        p_start = 0.0
+        if num_pr_blocks_in_money > 0:
+            p_start = pr_block_p_cumulative[num_pr_blocks_in_money - 1]
+        p_marginal = p_med - p_start
+        c_marginal = pr_block_c[pr_block_indices_sorted[num_pr_blocks_in_money]]
+        cost_pr += c_marginal * p_marginal
+    if num_cs_blocks_in_money < num_cs_block:
+        p_start = 0.0
+        if num_cs_blocks_in_money > 0:
+            p_start = cs_block_p_cumulative[num_cs_blocks_in_money - 1]
+        p_marginal = p_med - p_start
+        c_marginal = cs_block_c[cs_block_indices_sorted[num_cs_blocks_in_money]]
+        value_cs += c_marginal * p_marginal
+    value_exchanged = lambda_med * p_med
+    surplus_total = value_cs - cost_pr
+    surplus_pr = value_exchanged - cost_pr
+    surplus_cs = value_cs - value_exchanged
+
     equilibrium = {
         'fixed_demand': fixed_demand,
         'num_pr_block': num_pr_block,
@@ -448,6 +496,7 @@ def compute_equilibrium_flexible_demand(pr_block_max_p, pr_block_c, cs_block_max
         'lambda_max': lambda_max,
         'lambda_med': lambda_med,
         'surplus_total': surplus_total,
+        'value_exchanged': value_exchanged,
         'surplus_pr': surplus_pr,
         'surplus_cs': surplus_cs,
         'cost_pr': cost_pr,
@@ -458,7 +507,7 @@ def compute_equilibrium_flexible_demand(pr_block_max_p, pr_block_c, cs_block_max
 
     return equilibrium
     
-def analyze_supply_demand(data, do_plots=False):
+def analyze_supply_demand(data, do_plots=False, problem_file_name=None):
 
     num_t = get_num_t(data)
     sd_t_blocks = get_sd_t_blocks(data)
@@ -492,12 +541,30 @@ def analyze_supply_demand(data, do_plots=False):
     sort_t_blocks_by_decreasing_c(data, t_blocks_cs)
     add_p_max_cumul_to_t_blocks(data, t_blocks_pr)
     add_p_max_cumul_to_t_blocks(data, t_blocks_cs)
-    do_plots = True
+    #do_plots = True
     if do_plots:
         for t in range(num_t):
             plot_blocks_pr_cs_one_t(
                 t_blocks_pr[t],
                 t_blocks_cs[t],
                 t_equilibrium[t],
-                'supply_demand_t_{}.pdf'.format(t))
-    return t_equilibrium
+                problem_file_name=problem_file_name,
+                t=t,
+                file_name='supply_demand_t_{}.pdf'.format(t))
+    t_duration = data.time_series_input.general.interval_duration
+    surplus_total = sum([t_duration[t] * t_equilibrium[t]['surplus_total'] for t in range(num_t)])
+    value_exchanged = sum([t_duration[t] * t_equilibrium[t]['value_exchanged'] for t in range(num_t)])
+    surplus_pr = sum([t_duration[t] * t_equilibrium[t]['surplus_pr'] for t in range(num_t)])
+    surplus_cs = sum([t_duration[t] * t_equilibrium[t]['surplus_cs'] for t in range(num_t)])
+    cost_pr = sum([t_duration[t] * t_equilibrium[t]['cost_pr'] for t in range(num_t)])
+    value_cs = sum([t_duration[t] * t_equilibrium[t]['value_cs'] for t in range(num_t)])
+    output = {
+        't_equilibrium': t_equilibrium,
+        'value_exchanged': value_exchanged,
+        'surplus_total': surplus_total,
+        'surplus_pr': surplus_pr,
+        'surplus_cs': surplus_cs,
+        'cost_pr': cost_pr,
+        'value_cs': value_cs,
+        }
+    return output

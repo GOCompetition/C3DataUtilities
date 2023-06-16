@@ -809,6 +809,13 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         'problem': {},
         'solution': {},
         'evaluation': {}}
+    summary['problem']['t_supply_demand'] = []
+    summary['problem']['value_exchanged'] = 0.0
+    summary['problem']['surplus_total'] = 0.0
+    summary['problem']['surplus_pr'] = 0.0
+    summary['problem']['surplus_cs'] = 0.0
+    summary['problem']['cost_pr'] = 0.0
+    summary['problem']['value_cs'] = 0.0
     summary['problem']['error_diagnostics'] = ''
     summary['solution']['error_diagnostics'] = ''
     summary['evaluation']['error_diagnostics'] = ''
@@ -874,11 +881,6 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
     print('after reading problem with validation, memory info: {}'.format(utils.get_memory_info()))
     end_time = time.time()
     print('load time: {}'.format(end_time - start_time))
-
-    #summary['problem']['supply_demand_info'] = json.dumps(supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots']))
-    supply_demand_info = supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots'])
-    # temp TODO remove this - no need to serialize with json.dumps()
-    return
 
     # can skip further problem checks, POP solution, etc., if evaluating a solution
     if solution_file is None:
@@ -970,19 +972,42 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
                 feas_dispatch_q = feas_dispatch[1]
                 write_pop_solution(data_model, feas_comm_sched, feas_dispatch_p, feas_dispatch_q, config, pop_sol_file)
 
+    # further information
+    start_time = time.time()
+    try:
+        #summary['problem']['supply_demand_info'] = json.dumps(supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots']))
+        supply_demand_info = supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots'], problem_file)
+        # no need to serialize with json.dumps()
+        #return
+    except Error as e:
+        err_msg = 'data error - analyze supply and demand'
+        print(err_msg +'\n')
+        print(traceback.format_exc())
+        with open(problem_errors_file, 'a') as f:
+            f.write(traceback.format_exc())
+    print('after analyzing supply and demand, memory info: {}'.format(utils.get_memory_info()))
+    end_time = time.time()
+    print('supply/demand time: {}'.format(end_time - start_time))
+
     # summary
     # if we got to this point there are no error diagnostics to report
     problem_summary = get_summary(data_model)
-    problem_summary['supply_demand'] = supply_demand_info
+    problem_summary['t_supply_demand'] = supply_demand_info['t_equilibrium']
+    supply_demand_keys = [
+        'value_exchanged',
+        'surplus_total',
+        'surplus_pr',
+        'surplus_cs',
+        'cost_pr',
+        'value_cs']
+    for k in supply_demand_keys:
+        problem_summary[k] = supply_demand_info[k]
+    
     problem_summary['error_diagnostics'] = ''
     pp = pprint.PrettyPrinter()
     pp.pprint(problem_summary)
     summary['problem'] = problem_summary
     summary['problem']['pass'] = 1
-
-    # further information
-    #summary['problem']['supply_demand_info'] = json.dumps(supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots']))
-    # temp TODO uncomment this
 
     if solution_file is not None:
 
