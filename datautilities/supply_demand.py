@@ -145,7 +145,7 @@ def add_p_max_cumul_to_t_blocks(data, t_blocks):
 
     num_t = get_num_t(data)
     for t in range(num_t):
-        p_max_cumul = np.cumsum([b['p_max_cumul'] for b in t_blocks[t]])
+        p_max_cumul = np.cumsum([b['p_max'] for b in t_blocks[t]])
         for i in range(len(t_blocks[t])):
             t_blocks[t][i]['p_max_cumul'] = p_max_cumul[i]
         #p_max = 0.0
@@ -153,7 +153,7 @@ def add_p_max_cumul_to_t_blocks(data, t_blocks):
         #    p_max += b['p_max']
         #    b['p_max_cumul'] = p_max
 
-def plot_blocks_pr_cs_one_t(blocks_pr, blocks_cs, file_name):
+def plot_blocks_pr_cs_one_t(blocks_pr, blocks_cs, equilibrium, file_name):
 
     x_pr = [b['p_max_cumul'] for b in blocks_pr for i in range(2)]
     x_pr = x_pr[0:-1]
@@ -167,6 +167,10 @@ def plot_blocks_pr_cs_one_t(blocks_pr, blocks_cs, file_name):
     fig,ax = plt.subplots()
     ax.plot(x_pr, y_pr, x_cs, y_cs)
     ax.set_yscale('log')
+    ax.set_title('p: {}, lambda: {}'.format(equilibrium['p_med'], equilibrium['lambda_med']))
+    ax.legend(['supply', 'demand'])
+    ax.set_xlabel('p (pu)')
+    ax.set_ylabel('lambda ($/pu-h)')
     plt.savefig(fname=file_name)
 
 def compute_equilibrium_fixed_demand(block_p_max, block_c, p_demand):
@@ -216,18 +220,52 @@ def compute_equilibrium_fixed_demand(block_p_max, block_c, p_demand):
         p_max = p_demand
         block_indices_sorted = sorted(list(range(num_block)), key=(lambda x: block_c[x]))
         block_p_cumulative = np.cumsum([block_p_max[i] for i in block_indices_sorted])
-        marginal_index = min(np.flatnonzero(np.less_equal(p_demand, block_p_cumulative)).tolist())
-        marginal_block = block_indices_sorted[marginal_index]
-        lambda_min = block_c[marginal_block]
-        lambda_max = block_c[marginal_block]
-        # todo could go higher or lower in degenerate cases
-        # if p_demand < block_p_cumulative[marginal_index]:
-        #     lambda_min = block_c[marginal_block]
-        #     lambda_max = block_c[marginal_block]
-        # else:
-        #     next_block = block_indices_sorted[marginal_index + 1]
-        #     lambda_min = block_c[marginal_block]
-        #     lambda_max = block_c[next_block]
+        indices_below_demand = np.flatnonzero(np.less(block_p_cumulative, p_demand)).tolist()
+        indices_at_demand = np.flatnonzero(np.equal(block_p_cumulative, p_demand)).tolist()
+        indices_above_demand = np.flatnonzero(np.greater(block_p_cumulative, p_demand)).tolist()
+        assert len(indices_above_demand) > 0
+        if len(indices_at_demand) == 0:
+            min_index_above_demand = min(indices_above_demand)
+            lambda_index = min_index_above_demand
+            lambda_block = block_indices_sorted[lambda_index]
+            lambda_min = block_c[lambda_block]
+            lambda_max = block_c[lambda_block]
+        else:
+            min_index_at_demand = min(indices_at_demand)
+            max_index_at_demand = max(indices_at_demand)
+            lambda_min_index = min_index_at_demand
+            lambda_max_index = max_index_at_demand + 1
+            lambda_min_block = block_indices_sorted[lambda_min_index]
+            lambda_max_block = block_indices_sorted[lambda_max_index]
+            lambda_min = block_c[lambda_min_block]
+            lambda_max = block_c[lambda_max_block]
+        #
+        #marginal_index = min(np.flatnonzero(np.less_equal(p_demand, block_p_cumulative)).tolist())
+        #marginal_block = block_indices_sorted[marginal_index]
+        #lambda_min = block_c[marginal_block]
+        #lambda_max = block_c[marginal_block]
+        #
+
+    if p_min is None:
+        if p_max is None:
+            p_med = None
+        else:
+            p_med = p_max
+    else:
+        if p_max is None:
+            p_med = p_min
+        else:
+            p_med = 0.5 * (p_min + p_max)
+    if lambda_min is None:
+        if lambda_max is None:
+            lambda_med = None
+        else:
+            lambda_med = lambda_max
+    else:
+        if lambda_max is None:
+            lambda_med = lambda_min
+        else:
+            lambda_med = 0.5 * (lambda_min + lambda_max)
 
     equilibrium = {
         'fixed_demand': p_demand,
@@ -239,8 +277,10 @@ def compute_equilibrium_fixed_demand(block_p_max, block_c, p_demand):
         'lambda_max_pr': lambda_max_pr,
         'p_min': p_min,
         'p_max': p_max,
+        'p_med': p_med,
         'lambda_min': lambda_min,
         'lambda_max': lambda_max,
+        'lambda_med': lambda_med,
         }
 
     #print('fixed demand s-d equilibrium: {}'.format(equilibrium))
@@ -275,7 +315,7 @@ def compute_equilibrium_flexible_demand(pr_block_max_p, pr_block_c, cs_block_max
         p_demand=fixed_demand_plus_flex_demand_max)
 
     lambda_min = fixed_demand_equilibrium['lambda_min']
-    lambda_max = fixed_demand_equilibrium['lambda_min']
+    lambda_max = fixed_demand_equilibrium['lambda_max']
 
     p_min_pr = 0.0
     p_max_pr = sum(pr_block_max_p)
@@ -295,30 +335,99 @@ def compute_equilibrium_flexible_demand(pr_block_max_p, pr_block_c, cs_block_max
         lambda_min_cs = None
         lambda_max_cs = None
 
+    p_min = 0.0
+    p_max = 0.0
     # todo fill these in
+    surplus_total = 0.0
+    surplus_pr = 0.0
+    surplus_cs = 0.0
+    cost_pr = 0.0
+    value_cs = 0.0
     if p_max_pr > 0.0:
         if p_max_cs > 0.0:
-            block_indices_sorted = sorted(list(range(num_block)), key=(lambda x: pr_block_c[x]))
-            marginal_index = max(np.flatnonzero(np.
-            pass # todo
+            #pr_block_indices_sorted = sorted(list(range(num_pr_block)), key=(lambda x: pr_block_c[x]))
+            #pr_block_p_max_cumulative = np.cumsum([pr_block_p_max[i] for i in pr_block_indices_sorted])
+            #cs_block_indices_sorted = sorted(list(range(num_cs_block)), key=(lambda x: -cs_block_c[x]))
+            #cs_block_p_max_cumulative = np.cumsum([cs_block_p_max[i] for i in cs_block_indices_sorted])
+            if lambda_min is None:
+                if lambda_max is None:
+                    pr_block_indices_in_money = []
+                    pr_block_indices_out_of_money = []
+                    pr_block_indices_marginal = list(range(num_pr_block))
+                    cs_block_indices_in_money = []
+                    cs_block_indices_out_of_money = []
+                    cs_block_indices_marginal = list(range(num_cs_block))
+                else:
+                    pr_block_indices_in_money = []
+                    pr_block_indices_out_of_money = np.flatnonzero(np.greater(pr_block_c, lambda_max)).tolist()
+                    pr_block_indices_marginal = np.flatnonzero(np.less_equal(pr_block_c, lambda_max)).tolist()
+                    cs_block_indices_in_money = np.flatnonzero(np.greater(cs_block_c, lambda_max)).tolist()
+                    cs_block_indices_out_of_money = []
+                    cs_block_indices_marginal = np.flatnonzero(np.less_equal(cs_block_c, lambda_max)).tolist()
+            else:
+                if lambda_max is None:
+                    pr_block_indices_in_money = np.flatnonzero(np.less(pr_block_c, lambda_min)).tolist()
+                    pr_block_indices_out_of_money = []
+                    pr_block_indices_marginal = np.flatnonzero(np.greater_equal(pr_block_c, lambda_min)).tolist(),
+                    cs_block_indices_in_money = []
+                    cs_block_indices_out_of_money = np.flatnonzero(np.less(cs_block_c, lambda_min)).tolist()
+                    cs_block_indices_marginal = np.flatnonzero(np.greater_equal(cs_block_c, lambda_min)).tolist()
+                else:
+                    pr_block_indices_in_money = np.flatnonzero(np.less(pr_block_c, lambda_min)).tolist()
+                    pr_block_indices_out_of_money = np.flatnonzero(np.greater(pr_block_c, lambda_max)).tolist()
+                    pr_block_indices_marginal = np.flatnonzero(
+                        np.logical_and(
+                            np.greater_equal(pr_block_c, lambda_min),
+                            np.less_equal(pr_block_c, lambda_max))).tolist()
+                    cs_block_indices_in_money = np.flatnonzero(np.greater(cs_block_c, lambda_max)).tolist()
+                    cs_block_indices_out_of_money = np.flatnonzero(np.less(cs_block_c, lambda_min)).tolist()
+                    cs_block_indices_marginal = np.flatnonzero(
+                        np.logical_and(
+                            np.greater_equal(cs_block_c, lambda_min),
+                            np.less_equal(cs_block_c, lambda_max))).tolist()
+            pr_p_max_in_money = sum(pr_block_max_p[i] for i in pr_block_indices_in_money)
+            pr_p_max_out_of_money = sum(pr_block_max_p[i] for i in pr_block_indices_out_of_money)
+            pr_p_max_marginal = sum(pr_block_max_p[i] for i in pr_block_indices_marginal)
+            cs_p_max_in_money = sum(cs_block_max_p[i] for i in cs_block_indices_in_money)
+            cs_p_max_out_of_money = sum(cs_block_max_p[i] for i in cs_block_indices_out_of_money)
+            cs_p_max_marginal = sum(cs_block_max_p[i] for i in cs_block_indices_marginal)
+            p_min = max(pr_p_max_in_money, cs_p_max_in_money)
+            p_max = min(pr_p_max_in_money + pr_p_max_marginal, cs_p_max_in_money + cs_p_max_marginal)
+            # todo
         else:
-            pass # todo
+            pass # OK
     else:
         if p_max_cs > 0.0:
-            pass # todo
+            pass # OK
         else:
-            pass # todo
+            pass # OK
     # block_indices_sorted = sorted(list(range(num_block)), key=(lambda x: block_c[x]))
     # block_p_cumulative = np.cumsum([block_p_max[i] for i in block_indices_sorted])
     # marginal_index = min(np.flatnonzero(np.less_equal(p_demand, block_p_cumulative)).tolist())
     # marginal_block = block_indices_sorted[marginal_index]
     # lambda_min = block_c[marginal_block]
     # lambda_max = block_c[marginal_block]
-    surplus_total = 0.0
-    surplus_pr = 0.0
-    surplus_cs = 0.0
-    cost_pr = 0.0
-    value_cs = 0.0
+
+    if p_min is None:
+        if p_max is None:
+            p_med = None
+        else:
+            p_med = p_max
+    else:
+        if p_max is None:
+            p_med = p_min
+        else:
+            p_med = 0.5 * (p_min + p_max)
+    if lambda_min is None:
+        if lambda_max is None:
+            lambda_med = None
+        else:
+            lambda_med = lambda_max
+    else:
+        if lambda_max is None:
+            lambda_med = lambda_min
+        else:
+            lambda_med = 0.5 * (lambda_min + lambda_max)
 
     equilibrium = {
         'fixed_demand': fixed_demand,
@@ -334,8 +443,10 @@ def compute_equilibrium_flexible_demand(pr_block_max_p, pr_block_c, cs_block_max
         'lambda_max_cs': lambda_max_cs,
         'p_min': p_min,
         'p_max': p_max,
+        'p_med': p_med,
         'lambda_min': lambda_min,
         'lambda_max': lambda_max,
+        'lambda_med': lambda_med,
         'surplus_total': surplus_total,
         'surplus_pr': surplus_pr,
         'surplus_cs': surplus_cs,
@@ -387,5 +498,6 @@ def analyze_supply_demand(data, do_plots=False):
             plot_blocks_pr_cs_one_t(
                 t_blocks_pr[t],
                 t_blocks_cs[t],
+                t_equilibrium[t],
                 'supply_demand_t_{}.pdf'.format(t))
     return t_equilibrium

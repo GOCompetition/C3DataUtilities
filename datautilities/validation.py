@@ -876,9 +876,9 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
     print('load time: {}'.format(end_time - start_time))
 
     #summary['problem']['supply_demand_info'] = json.dumps(supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots']))
-    summary['problem']['supply_demand_info'] = supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots'])
+    supply_demand_info = supply_demand.analyze_supply_demand(data_model, config['do_problem_supply_demand_plots'])
     # temp TODO remove this - no need to serialize with json.dumps()
-    #return
+    return
 
     # can skip further problem checks, POP solution, etc., if evaluating a solution
     if solution_file is None:
@@ -973,6 +973,7 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
     # summary
     # if we got to this point there are no error diagnostics to report
     problem_summary = get_summary(data_model)
+    problem_summary['supply_demand'] = supply_demand_info
     problem_summary['error_diagnostics'] = ''
     pp = pprint.PrettyPrinter()
     pp.pprint(problem_summary)
