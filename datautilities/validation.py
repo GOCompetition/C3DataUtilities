@@ -354,7 +354,6 @@ def scrub_data(problem_file, default_config_file, config_file, parameters_str, s
 
     # use json? or pydantic model? - json for now
     use_json = True
-
     if use_json:
         problem_data_dict = read_json(problem_file)
         scrub_problem(problem_data_dict, config)
@@ -370,6 +369,11 @@ def scrub_problem(problem_data, config, use_pydantic=False):
     anonymize_uids(problem_data, config, use_pydantic)
     remove_optional_fields(problem_data, config, use_pydantic)
     ensure_pos_obj_coeffs(problem_data, config, use_pydantic)
+
+    if config['do_private_modifications']:
+        assert not use_pydantic
+        from privatedatautilities import modify_data
+        modify_data(problem_data, config)
 
 def ensure_pos_obj_coeffs(problem_data, config, use_pydantic=False):
 

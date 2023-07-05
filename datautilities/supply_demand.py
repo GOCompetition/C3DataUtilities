@@ -1,4 +1,8 @@
-import matplotlib.pyplot as plt
+plt = None
+try:
+    import matplotlib.pyplot as plt
+except:
+    print('cannot load matplotlib')
 import numpy as np
 
 def get_sd_uid(data):
@@ -543,14 +547,17 @@ def analyze_supply_demand(data, do_plots=False, problem_file_name=None):
     add_p_max_cumul_to_t_blocks(data, t_blocks_cs)
     #do_plots = True
     if do_plots:
-        for t in range(num_t):
-            plot_blocks_pr_cs_one_t(
-                t_blocks_pr[t],
-                t_blocks_cs[t],
-                t_equilibrium[t],
-                problem_file_name=problem_file_name,
-                t=t,
-                file_name='supply_demand_t_{}.pdf'.format(t))
+        if plt is None:
+            print('cannot do plots due to failure to import matplotlib')
+        else:
+            for t in range(num_t):
+                plot_blocks_pr_cs_one_t(
+                    t_blocks_pr[t],
+                    t_blocks_cs[t],
+                    t_equilibrium[t],
+                    problem_file_name=problem_file_name,
+                    t=t,
+                    file_name='supply_demand_t_{}.pdf'.format(t))
     t_duration = data.time_series_input.general.interval_duration
     surplus_total = sum([t_duration[t] * t_equilibrium[t]['surplus_total'] for t in range(num_t)])
     value_exchanged = sum([t_duration[t] * t_equilibrium[t]['value_exchanged'] for t in range(num_t)])
