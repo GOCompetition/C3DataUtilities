@@ -372,8 +372,8 @@ def scrub_problem(problem_data, config, use_pydantic=False):
 
     if config['do_private_modifications']:
         assert not use_pydantic
-        from privatedatautilities import modify_data
-        modify_data(problem_data, config)
+        from privatedatautilities import modification
+        modification.modify_data(problem_data, config)
 
 def ensure_pos_obj_coeffs(problem_data, config, use_pydantic=False):
 
