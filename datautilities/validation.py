@@ -814,6 +814,14 @@ def check_data(problem_file, solution_file, default_config_file, config_file, pa
         'solution': {},
         'evaluation': {}}
     summary['problem']['t_supply_demand'] = []
+    summary['problem']['p_pr_0'] = 0.0
+    summary['problem']['p_cs_0'] = 0.0
+    summary['problem']['q_pr_0'] = 0.0
+    summary['problem']['q_cs_0'] = 0.0
+    summary['problem']['u_pr_0'] = 0
+    summary['problem']['u_cs_0'] = 0
+    summary['problem']['u_acl_0'] = 0
+    summary['problem']['u_xfr_0'] = 0
     summary['problem']['value_exchanged'] = 0.0
     summary['problem']['surplus_total'] = 0.0
     summary['problem']['surplus_pr'] = 0.0
@@ -1259,6 +1267,15 @@ def get_summary(data):
     summary['total duration'] = sum(ts_intervals)
     summary['interval durations'] = ts_intervals
     
+    summary['p_pr_0'] = sum(i.initial_status.p for i in pd)
+    summary['p_cs_0'] = sum(i.initial_status.p for i in cd)
+    summary['q_pr_0'] = sum(i.initial_status.q for i in pd)
+    summary['q_cs_0'] = sum(i.initial_status.q for i in cd)
+    summary['u_pr_0'] = sum(i.initial_status.on_status for i in pd)
+    summary['u_cs_0'] = sum(i.initial_status.on_status for i in cd)
+    summary['u_acl_0'] = sum(i.initial_status.on_status for i in acl)
+    summary['u_xfr_0'] = sum(i.initial_status.on_status for i in xfr)
+
     return summary
 
 def get_solution_summary(problem_data, solution_data):
