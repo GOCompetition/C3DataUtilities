@@ -1276,7 +1276,209 @@ def get_summary(data):
     summary['u_acl_0'] = sum(i.initial_status.on_status for i in acl)
     summary['u_xfr_0'] = sum(i.initial_status.on_status for i in xfr)
 
+    summary['reserve_info'] = get_problem_reserve_info(data)
+
     return summary
+
+def get_problem_reserve_info(data):
+    # todo 2023-08-23
+    # reserve parameters
+    # min, med, max, rng over zones of
+    #   rgu_short_cost
+    #   rgd_short_cost
+    #   scr_short_cost
+    #   nsc_short_cost
+    #   rru_short_cost
+    #   rrd_short_cost
+    #   qru_short_cost
+    #   qrd_short_cost
+    #   rgu_req_scale
+    #   rgd_req_scale
+    #   scr_scale
+    #   nsc_req_scale
+    #   min, med, max, rng over time of
+    #     rru_req
+    #     rrd_req
+    #     qru_req
+    #     qrd_req
+    # the column names will be
+    #   problem.reserve_info.<M1>_zone_<P1>
+    # where M1 is one of
+    #   min
+    #   med
+    #   max
+    #   rng
+    # and P1 is one of
+    #   rgu_short_cost
+    #   rgd_short_cost
+    #   scr_short_cost
+    #   nsc_short_cost
+    #   rru_short_cost
+    #   rrd_short_cost
+    #   qru_short_cost
+    #   qrd_short_cost
+    #   rgu_req_scale
+    #   rgd_req_scale
+    #   scr_req_scale
+    #   nsc_req_scale
+    # and
+    #   problem.reserve_info.<M1>_zone_<M2>_time_<P2>
+    # where M1 is one of
+    #   min
+    #   med
+    #   max
+    #   rng
+    # and M2 is one of
+    #   min
+    #   med
+    #   max
+    #   rng
+    # and P2 is one of
+    #   rru_req
+    #   rrd_req
+    #   qru_req
+    #   qrd_req
+    
+    info = {}
+    imin = lambda x: None if x is None else (None if len(x) == 0 else numpy.amin(x))
+    imed = lambda x: None if x is None else (None if len(x) == 0 else numpy.median(x))
+    imax = lambda x: None if x is None else (None if len(x) == 0 else numpy.amax(x))
+    irng = lambda x: None if x is None else (None if len(x) == 0 else imax(x) - imin(x))
+    info['min_zone_rgu_short_cost'] = imin([i.REG_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_rgu_short_cost'] = imed([i.REG_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_rgu_short_cost'] = imax([i.REG_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_rgu_short_cost'] = irng([i.REG_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_rgd_short_cost'] = imin([i.REG_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_rgd_short_cost'] = imed([i.REG_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_rgd_short_cost'] = imax([i.REG_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_rgd_short_cost'] = irng([i.REG_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_scr_short_cost'] = imin([i.SYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_scr_short_cost'] = imed([i.SYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_scr_short_cost'] = imax([i.SYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_scr_short_cost'] = irng([i.SYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_nsc_short_cost'] = imin([i.NSYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_nsc_short_cost'] = imed([i.NSYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_nsc_short_cost'] = imax([i.NSYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_nsc_short_cost'] = irng([i.NSYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_rru_short_cost'] = imin([i.RAMPING_RESERVE_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_rru_short_cost'] = imed([i.RAMPING_RESERVE_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_rru_short_cost'] = imax([i.RAMPING_RESERVE_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_rru_short_cost'] = irng([i.RAMPING_RESERVE_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_rrd_short_cost'] = imin([i.RAMPING_RESERVE_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_rrd_short_cost'] = imed([i.RAMPING_RESERVE_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_rrd_short_cost'] = imax([i.RAMPING_RESERVE_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_rrd_short_cost'] = irng([i.RAMPING_RESERVE_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_qru_short_cost'] = imin([i.REACT_UP_vio_cost for i in data.network.reactive_zonal_reserve])
+    info['med_zone_qru_short_cost'] = imed([i.REACT_UP_vio_cost for i in data.network.reactive_zonal_reserve])
+    info['max_zone_qru_short_cost'] = imax([i.REACT_UP_vio_cost for i in data.network.reactive_zonal_reserve])
+    info['rng_zone_qru_short_cost'] = irng([i.REACT_UP_vio_cost for i in data.network.reactive_zonal_reserve])
+    info['min_zone_qrd_short_cost'] = imin([i.REACT_DOWN_vio_cost for i in data.network.reactive_zonal_reserve])
+    info['med_zone_qrd_short_cost'] = imed([i.REACT_DOWN_vio_cost for i in data.network.reactive_zonal_reserve])
+    info['max_zone_qrd_short_cost'] = imax([i.REACT_DOWN_vio_cost for i in data.network.reactive_zonal_reserve])
+    info['rng_zone_qrd_short_cost'] = irng([i.REACT_DOWN_vio_cost for i in data.network.reactive_zonal_reserve])
+    info['min_zone_rgu_req_scale'] = imin([i.REG_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_rgu_req_scale'] = imed([i.REG_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_rgu_req_scale'] = imax([i.REG_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_rgu_req_scale'] = irng([i.REG_UP_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_rgd_req_scale'] = imin([i.REG_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_rgd_req_scale'] = imed([i.REG_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_rgd_req_scale'] = imax([i.REG_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_rgd_req_scale'] = irng([i.REG_DOWN_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_scr_req_scale'] = imin([i.SYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_scr_req_scale'] = imed([i.SYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_scr_req_scale'] = imax([i.SYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_scr_req_scale'] = irng([i.SYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['min_zone_nsc_req_scale'] = imin([i.NSYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['med_zone_nsc_req_scale'] = imed([i.NSYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['max_zone_nsc_req_scale'] = imax([i.NSYN_vio_cost for i in data.network.active_zonal_reserve])
+    info['rng_zone_nsc_req_scale'] = irng([i.NSYN_vio_cost for i in data.network.active_zonal_reserve])
+    zone_min_time_rru_req = [imin(i.RAMPING_RESERVE_UP) for i in data.time_series_input.active_zonal_reserve]
+    zone_med_time_rru_req = [imed(i.RAMPING_RESERVE_UP) for i in data.time_series_input.active_zonal_reserve]
+    zone_max_time_rru_req = [imax(i.RAMPING_RESERVE_UP) for i in data.time_series_input.active_zonal_reserve]
+    zone_rng_time_rru_req = [irng(i.RAMPING_RESERVE_UP) for i in data.time_series_input.active_zonal_reserve]
+    zone_min_time_rrd_req = [imin(i.RAMPING_RESERVE_DOWN) for i in data.time_series_input.active_zonal_reserve]
+    zone_med_time_rrd_req = [imed(i.RAMPING_RESERVE_DOWN) for i in data.time_series_input.active_zonal_reserve]
+    zone_max_time_rrd_req = [imax(i.RAMPING_RESERVE_DOWN) for i in data.time_series_input.active_zonal_reserve]
+    zone_rng_time_rrd_req = [irng(i.RAMPING_RESERVE_DOWN) for i in data.time_series_input.active_zonal_reserve]
+    zone_min_time_qru_req = [imin(i.REACT_UP) for i in data.time_series_input.reactive_zonal_reserve]
+    zone_med_time_qru_req = [imed(i.REACT_UP) for i in data.time_series_input.reactive_zonal_reserve]
+    zone_max_time_qru_req = [imax(i.REACT_UP) for i in data.time_series_input.reactive_zonal_reserve]
+    zone_rng_time_qru_req = [irng(i.REACT_UP) for i in data.time_series_input.reactive_zonal_reserve]
+    zone_min_time_qrd_req = [imin(i.REACT_DOWN) for i in data.time_series_input.reactive_zonal_reserve]
+    zone_med_time_qrd_req = [imed(i.REACT_DOWN) for i in data.time_series_input.reactive_zonal_reserve]
+    zone_max_time_qrd_req = [imax(i.REACT_DOWN) for i in data.time_series_input.reactive_zonal_reserve]
+    zone_rng_time_qrd_req = [irng(i.REACT_DOWN) for i in data.time_series_input.reactive_zonal_reserve]
+    info['min_zone_min_time_rru_req'] = imin(zone_min_time_rru_req)
+    info['med_zone_min_time_rru_req'] = imed(zone_min_time_rru_req)
+    info['max_zone_min_time_rru_req'] = imax(zone_min_time_rru_req)
+    info['rng_zone_min_time_rru_req'] = irng(zone_min_time_rru_req)
+    info['min_zone_med_time_rru_req'] = imin(zone_med_time_rru_req)
+    info['med_zone_med_time_rru_req'] = imed(zone_med_time_rru_req)
+    info['max_zone_med_time_rru_req'] = imax(zone_med_time_rru_req)
+    info['rng_zone_med_time_rru_req'] = irng(zone_med_time_rru_req)
+    info['min_zone_max_time_rru_req'] = imin(zone_max_time_rru_req)
+    info['med_zone_max_time_rru_req'] = imed(zone_max_time_rru_req)
+    info['max_zone_max_time_rru_req'] = imax(zone_max_time_rru_req)
+    info['rng_zone_max_time_rru_req'] = irng(zone_max_time_rru_req)
+    info['min_zone_rng_time_rru_req'] = imin(zone_rng_time_rru_req)
+    info['med_zone_rng_time_rru_req'] = imed(zone_rng_time_rru_req)
+    info['max_zone_rng_time_rru_req'] = imax(zone_rng_time_rru_req)
+    info['rng_zone_rng_time_rru_req'] = irng(zone_rng_time_rru_req)
+    info['min_zone_min_time_rrd_req'] = imin(zone_min_time_rrd_req)
+    info['med_zone_min_time_rrd_req'] = imed(zone_min_time_rrd_req)
+    info['max_zone_min_time_rrd_req'] = imax(zone_min_time_rrd_req)
+    info['rng_zone_min_time_rrd_req'] = irng(zone_min_time_rrd_req)
+    info['min_zone_med_time_rrd_req'] = imin(zone_med_time_rrd_req)
+    info['med_zone_med_time_rrd_req'] = imed(zone_med_time_rrd_req)
+    info['max_zone_med_time_rrd_req'] = imax(zone_med_time_rrd_req)
+    info['rng_zone_med_time_rrd_req'] = irng(zone_med_time_rrd_req)
+    info['min_zone_max_time_rrd_req'] = imin(zone_max_time_rrd_req)
+    info['med_zone_max_time_rrd_req'] = imed(zone_max_time_rrd_req)
+    info['max_zone_max_time_rrd_req'] = imax(zone_max_time_rrd_req)
+    info['rng_zone_max_time_rrd_req'] = irng(zone_max_time_rrd_req)
+    info['min_zone_rng_time_rrd_req'] = imin(zone_rng_time_rrd_req)
+    info['med_zone_rng_time_rrd_req'] = imed(zone_rng_time_rrd_req)
+    info['max_zone_rng_time_rrd_req'] = imax(zone_rng_time_rrd_req)
+    info['rng_zone_rng_time_rrd_req'] = irng(zone_rng_time_rrd_req)
+    info['min_zone_min_time_qru_req'] = imin(zone_min_time_qru_req)
+    info['med_zone_min_time_qru_req'] = imed(zone_min_time_qru_req)
+    info['max_zone_min_time_qru_req'] = imax(zone_min_time_qru_req)
+    info['rng_zone_min_time_qru_req'] = irng(zone_min_time_qru_req)
+    info['min_zone_med_time_qru_req'] = imin(zone_med_time_qru_req)
+    info['med_zone_med_time_qru_req'] = imed(zone_med_time_qru_req)
+    info['max_zone_med_time_qru_req'] = imax(zone_med_time_qru_req)
+    info['rng_zone_med_time_qru_req'] = irng(zone_med_time_qru_req)
+    info['min_zone_max_time_qru_req'] = imin(zone_max_time_qru_req)
+    info['med_zone_max_time_qru_req'] = imed(zone_max_time_qru_req)
+    info['max_zone_max_time_qru_req'] = imax(zone_max_time_qru_req)
+    info['rng_zone_max_time_qru_req'] = irng(zone_max_time_qru_req)
+    info['min_zone_rng_time_qru_req'] = imin(zone_rng_time_qru_req)
+    info['med_zone_rng_time_qru_req'] = imed(zone_rng_time_qru_req)
+    info['max_zone_rng_time_qru_req'] = imax(zone_rng_time_qru_req)
+    info['rng_zone_rng_time_qru_req'] = irng(zone_rng_time_qru_req)
+    info['min_zone_min_time_qrd_req'] = imin(zone_min_time_qrd_req)
+    info['med_zone_min_time_qrd_req'] = imed(zone_min_time_qrd_req)
+    info['max_zone_min_time_qrd_req'] = imax(zone_min_time_qrd_req)
+    info['rng_zone_min_time_qrd_req'] = irng(zone_min_time_qrd_req)
+    info['min_zone_med_time_qrd_req'] = imin(zone_med_time_qrd_req)
+    info['med_zone_med_time_qrd_req'] = imed(zone_med_time_qrd_req)
+    info['max_zone_med_time_qrd_req'] = imax(zone_med_time_qrd_req)
+    info['rng_zone_med_time_qrd_req'] = irng(zone_med_time_qrd_req)
+    info['min_zone_max_time_qrd_req'] = imin(zone_max_time_qrd_req)
+    info['med_zone_max_time_qrd_req'] = imed(zone_max_time_qrd_req)
+    info['max_zone_max_time_qrd_req'] = imax(zone_max_time_qrd_req)
+    info['rng_zone_max_time_qrd_req'] = irng(zone_max_time_qrd_req)
+    info['min_zone_rng_time_qrd_req'] = imin(zone_rng_time_qrd_req)
+    info['med_zone_rng_time_qrd_req'] = imed(zone_rng_time_qrd_req)
+    info['max_zone_rng_time_qrd_req'] = imax(zone_rng_time_qrd_req)
+    info['rng_zone_rng_time_qrd_req'] = irng(zone_rng_time_qrd_req)
+
+    #   rgu_req_scale
+    #   rgd_req_scale
+    #   scr_scale
+    #   nsc_req_scale
+
+    return info
 
 def get_solution_summary(problem_data, solution_data):
 
