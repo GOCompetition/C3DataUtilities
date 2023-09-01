@@ -376,6 +376,7 @@ def scrub_problem(problem_data, config, use_pydantic=False):
         modification.modify_data(problem_data, config)
 
 def ensure_pos_obj_coeffs(problem_data, config, use_pydantic=False):
+    # set to defaults if defaults exist
 
     ensure_pos_c_e(problem_data, config, use_pydantic)
     ensure_pos_c_p(problem_data, config, use_pydantic)
@@ -401,6 +402,16 @@ def ensure_pos_c_e(problem_data, config, use_pydantic=False):
                 problem_data['network']['violation_cost']['e_vio_cost'], default_value)
             print(msg)
             problem_data['network']['violation_cost']['e_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('e_vio_cost_default') is not None:
+            msg = 'e_vio_cost, value: {}, replacing with default value: {}'.format(
+                problem_data['network']['violation_cost']['e_vio_cost'], config.get('e_vio_cost_default'))
+            print(msg)
+            problem_data['network']['violation_cost']['e_vio_cost'] = config.get('e_vio_cost_default')
+    # print('config e_vio_cost_default:')
+    # print(config.get('e_vio_cost_default'))
+    # print('config use_cost_defaults:')
+    # print(config.get('use_cost_defaults'))
 
 def ensure_pos_c_p(problem_data, config, use_pydantic=False):
     '''
@@ -413,6 +424,12 @@ def ensure_pos_c_p(problem_data, config, use_pydantic=False):
                 problem_data['network']['violation_cost']['p_bus_vio_cost'], default_value)
             print(msg)
             problem_data['network']['violation_cost']['p_bus_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('p_bus_vio_cost_default') is not None:
+            msg = 'p_bus_vio_cost, value: {}, replacing with default value: {}'.format(
+                problem_data['network']['violation_cost']['p_bus_vio_cost'], config.get('p_bus_vio_cost_default'))
+            print(msg)
+            problem_data['network']['violation_cost']['p_bus_vio_cost'] = config.get('p_bus_vio_cost_default')
 
 def ensure_pos_c_q(problem_data, config, use_pydantic=False):
     '''
@@ -425,6 +442,12 @@ def ensure_pos_c_q(problem_data, config, use_pydantic=False):
                 problem_data['network']['violation_cost']['q_bus_vio_cost'], default_value)
             print(msg)
             problem_data['network']['violation_cost']['q_bus_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('q_bus_vio_cost_default') is not None:
+            msg = 'q_bus_vio_cost, value: {}, replacing with default value: {}'.format(
+                problem_data['network']['violation_cost']['q_bus_vio_cost'], config.get('q_bus_vio_cost_default'))
+            print(msg)
+            problem_data['network']['violation_cost']['q_bus_vio_cost'] = config.get('q_bus_vio_cost_default')
 
 def ensure_pos_c_s(problem_data, config, use_pydantic=False):
     '''
@@ -437,6 +460,12 @@ def ensure_pos_c_s(problem_data, config, use_pydantic=False):
                 problem_data['network']['violation_cost']['s_vio_cost'], default_value)
             print(msg)
             problem_data['network']['violation_cost']['s_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('s_vio_cost_default') is not None:
+            msg = 's_vio_cost, value: {}, replacing with default value: {}'.format(
+                problem_data['network']['violation_cost']['s_vio_cost'], config.get('s_vio_cost_default'))
+            print(msg)
+            problem_data['network']['violation_cost']['s_vio_cost'] = config.get('s_vio_cost_default')
 
 def ensure_pos_c_rgu(problem_data, config, use_pydantic=False):
     '''
@@ -450,6 +479,13 @@ def ensure_pos_c_rgu(problem_data, config, use_pydantic=False):
                     i['uid'], i['REG_UP_vio_cost'], default_value)
                 print(msg)
                 i['REG_UP_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('REG_UP_vio_cost_default') is not None:
+            for i in problem_data['network']['active_zonal_reserve']:
+                msg = 'REG_UP_vio_cost, zone uid: {}, value: {}, replacing with default value: {}'.format(
+                    i['uid'], i['REG_UP_vio_cost'], config.get('REG_UP_vio_cost_default'))
+                print(msg)
+                i['REG_UP_vio_cost'] = config.get('REG_UP_vio_cost_default')
 
 def ensure_pos_c_rgd(problem_data, config, use_pydantic=False):
     '''
@@ -463,6 +499,13 @@ def ensure_pos_c_rgd(problem_data, config, use_pydantic=False):
                     i['uid'], i['REG_DOWN_vio_cost'], default_value)
                 print(msg)
                 i['REG_DOWN_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('REG_DOWN_vio_cost_default') is not None:
+            for i in problem_data['network']['active_zonal_reserve']:
+                msg = 'REG_DOWN_vio_cost, zone uid: {}, value: {}, replacing with default value: {}'.format(
+                    i['uid'], i['REG_DOWN_vio_cost'], config.get('REG_DOWN_vio_cost_default'))
+                print(msg)
+                i['REG_DOWN_vio_cost'] = config.get('REG_DOWN_vio_cost_default')
 
 def ensure_pos_c_scr(problem_data, config, use_pydantic=False):
     '''
@@ -476,6 +519,13 @@ def ensure_pos_c_scr(problem_data, config, use_pydantic=False):
                     i['uid'], i['SYN_vio_cost'], default_value)
                 print(msg)
                 i['SYN_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('SYN_vio_cost_default') is not None:
+            for i in problem_data['network']['active_zonal_reserve']:
+                msg = 'SYN_vio_cost, zone uid: {}, value: {}, replacing with default value: {}'.format(
+                    i['uid'], i['SYN_vio_cost'], config.get('SYN_vio_cost_default'))
+                print(msg)
+                i['SYN_vio_cost'] = config.get('SYN_vio_cost_default')
 
 def ensure_pos_c_nsc(problem_data, config, use_pydantic=False):
     '''
@@ -489,6 +539,13 @@ def ensure_pos_c_nsc(problem_data, config, use_pydantic=False):
                     i['uid'], i['NSYN_vio_cost'], default_value)
                 print(msg)
                 i['NSYN_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('NSYN_vio_cost_default') is not None:
+            for i in problem_data['network']['active_zonal_reserve']:
+                msg = 'NSYN_vio_cost, zone uid: {}, value: {}, replacing with default value: {}'.format(
+                    i['uid'], i['NSYN_vio_cost'], config.get('NSYN_vio_cost_default'))
+                print(msg)
+                i['NSYN_vio_cost'] = config.get('NSYN_vio_cost_default')
 
 def ensure_pos_c_rru(problem_data, config, use_pydantic=False):
     '''
@@ -502,6 +559,13 @@ def ensure_pos_c_rru(problem_data, config, use_pydantic=False):
                     i['uid'], i['RAMPING_RESERVE_UP_vio_cost'], default_value)
                 print(msg)
                 i['RAMPING_RESERVE_UP_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('RAMPING_RESERVE_UP_vio_cost_default') is not None:
+            for i in problem_data['network']['active_zonal_reserve']:
+                msg = 'RAMPING_RESERVE_UP_vio_cost, zone uid: {}, value: {}, replacing with default value: {}'.format(
+                    i['uid'], i['RAMPING_RESERVE_UP_vio_cost'], config.get('RAMPING_RESERVE_UP_vio_cost_default'))
+                print(msg)
+                i['RAMPING_RESERVE_UP_vio_cost'] = config.get('RAMPING_RESERVE_UP_vio_cost_default')
 
 def ensure_pos_c_rrd(problem_data, config, use_pydantic=False):
     '''
@@ -515,6 +579,13 @@ def ensure_pos_c_rrd(problem_data, config, use_pydantic=False):
                     i['uid'], i['RAMPING_RESERVE_DOWN_vio_cost'], default_value)
                 print(msg)
                 i['RAMPING_RESERVE_DOWN_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('RAMPING_RESERVE_DOWN_vio_cost_default') is not None:
+            for i in problem_data['network']['active_zonal_reserve']:
+                msg = 'RAMPING_RESERVE_DOWN_vio_cost, zone uid: {}, value: {}, replacing with default value: {}'.format(
+                    i['uid'], i['RAMPING_RESERVE_DOWN_vio_cost'], config.get('RAMPING_RESERVE_DOWN_vio_cost_default'))
+                print(msg)
+                i['RAMPING_RESERVE_DOWN_vio_cost'] = config.get('RAMPING_RESERVE_DOWN_vio_cost_default')
 
 def ensure_pos_c_qru(problem_data, config, use_pydantic=False):
     '''
@@ -528,6 +599,13 @@ def ensure_pos_c_qru(problem_data, config, use_pydantic=False):
                     i['uid'], i['REACT_UP_vio_cost'], default_value)
                 print(msg)
                 i['REACT_UP_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('REACT_UP_vio_cost_default') is not None:
+            for i in problem_data['network']['reactive_zonal_reserve']:
+                msg = 'REACT_UP_vio_cost, zone uid: {}, value: {}, replacing with default value: {}'.format(
+                    i['uid'], i['REACT_UP_vio_cost'], config.get('REACT_UP_vio_cost_default'))
+                print(msg)
+                i['REACT_UP_vio_cost'] = config.get('REACT_UP_vio_cost_default')
 
 def ensure_pos_c_qrd(problem_data, config, use_pydantic=False):
     '''
@@ -541,6 +619,13 @@ def ensure_pos_c_qrd(problem_data, config, use_pydantic=False):
                     i['uid'], i['REACT_DOWN_vio_cost'], default_value)
                 print(msg)
                 i['REACT_DOWN_vio_cost'] = default_value
+    if config.get('use_cost_defaults'):
+        if config.get('REACT_DOWN_vio_cost_default') is not None:
+            for i in problem_data['network']['reactive_zonal_reserve']:
+                msg = 'REACT_DOWN_vio_cost, zone uid: {}, value: {}, replacing with default value: {}'.format(
+                    i['uid'], i['REACT_DOWN_vio_cost'], config.get('REACT_DOWN_vio_cost_default'))
+                print(msg)
+                i['REACT_DOWN_vio_cost'] = config.get('REACT_DOWN_vio_cost_default')
 
 def anonymize_uids(problem_data, config, use_pydantic=False):
 
