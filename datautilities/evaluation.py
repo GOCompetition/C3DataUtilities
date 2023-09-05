@@ -228,7 +228,15 @@ class SolutionEvaluator(object):
              'val_type': int,
              'tol': None,
              'num_indices': 0},
+            {'key': 'sum_sd_t_su_t_start',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
             {'key': 'sum_sd_t_sd',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_sd_t_sd_t_start',
              'val_type': int,
              'tol': None,
              'num_indices': 0},
@@ -336,7 +344,15 @@ class SolutionEvaluator(object):
              'val_type': int,
              'tol': None,
              'num_indices': 0},
+            {'key': 'sum_acl_t_u_su_t_start',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
             {'key': 'sum_acl_t_u_sd',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_acl_t_u_sd_t_start',
              'val_type': int,
              'tol': None,
              'num_indices': 0},
@@ -344,7 +360,15 @@ class SolutionEvaluator(object):
              'val_type': int,
              'tol': None,
              'num_indices': 0},
+            {'key': 'sum_xfr_t_u_su_t_start',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
             {'key': 'sum_xfr_t_u_sd',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'sum_xfr_t_u_sd_t_start',
              'val_type': int,
              'tol': None,
              'num_indices': 0},
@@ -736,6 +760,14 @@ class SolutionEvaluator(object):
              'val_type': int,
              'tol': None,
              'num_indices': 0},
+            {'key': 'total_switches_su_t_start',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
+            {'key': 'total_switches_sd_t_start',
+             'val_type': int,
+             'tol': None,
+             'num_indices': 0},
             {'key': 'z_cost',
              'val_type': float,
              'tol': None,
@@ -1079,6 +1111,8 @@ class SolutionEvaluator(object):
     def eval_switches(self):
 
         self.total_switches = self.sum_acl_t_u_su + self.sum_acl_t_u_sd + self.sum_xfr_t_u_su + self.sum_xfr_t_u_sd
+        self.total_switches_su_t_start = self.sum_acl_t_u_su_t_start + self.sum_xfr_t_u_su_t_start # todo 2023-09-05 - what are the new fields?
+        self.total_switches_sd_t_start = self.sum_acl_t_u_sd_t_start + self.sum_xfr_t_u_sd_t_start
 
     def eval_z_cost(self):
 
@@ -2516,7 +2550,9 @@ class SolutionEvaluator(object):
         numpy.negative(self.sd_t_int, out=self.sd_t_int)
         numpy.maximum(self.sd_t_int, 0, out=self.sd_t_u_sd)
         self.sum_sd_t_su = numpy.sum(self.sd_t_u_su)
+        self.sum_sd_t_su_t_start = numpy.sum(self.sd_t_u_su[:,:1])
         self.sum_sd_t_sd = numpy.sum(self.sd_t_u_sd)
+        self.sum_sd_t_sd_t_start = numpy.sum(self.sd_t_u_sd[:,:1])
 
     def eval_sd_t_d_up_min(self):
         '''
@@ -2920,6 +2956,7 @@ class SolutionEvaluator(object):
         if not self.config['acl_switch_up_allowed']:
             self.viol_acl_t_u_su_max = utils.get_max(self.acl_t_int, idx_lists=[self.problem.acl_uid, self.problem.t_num])
         self.sum_acl_t_u_su = numpy.sum(self.acl_t_int)
+        self.sum_acl_t_u_su_t_start = numpy.sum(self.acl_t_int[:,:1])
         numpy.multiply(
             numpy.reshape(self.problem.acl_c_su, newshape=(self.problem.num_acl, 1)), self.acl_t_int, out=self.acl_t_float)
         self.sum_acl_t_z_su = numpy.sum(self.acl_t_float)
@@ -2940,6 +2977,7 @@ class SolutionEvaluator(object):
         if not self.config['acl_switch_dn_allowed']:
             self.viol_acl_t_u_sd_max = utils.get_max(self.acl_t_int, idx_lists=[self.problem.acl_uid, self.problem.t_num])
         self.sum_acl_t_u_sd = numpy.sum(self.acl_t_int)
+        self.sum_acl_t_u_sd_t_start = numpy.sum(self.acl_t_int[:,:1])
         numpy.multiply(
             numpy.reshape(self.problem.acl_c_sd, newshape=(self.problem.num_acl, 1)), self.acl_t_int, out=self.acl_t_float)
         self.sum_acl_t_z_sd = numpy.sum(self.acl_t_float)
@@ -2959,6 +2997,7 @@ class SolutionEvaluator(object):
         if not self.config['xfr_switch_up_allowed']:
             self.viol_xfr_t_u_su_max = utils.get_max(self.xfr_t_int, idx_lists=[self.problem.xfr_uid, self.problem.t_num])
         self.sum_xfr_t_u_su = numpy.sum(self.xfr_t_int)
+        self.sum_xfr_t_u_su_t_start = numpy.sum(self.xfr_t_int[:,:1])
         numpy.multiply(
             numpy.reshape(self.problem.xfr_c_su, newshape=(self.problem.num_xfr, 1)), self.xfr_t_int, out=self.xfr_t_float)
         self.sum_xfr_t_z_su = numpy.sum(self.xfr_t_float)
@@ -2979,6 +3018,7 @@ class SolutionEvaluator(object):
         if not self.config['xfr_switch_dn_allowed']:
             self.viol_xfr_t_u_sd_max = utils.get_max(self.xfr_t_int, idx_lists=[self.problem.xfr_uid, self.problem.t_num])
         self.sum_xfr_t_u_sd = numpy.sum(self.xfr_t_int)
+        self.sum_xfr_t_u_sd_t_start = numpy.sum(self.xfr_t_int[:,:1])
         numpy.multiply(
             numpy.reshape(self.problem.xfr_c_sd, newshape=(self.problem.num_xfr, 1)), self.xfr_t_int, out=self.xfr_t_float)
         self.sum_xfr_t_z_sd = numpy.sum(self.xfr_t_float)
